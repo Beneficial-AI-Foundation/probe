@@ -246,6 +246,54 @@ the envelope, not parse the filename.
 - **`config.json`**: User/project configuration. Not part of the schema spec; it is a
   tool configuration concern.
 
+## Merged-Atoms Envelope Variant
+
+When `probe merge-atoms` produces a merged file, the envelope differs from single-tool
+output:
+
+- `schema` is `"probe/merged-atoms"`.
+- `source` is **omitted** (a merged file spans multiple projects).
+- `inputs` (array, required) replaces `source`. Each entry records the `schema` and
+  `source` object from one input file, preserving full provenance.
+
+```json
+{
+  "schema": "probe/merged-atoms",
+  "schema-version": "2.0",
+  "tool": {
+    "name": "probe",
+    "version": "0.1.0",
+    "command": "merge-atoms"
+  },
+  "inputs": [
+    {
+      "schema": "probe-verus/atoms",
+      "source": {
+        "repo": "https://github.com/ArtificialBreeze/curve25519-dalek",
+        "commit": "a1b2c3d4...",
+        "language": "rust",
+        "package": "curve25519-dalek",
+        "package-version": "4.1.3"
+      }
+    },
+    {
+      "schema": "probe-lean/atoms",
+      "source": {
+        "repo": "https://github.com/ArtificialBreeze/curve25519-dalek-lean-verify",
+        "commit": "f6e5d4c3...",
+        "language": "lean",
+        "package": "Curve25519DalekLeanVerify",
+        "package-version": "0.1.0"
+      }
+    }
+  ],
+  "timestamp": "2026-03-05T15:00:00Z",
+  "data": { }
+}
+```
+
+The full merge algorithm is specified in [merge-algorithm.md](merge-algorithm.md).
+
 ## Rollout
 
 The only consumer of probe output is currently `verilib-cli`, which we control. There is

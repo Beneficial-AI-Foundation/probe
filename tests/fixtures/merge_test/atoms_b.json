@@ -1,0 +1,57 @@
+{
+  "schema": "probe-verus/atoms",
+  "schema-version": "2.0",
+  "tool": {
+    "name": "probe-verus",
+    "version": "2.0.0",
+    "command": "atomize"
+  },
+  "source": {
+    "repo": "https://github.com/example/crate-b",
+    "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "language": "rust",
+    "package": "crate-b",
+    "package-version": "1.0"
+  },
+  "timestamp": "2026-03-05T10:00:00Z",
+  "data": {
+    "probe:crate-b/1.0/helpers/compute()": {
+      "display-name": "compute",
+      "dependencies": [
+        "probe:crate-b/1.0/helpers/validate()"
+      ],
+      "code-module": "helpers",
+      "code-path": "crate-b/src/helpers.rs",
+      "code-text": {
+        "lines-start": 5,
+        "lines-end": 15
+      },
+      "kind": "spec",
+      "language": "rust"
+    },
+    "probe:crate-b/1.0/helpers/validate()": {
+      "display-name": "validate",
+      "dependencies": [],
+      "code-module": "helpers",
+      "code-path": "crate-b/src/helpers.rs",
+      "code-text": {
+        "lines-start": 17,
+        "lines-end": 30
+      },
+      "kind": "proof",
+      "language": "rust"
+    },
+    "probe:crate-b/1.0/helpers/internal()": {
+      "display-name": "internal",
+      "dependencies": [],
+      "code-module": "helpers",
+      "code-path": "crate-b/src/helpers.rs",
+      "code-text": {
+        "lines-start": 32,
+        "lines-end": 40
+      },
+      "kind": "exec",
+      "language": "rust"
+    }
+  }
+}

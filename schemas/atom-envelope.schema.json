@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Beneficial-AI-Foundation/probe/schemas/atom-envelope.schema.json",
+  "title": "Probe Atom Envelope",
+  "description": "Schema 2.0 envelope for probe-* atom files (single-tool and merged).",
+
+  "oneOf": [
+    { "$ref": "#/$defs/singleToolEnvelope" },
+    { "$ref": "#/$defs/mergedAtomsEnvelope" }
+  ],
+
+  "$defs": {
+    "singleToolEnvelope": {
+      "type": "object",
+      "description": "Envelope for a single-tool atom file (e.g., probe-verus/atoms, probe-lean/atoms).",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^probe-(verus|lean|latex)/(atoms|enriched-atoms)$"
+        },
+        "schema-version": { "$ref": "#/$defs/schemaVersion" },
+        "tool": { "$ref": "#/$defs/tool" },
+        "source": { "$ref": "#/$defs/source" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "data": { "$ref": "#/$defs/atomDictionary" }
+      },
+      "required": ["schema", "schema-version", "tool", "source", "timestamp", "data"],
+      "additionalProperties": false
+    },
+
+    "mergedAtomsEnvelope": {
+      "type": "object",
+      "description": "Envelope for a merged atom file produced by probe merge-atoms.",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "const": "probe/merged-atoms"
+        },
+        "schema-version": { "$ref": "#/$defs/schemaVersion" },
+        "tool": { "$ref": "#/$defs/tool" },
+        "inputs": {
+          "type": "array",
+          "description": "Provenance: one entry per input file that was merged.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schema": { "type": "string" },
+              "source": { "$ref": "#/$defs/source" }
+            },
+            "required": ["schema", "source"],
+            "additionalProperties": false
+          },
+          "minItems": 2
+        },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "data": { "$ref": "#/$defs/atomDictionary" }
+      },
+      "required": ["schema", "schema-version", "tool", "inputs", "timestamp", "data"],
+      "additionalProperties": false
+    },
+
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Interchange spec version in <major>.<minor> format."
+    },
+
+    "tool": {
+      "type": "object",
+      "description": "Metadata about the tool that produced this file.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tool identifier (e.g., \"probe-verus\", \"probe-lean\", \"probe\")."
+        },
+        "version": {
+          "type": "string",
+          "description": "Semver version of the tool."
+        },
+        "command": {
+          "type": "string",
+          "description": "The command that produced this file (e.g., \"atomize\", \"merge-atoms\")."
+        }
+      },
+      "required": ["name", "version", "command"],
+      "additionalProperties": false
+    },
+
+    "source": {
+      "type": "object",
+      "description": "Metadata about the analyzed project.",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "description": "Git remote URL of the analyzed project."
+        },
+        "commit": {
+          "type": "string",
+          "description": "Full git commit hash at analysis time."
+        },
+        "language": {
+          "type": "string",
+          "enum": ["rust", "lean", "latex"],
+          "description": "Source language."
+        },
+        "package": {
+          "type": "string",
+          "description": "Package/crate/project name."
+        },
+        "package-version": {
+          "type": "string",
+          "description": "Version identifier (semver or short commit hash)."
+        }
+      },
+      "required": ["repo", "commit", "language", "package", "package-version"],
+      "additionalProperties": false
+    },
+
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the analysis was run."
+    },
+
+    "atomDictionary": {
+      "type": "object",
+      "description": "Dictionary keyed by code-name URI. Each value is an atom.",
+      "additionalProperties": { "$ref": "#/$defs/atom" }
+    },
+
+    "atom": {
+      "type": "object",
+      "description": "A single atom (function, definition, theorem, etc.).",
+      "properties": {
+        "display-name": {
+          "type": "string",
+          "description": "Human-readable name."
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Sorted code-name URIs of referenced atoms."
+        },
+        "code-module": {
+          "type": "string",
+          "description": "Module, namespace, or section path."
+        },
+        "code-path": {
+          "type": "string",
+          "description": "Relative path to source file. Empty for stubs."
+        },
+        "code-text": {
+          "type": "object",
+          "properties": {
+            "lines-start": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "First line (1-based). 0 for stubs."
+            },
+            "lines-end": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Last line (1-based). 0 for stubs."
+            }
+          },
+          "required": ["lines-start", "lines-end"],
+          "additionalProperties": false
+        },
+        "kind": {
+          "type": "string",
+          "description": "Declaration kind. Values are language-specific."
+        },
+        "language": {
+          "type": "string",
+          "enum": ["rust", "lean", "latex"],
+          "description": "Source language of this atom."
+        }
+      },
+      "required": [
+        "display-name",
+        "dependencies",
+        "code-module",
+        "code-path",
+        "code-text",
+        "kind",
+        "language"
+      ],
+      "additionalProperties": true
+    }
+  }
+}

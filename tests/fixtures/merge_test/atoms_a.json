@@ -1,0 +1,72 @@
+{
+  "schema": "probe-verus/atoms",
+  "schema-version": "2.0",
+  "tool": {
+    "name": "probe-verus",
+    "version": "2.0.0",
+    "command": "atomize"
+  },
+  "source": {
+    "repo": "https://github.com/example/crate-a",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "language": "rust",
+    "package": "crate-a",
+    "package-version": "1.0"
+  },
+  "timestamp": "2026-03-05T10:00:00Z",
+  "data": {
+    "probe:crate-a/1.0/lib/main()": {
+      "display-name": "main",
+      "dependencies": [
+        "probe:crate-a/1.0/lib/process()",
+        "probe:crate-b/1.0/helpers/compute()"
+      ],
+      "code-module": "lib",
+      "code-path": "crate-a/src/lib.rs",
+      "code-text": {
+        "lines-start": 1,
+        "lines-end": 10
+      },
+      "kind": "exec",
+      "language": "rust"
+    },
+    "probe:crate-a/1.0/lib/process()": {
+      "display-name": "process",
+      "dependencies": [
+        "probe:crate-b/1.0/helpers/validate()"
+      ],
+      "code-module": "lib",
+      "code-path": "crate-a/src/lib.rs",
+      "code-text": {
+        "lines-start": 12,
+        "lines-end": 25
+      },
+      "kind": "exec",
+      "language": "rust"
+    },
+    "probe:crate-b/1.0/helpers/compute()": {
+      "display-name": "compute",
+      "dependencies": [],
+      "code-module": "",
+      "code-path": "",
+      "code-text": {
+        "lines-start": 0,
+        "lines-end": 0
+      },
+      "kind": "exec",
+      "language": "rust"
+    },
+    "probe:crate-b/1.0/helpers/validate()": {
+      "display-name": "validate",
+      "dependencies": [],
+      "code-module": "",
+      "code-path": "",
+      "code-text": {
+        "lines-start": 0,
+        "lines-end": 0
+      },
+      "kind": "exec",
+      "language": "rust"
+    }
+  }
+}
