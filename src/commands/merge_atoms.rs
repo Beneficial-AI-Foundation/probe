@@ -1,6 +1,4 @@
-use crate::types::{
-    Atom, InputProvenance, MergedAtomEnvelope, Source, Tool, load_atom_file,
-};
+use crate::types::{load_atom_file, Atom, InputProvenance, MergedAtomEnvelope, Source, Tool};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -21,9 +19,7 @@ pub struct MergeStats {
 
 /// Normalize all keys and dependency references in an atom map.
 /// Returns the normalized map and a count of keys that changed.
-fn normalize_atoms(
-    atoms: BTreeMap<String, Atom>,
-) -> (BTreeMap<String, Atom>, usize) {
+fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, usize) {
     let mut out: BTreeMap<String, Atom> = BTreeMap::new();
     let mut changed = 0;
 
@@ -74,9 +70,7 @@ fn normalize_atoms(
 /// - Stubs in the base are replaced by real atoms from the incoming map.
 /// - New atoms (not in base) are added.
 /// - Real-vs-real conflicts keep the base version (first wins).
-pub fn merge_atom_maps(
-    maps: Vec<BTreeMap<String, Atom>>,
-) -> (BTreeMap<String, Atom>, MergeStats) {
+pub fn merge_atom_maps(maps: Vec<BTreeMap<String, Atom>>) -> (BTreeMap<String, Atom>, MergeStats) {
     let mut stats = MergeStats {
         total_atoms: 0,
         stubs_replaced: 0,
@@ -298,10 +292,7 @@ mod tests {
     #[test]
     fn test_trailing_dot_normalization() {
         let mut base = BTreeMap::new();
-        base.insert(
-            "probe:a/1.0/mod/f().".to_string(),
-            make_stub("f", "rust"),
-        );
+        base.insert("probe:a/1.0/mod/f().".to_string(), make_stub("f", "rust"));
 
         let mut incoming = BTreeMap::new();
         incoming.insert(
@@ -335,14 +326,8 @@ mod tests {
 
         assert_eq!(stats.atoms_added, 1);
         assert_eq!(merged.len(), 2);
-        assert_eq!(
-            merged["probe:dalek/4.1.3/scalar/add()"].language,
-            "rust"
-        );
-        assert_eq!(
-            merged["probe:Curve25519Dalek.Scalar.add"].language,
-            "lean"
-        );
+        assert_eq!(merged["probe:dalek/4.1.3/scalar/add()"].language, "rust");
+        assert_eq!(merged["probe:Curve25519Dalek.Scalar.add"].language, "lean");
     }
 
     #[test]

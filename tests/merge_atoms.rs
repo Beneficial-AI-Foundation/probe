@@ -75,14 +75,20 @@ fn test_merge_fixtures_match_expected() {
     assert_eq!(main_fn.code_text.lines_end, 10);
     assert_eq!(main_fn.kind, "exec");
     assert_eq!(main_fn.language, "rust");
-    assert!(main_fn.dependencies.contains("probe:crate-a/1.0/lib/process()"));
-    assert!(main_fn.dependencies.contains("probe:crate-b/1.0/helpers/compute()"));
+    assert!(main_fn
+        .dependencies
+        .contains("probe:crate-a/1.0/lib/process()"));
+    assert!(main_fn
+        .dependencies
+        .contains("probe:crate-b/1.0/helpers/compute()"));
 
     let process_fn = &merged["probe:crate-a/1.0/lib/process()"];
     assert_eq!(process_fn.display_name, "process");
     assert_eq!(process_fn.code_path, "crate-a/src/lib.rs");
     assert_eq!(process_fn.kind, "exec");
-    assert!(process_fn.dependencies.contains("probe:crate-b/1.0/helpers/validate()"));
+    assert!(process_fn
+        .dependencies
+        .contains("probe:crate-b/1.0/helpers/validate()"));
 
     let compute_fn = &merged["probe:crate-b/1.0/helpers/compute()"];
     assert_eq!(compute_fn.display_name, "compute");
@@ -91,7 +97,9 @@ fn test_merge_fixtures_match_expected() {
     assert_eq!(compute_fn.code_text.lines_end, 15);
     assert_eq!(compute_fn.kind, "spec");
     assert_eq!(compute_fn.code_module, "helpers");
-    assert!(compute_fn.dependencies.contains("probe:crate-b/1.0/helpers/validate()"));
+    assert!(compute_fn
+        .dependencies
+        .contains("probe:crate-b/1.0/helpers/validate()"));
 
     let validate_fn = &merged["probe:crate-b/1.0/helpers/validate()"];
     assert_eq!(validate_fn.display_name, "validate");
@@ -139,13 +147,17 @@ fn test_merge_cross_project_edges_preserved() {
 
     let main_fn = &merged["probe:crate-a/1.0/lib/main()"];
     assert!(
-        main_fn.dependencies.contains("probe:crate-b/1.0/helpers/compute()"),
+        main_fn
+            .dependencies
+            .contains("probe:crate-b/1.0/helpers/compute()"),
         "main() should depend on compute()"
     );
 
     let process_fn = &merged["probe:crate-a/1.0/lib/process()"];
     assert!(
-        process_fn.dependencies.contains("probe:crate-b/1.0/helpers/validate()"),
+        process_fn
+            .dependencies
+            .contains("probe:crate-b/1.0/helpers/validate()"),
         "process() should depend on validate()"
     );
 }
