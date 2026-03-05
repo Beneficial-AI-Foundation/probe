@@ -401,3 +401,10 @@ This specification follows semver:
 
 Consumers should check `schema-version` major version for compatibility and ignore
 unknown optional fields for forward compatibility.
+
+## JSON Schema
+
+A machine-readable JSON Schema for the envelope and core atom fields is maintained at
+[`schemas/atom-envelope.schema.json`](../schemas/atom-envelope.schema.json). All
+`probe-*` codebases should validate their output against this schema in tests. See the
+project [README](../README.md#json-schema) for usage examples in Rust, Lean, and CI.
