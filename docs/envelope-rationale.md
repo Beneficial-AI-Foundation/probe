@@ -246,51 +246,6 @@ the envelope, not parse the filename.
 - **`config.json`**: User/project configuration. Not part of the schema spec; it is a
   tool configuration concern.
 
-## Industry Standards Comparison
-
-The envelope design draws from five established standards:
-
-**SARIF** (OASIS, static analysis results): Uses `$schema` URI, `version`, and `runs[]`
-array with tool metadata. Probe takes the structured `tool` object pattern and the idea of
-separating runs. Probe does not take SARIF's verbosity or `$schema` URI (premature).
-
-**CycloneDX** (ECMA-424, software bill of materials): Uses `bomFormat`, `specVersion`,
-`metadata.timestamp`, `metadata.tools`, `metadata.component`. Probe takes the structured
-source/component metadata, timestamp, and the idea that each file should be
-self-identifying.
-
-**SCIP** (Sourcegraph, code intelligence): Uses Protobuf with fully-qualified symbol URIs.
-Probe's `code-name` URI scheme is well-aligned. Probe uses JSON instead of Protobuf for
-human readability.
-
-**SPDX 3.0** (Linux Foundation, software package data): Uses JSON-LD with `creationInfo`
-(who, when, with what tool). Probe takes the provenance pattern but not JSON-LD (too
-heavy).
-
-**Code Property Graph** (Joern/ShiftLeft): Uses layered graph representation with metadata,
-namespace, callgraph layers. Probe's `probes/` folder (one file per analysis) parallels
-the layer concept.
-
-### What is standard vs. novel
-
-Standard (well-established in industry):
-- Envelope with schema identifier, schema version, tool version
-- Structured source/component metadata (repo, commit, version)
-- Timestamps
-- URI-based identifiers for atoms
-- Language-agnostic core fields with language-specific extensions
-
-Novel (probe-specific):
-- The `views/` concept (filtered projections of atom data)
-- The `translations/` concept (cross-language atom mappings)
-- The `probes/` folder convention (one file per language-package-version analysis)
-- The `kind` field taxonomy (exec/proof/spec for Verus; def/theorem/lemma for Lean)
-
-Pragmatic departures from standards:
-- Not using JSON-LD (too heavy; SPDX's choice is widely criticized)
-- Not using Protobuf (JSON is better for human debugging; data volumes are small)
-- Flat dictionary keyed by code-name rather than array of objects (matches lookup patterns)
-
 ## Rollout
 
 The only consumer of probe output is currently `verilib-cli`, which we control. There is
@@ -308,5 +263,3 @@ All three changes can be coordinated in lockstep.
   `$schema` URI to the envelope.
 - **Provenance tracking for views**: When views combine data from multiple probes, record
   which probe files were inputs (`sources` field in view envelope).
-- **UUID serial numbers**: Assign each generated file a unique ID for deduplication and
-  audit trails.
