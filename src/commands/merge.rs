@@ -275,8 +275,7 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf) {
                 data: merged,
             };
 
-            let json =
-                serde_json::to_string_pretty(&envelope).expect("Failed to serialize JSON");
+            let json = serde_json::to_string_pretty(&envelope).expect("Failed to serialize JSON");
             std::fs::write(&output, &json).expect("Failed to write output file");
 
             print_stats(&output, &stats);
@@ -310,8 +309,7 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf) {
                 data: merged,
             };
 
-            let json =
-                serde_json::to_string_pretty(&envelope).expect("Failed to serialize JSON");
+            let json = serde_json::to_string_pretty(&envelope).expect("Failed to serialize JSON");
             std::fs::write(&output, &json).expect("Failed to write output file");
 
             print_stats(&output, &stats);
@@ -544,8 +542,22 @@ mod tests {
             "data": data_b
         });
 
-        std::fs::File::create(&file_a).unwrap().write_all(serde_json::to_string_pretty(&envelope_a).unwrap().as_bytes()).unwrap();
-        std::fs::File::create(&file_b).unwrap().write_all(serde_json::to_string_pretty(&envelope_b).unwrap().as_bytes()).unwrap();
+        std::fs::File::create(&file_a)
+            .unwrap()
+            .write_all(
+                serde_json::to_string_pretty(&envelope_a)
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
+        std::fs::File::create(&file_b)
+            .unwrap()
+            .write_all(
+                serde_json::to_string_pretty(&envelope_b)
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
 
         let (atoms_a, prov_a) = load_atom_file(&file_a).unwrap();
         let (atoms_b, prov_b) = load_atom_file(&file_b).unwrap();
@@ -563,14 +575,25 @@ mod tests {
         let merged_envelope = MergedAtomEnvelope {
             schema: "probe/merged-atoms".to_string(),
             schema_version: "2.0".to_string(),
-            tool: Tool { name: "probe".to_string(), version: "0.1.0".to_string(), command: "merge".to_string() },
+            tool: Tool {
+                name: "probe".to_string(),
+                version: "0.1.0".to_string(),
+                command: "merge".to_string(),
+            },
             inputs: all_prov,
             timestamp: "2025-01-01T00:00:00Z".to_string(),
             data: merged_data,
         };
 
         let merged_file = dir.path().join("merged_ab.json");
-        std::fs::File::create(&merged_file).unwrap().write_all(serde_json::to_string_pretty(&merged_envelope).unwrap().as_bytes()).unwrap();
+        std::fs::File::create(&merged_file)
+            .unwrap()
+            .write_all(
+                serde_json::to_string_pretty(&merged_envelope)
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
 
         let file_c = dir.path().join("c.json");
         let atom_c = make_real_atom("baz", "src/c.rs", "rust", "exec");
@@ -585,15 +608,29 @@ mod tests {
             "timestamp": "2025-01-01T00:00:00Z",
             "data": data_c
         });
-        std::fs::File::create(&file_c).unwrap().write_all(serde_json::to_string_pretty(&envelope_c).unwrap().as_bytes()).unwrap();
+        std::fs::File::create(&file_c)
+            .unwrap()
+            .write_all(
+                serde_json::to_string_pretty(&envelope_c)
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
 
         let (atoms_merged, prov_merged) = load_atom_file(&merged_file).unwrap();
         let (atoms_c, prov_c) = load_atom_file(&file_c).unwrap();
 
-        assert_eq!(prov_merged.len(), 2, "merged file provenance should be flattened");
+        assert_eq!(
+            prov_merged.len(),
+            2,
+            "merged file provenance should be flattened"
+        );
         assert_eq!(prov_c.len(), 1);
 
-        let packages: Vec<&str> = prov_merged.iter().map(|p| p.source.package.as_str()).collect();
+        let packages: Vec<&str> = prov_merged
+            .iter()
+            .map(|p| p.source.package.as_str())
+            .collect();
         assert!(packages.contains(&"pkg-a"));
         assert!(packages.contains(&"pkg-b"));
         assert_eq!(prov_c[0].source.package, "pkg-c");
@@ -604,9 +641,16 @@ mod tests {
         final_prov.extend(prov_c);
 
         assert_eq!(final_data.len(), 3);
-        assert_eq!(final_prov.len(), 3, "final provenance should have all 3 original sources");
+        assert_eq!(
+            final_prov.len(),
+            3,
+            "final provenance should have all 3 original sources"
+        );
 
-        let final_packages: Vec<&str> = final_prov.iter().map(|p| p.source.package.as_str()).collect();
+        let final_packages: Vec<&str> = final_prov
+            .iter()
+            .map(|p| p.source.package.as_str())
+            .collect();
         assert!(final_packages.contains(&"pkg-a"));
         assert!(final_packages.contains(&"pkg-b"));
         assert!(final_packages.contains(&"pkg-c"));
@@ -704,8 +748,22 @@ mod tests {
             }
         });
 
-        std::fs::File::create(&file_a).unwrap().write_all(serde_json::to_string_pretty(&envelope_a).unwrap().as_bytes()).unwrap();
-        std::fs::File::create(&file_b).unwrap().write_all(serde_json::to_string_pretty(&envelope_b).unwrap().as_bytes()).unwrap();
+        std::fs::File::create(&file_a)
+            .unwrap()
+            .write_all(
+                serde_json::to_string_pretty(&envelope_a)
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
+        std::fs::File::create(&file_b)
+            .unwrap()
+            .write_all(
+                serde_json::to_string_pretty(&envelope_b)
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
 
         let (data_a, prov_a, cat_a) = load_generic_file(&file_a).unwrap();
         let (data_b, prov_b, cat_b) = load_generic_file(&file_b).unwrap();
@@ -721,19 +779,34 @@ mod tests {
         let merged_envelope = MergedGenericEnvelope {
             schema: "probe/merged-specs".to_string(),
             schema_version: "2.0".to_string(),
-            tool: Tool { name: "probe".to_string(), version: "0.1.0".to_string(), command: "merge".to_string() },
+            tool: Tool {
+                name: "probe".to_string(),
+                version: "0.1.0".to_string(),
+                command: "merge".to_string(),
+            },
             inputs: all_prov,
             timestamp: "2025-01-01T00:00:00Z".to_string(),
             data: merged_data,
         };
 
         let merged_file = dir.path().join("merged_specs.json");
-        std::fs::File::create(&merged_file).unwrap().write_all(serde_json::to_string_pretty(&merged_envelope).unwrap().as_bytes()).unwrap();
+        std::fs::File::create(&merged_file)
+            .unwrap()
+            .write_all(
+                serde_json::to_string_pretty(&merged_envelope)
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
 
         // Load the merged file back and verify provenance is flattened.
         let (_data, prov, cat) = load_generic_file(&merged_file).unwrap();
         assert_eq!(cat, SchemaCategory::Specs);
-        assert_eq!(prov.len(), 2, "merged specs should carry both original provenance entries");
+        assert_eq!(
+            prov.len(),
+            2,
+            "merged specs should carry both original provenance entries"
+        );
 
         let packages: Vec<&str> = prov.iter().map(|p| p.source.package.as_str()).collect();
         assert!(packages.contains(&"pkg-a"));
@@ -744,15 +817,42 @@ mod tests {
     fn test_category_detection() {
         use crate::types::detect_category;
 
-        assert_eq!(detect_category("probe-verus/atoms"), Some(SchemaCategory::Atoms));
-        assert_eq!(detect_category("probe-lean/enriched-atoms"), Some(SchemaCategory::Atoms));
-        assert_eq!(detect_category("probe/merged-atoms"), Some(SchemaCategory::Atoms));
-        assert_eq!(detect_category("probe-verus/specs"), Some(SchemaCategory::Specs));
-        assert_eq!(detect_category("probe-lean/specs"), Some(SchemaCategory::Specs));
-        assert_eq!(detect_category("probe/merged-specs"), Some(SchemaCategory::Specs));
-        assert_eq!(detect_category("probe-verus/proofs"), Some(SchemaCategory::Proofs));
-        assert_eq!(detect_category("probe-lean/proofs"), Some(SchemaCategory::Proofs));
-        assert_eq!(detect_category("probe/merged-proofs"), Some(SchemaCategory::Proofs));
+        assert_eq!(
+            detect_category("probe-verus/atoms"),
+            Some(SchemaCategory::Atoms)
+        );
+        assert_eq!(
+            detect_category("probe-lean/enriched-atoms"),
+            Some(SchemaCategory::Atoms)
+        );
+        assert_eq!(
+            detect_category("probe/merged-atoms"),
+            Some(SchemaCategory::Atoms)
+        );
+        assert_eq!(
+            detect_category("probe-verus/specs"),
+            Some(SchemaCategory::Specs)
+        );
+        assert_eq!(
+            detect_category("probe-lean/specs"),
+            Some(SchemaCategory::Specs)
+        );
+        assert_eq!(
+            detect_category("probe/merged-specs"),
+            Some(SchemaCategory::Specs)
+        );
+        assert_eq!(
+            detect_category("probe-verus/proofs"),
+            Some(SchemaCategory::Proofs)
+        );
+        assert_eq!(
+            detect_category("probe-lean/proofs"),
+            Some(SchemaCategory::Proofs)
+        );
+        assert_eq!(
+            detect_category("probe/merged-proofs"),
+            Some(SchemaCategory::Proofs)
+        );
         assert_eq!(detect_category("probe-verus/stubs"), None);
         assert_eq!(detect_category("something-else"), None);
     }
@@ -784,14 +884,23 @@ mod tests {
             "data": {"probe:a/1.0/f()": {"display-name": "f", "dependencies": [], "code-module": "", "code-path": "a.rs", "code-text": {"lines-start": 1, "lines-end": 10}, "kind": "exec", "language": "rust"}}
         });
 
-        std::fs::File::create(&specs_file).unwrap().write_all(serde_json::to_string_pretty(&specs).unwrap().as_bytes()).unwrap();
-        std::fs::File::create(&atoms_file).unwrap().write_all(serde_json::to_string_pretty(&atoms).unwrap().as_bytes()).unwrap();
+        std::fs::File::create(&specs_file)
+            .unwrap()
+            .write_all(serde_json::to_string_pretty(&specs).unwrap().as_bytes())
+            .unwrap();
+        std::fs::File::create(&atoms_file)
+            .unwrap()
+            .write_all(serde_json::to_string_pretty(&atoms).unwrap().as_bytes())
+            .unwrap();
 
         let (_, _, cat_s) = load_generic_file(&specs_file).unwrap();
         let (_, _, cat_a) = load_generic_file(&atoms_file).unwrap();
 
         assert_eq!(cat_s, SchemaCategory::Specs);
         assert_eq!(cat_a, SchemaCategory::Atoms);
-        assert_ne!(cat_s, cat_a, "different categories should be distinguishable");
+        assert_ne!(
+            cat_s, cat_a,
+            "different categories should be distinguishable"
+        );
     }
 }
