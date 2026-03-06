@@ -129,9 +129,13 @@ Known values:
 - `probe-verus/atoms` -- Rust/Verus call graph atoms
 - `probe-verus/specs` -- Rust/Verus function specifications
 - `probe-verus/proofs` -- Rust/Verus verification results
+- `probe-verus/stubs` -- Rust/Verus stubs (output of the `stubify` command)
+- `probe-verus/verification-report` -- Rust/Verus verification report (output of `verify` without atoms enrichment)
 - `probe-lean/atoms` -- Lean call graph atoms
 - `probe-lean/specs` -- Lean function specifications
 - `probe-lean/proofs` -- Lean verification results
+- `probe-lean/stubs` -- Lean stubs (output of the `stubify` command)
+- `probe-lean/enriched-atoms` -- Lean enriched atoms (atoms augmented with specs/proofs)
 - `probe/merged-atoms` -- merged atoms from multiple tools
 
 New tools register their schema values by adding them to this list.
