@@ -91,13 +91,19 @@ impl Atom {
     }
 }
 
-/// Result of loading an atom file: data dictionary, schema string, and optional source.
-pub type LoadResult = (BTreeMap<String, Atom>, String, Option<Source>);
+/// Result of loading an atom file: data dictionary and provenance entries.
+///
+/// For single-tool files the vec contains one entry (from the `source` field).
+/// For merged files the vec contains the flattened `inputs` array, preserving
+/// the original provenance through repeated merges.
+pub type LoadResult = (BTreeMap<String, Atom>, Vec<InputProvenance>);
 
 /// Load a Schema 2.0 atom file, extracting the data dictionary from the envelope.
 ///
-/// Accepts both single-tool and merged-atoms envelopes. Returns the atom data,
-/// the `schema` string, and the `source` object (None for merged files).
+/// Accepts both single-tool and merged-atoms envelopes. For single-tool files
+/// the provenance is built from the top-level `source` object. For merged files
+/// the `inputs` array is returned directly so provenance is carried forward
+/// across recursive merges.
 pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
@@ -138,9 +144,29 @@ pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
     let data: BTreeMap<String, Atom> = serde_json::from_value(data_value.clone())
         .map_err(|e| format!("{}: failed to deserialize atoms: {e}", path.display()))?;
 
-    let source = raw
-        .get("source")
-        .and_then(|v| serde_json::from_value::<Source>(v.clone()).ok());
+    let provenance = if schema == "probe/merged-atoms" {
+        raw.get("inputs")
+            .and_then(|v| serde_json::from_value::<Vec<InputProvenance>>(v.clone()).ok())
+            .unwrap_or_default()
+    } else {
+        let source = raw
+            .get("source")
+            .and_then(|v| serde_json::from_value::<Source>(v.clone()).ok())
+            .unwrap_or_else(|| Source {
+                repo: String::new(),
+                commit: String::new(),
+                language: String::new(),
+                package: path.file_stem().map_or_else(
+                    || "unknown".to_string(),
+                    |s| s.to_string_lossy().to_string(),
+                ),
+                package_version: String::new(),
+            });
+        vec![InputProvenance {
+            schema: schema.to_string(),
+            source,
+        }]
+    };
 
-    Ok((data, schema.to_string(), source))
+    Ok((data, provenance))
 }

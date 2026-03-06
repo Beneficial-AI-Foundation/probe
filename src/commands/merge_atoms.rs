@@ -1,4 +1,4 @@
-use crate::types::{load_atom_file, Atom, InputProvenance, MergedAtomEnvelope, Source, Tool};
+use crate::types::{load_atom_file, Atom, MergedAtomEnvelope, Tool};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -130,22 +130,10 @@ pub fn cmd_merge_atoms(inputs: Vec<PathBuf>, output: PathBuf) {
     for path in &inputs {
         println!("  Loading {}...", path.display());
         match load_atom_file(path) {
-            Ok((atoms, schema, source)) => {
-                println!("    {} atoms loaded", atoms.len());
+            Ok((atoms, input_provenance)) => {
+                println!("    {} atoms loaded ({} provenance entries)", atoms.len(), input_provenance.len());
                 maps.push(atoms);
-                provenance.push(InputProvenance {
-                    schema,
-                    source: source.unwrap_or_else(|| Source {
-                        repo: String::new(),
-                        commit: String::new(),
-                        language: String::new(),
-                        package: path.file_stem().map_or_else(
-                            || "unknown".to_string(),
-                            |s| s.to_string_lossy().to_string(),
-                        ),
-                        package_version: String::new(),
-                    }),
-                });
+                provenance.extend(input_provenance);
             }
             Err(e) => {
                 eprintln!("Error: {e}");
@@ -354,5 +342,115 @@ mod tests {
 
         let f = &merged["probe:a/1.0/f()"];
         assert!(f.extensions.contains_key("dependencies-with-locations"));
+    }
+
+    #[test]
+    fn test_recursive_merge_flattens_provenance() {
+        use crate::types::{load_atom_file, MergedAtomEnvelope, Tool};
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+
+        // --- Write two single-source atom files (A and B) ---
+        let file_a = dir.path().join("a.json");
+        let file_b = dir.path().join("b.json");
+        let atom_a = make_real_atom("foo", "src/a.rs", "rust", "exec");
+        let atom_b = make_real_atom("bar", "src/b.rs", "lean", "def");
+
+        let mut data_a = BTreeMap::new();
+        data_a.insert("probe:a/1.0/mod/foo()".to_string(), atom_a);
+
+        let mut data_b = BTreeMap::new();
+        data_b.insert("probe:b/1.0/mod/bar()".to_string(), atom_b);
+
+        let envelope_a = serde_json::json!({
+            "schema": "verus-analyzer/atoms",
+            "schema-version": "2.0",
+            "tool": {"name": "probe", "version": "0.1.0", "command": "extract"},
+            "source": {"repo": "repo-a", "commit": "aaa", "language": "rust", "package": "pkg-a", "package-version": "1.0"},
+            "timestamp": "2025-01-01T00:00:00Z",
+            "data": data_a
+        });
+        let envelope_b = serde_json::json!({
+            "schema": "lean-analyzer/atoms",
+            "schema-version": "2.0",
+            "tool": {"name": "probe", "version": "0.1.0", "command": "extract"},
+            "source": {"repo": "repo-b", "commit": "bbb", "language": "lean", "package": "pkg-b", "package-version": "2.0"},
+            "timestamp": "2025-01-01T00:00:00Z",
+            "data": data_b
+        });
+
+        std::fs::File::create(&file_a).unwrap().write_all(serde_json::to_string_pretty(&envelope_a).unwrap().as_bytes()).unwrap();
+        std::fs::File::create(&file_b).unwrap().write_all(serde_json::to_string_pretty(&envelope_b).unwrap().as_bytes()).unwrap();
+
+        // --- Load A and B, verify provenance ---
+        let (atoms_a, prov_a) = load_atom_file(&file_a).unwrap();
+        let (atoms_b, prov_b) = load_atom_file(&file_b).unwrap();
+        assert_eq!(prov_a.len(), 1);
+        assert_eq!(prov_a[0].source.package, "pkg-a");
+        assert_eq!(prov_b.len(), 1);
+        assert_eq!(prov_b[0].source.package, "pkg-b");
+
+        // --- Simulate first merge: A + B → merged file ---
+        let (merged_data, _stats) = merge_atom_maps(vec![atoms_a, atoms_b]);
+
+        let mut all_prov = Vec::new();
+        all_prov.extend(prov_a);
+        all_prov.extend(prov_b);
+
+        let merged_envelope = MergedAtomEnvelope {
+            schema: "probe/merged-atoms".to_string(),
+            schema_version: "2.0".to_string(),
+            tool: Tool { name: "probe".to_string(), version: "0.1.0".to_string(), command: "merge-atoms".to_string() },
+            inputs: all_prov,
+            timestamp: "2025-01-01T00:00:00Z".to_string(),
+            data: merged_data,
+        };
+
+        let merged_file = dir.path().join("merged_ab.json");
+        std::fs::File::create(&merged_file).unwrap().write_all(serde_json::to_string_pretty(&merged_envelope).unwrap().as_bytes()).unwrap();
+
+        // --- Write a third single-source file (C) ---
+        let file_c = dir.path().join("c.json");
+        let atom_c = make_real_atom("baz", "src/c.rs", "rust", "exec");
+        let mut data_c = BTreeMap::new();
+        data_c.insert("probe:c/1.0/mod/baz()".to_string(), atom_c);
+
+        let envelope_c = serde_json::json!({
+            "schema": "verus-analyzer/atoms",
+            "schema-version": "2.0",
+            "tool": {"name": "probe", "version": "0.1.0", "command": "extract"},
+            "source": {"repo": "repo-c", "commit": "ccc", "language": "rust", "package": "pkg-c", "package-version": "3.0"},
+            "timestamp": "2025-01-01T00:00:00Z",
+            "data": data_c
+        });
+        std::fs::File::create(&file_c).unwrap().write_all(serde_json::to_string_pretty(&envelope_c).unwrap().as_bytes()).unwrap();
+
+        // --- Load merged_ab and C, verify flattened provenance ---
+        let (atoms_merged, prov_merged) = load_atom_file(&merged_file).unwrap();
+        let (atoms_c, prov_c) = load_atom_file(&file_c).unwrap();
+
+        // The merged file should yield 2 provenance entries (A and B), not 1.
+        assert_eq!(prov_merged.len(), 2, "merged file provenance should be flattened");
+        assert_eq!(prov_c.len(), 1);
+
+        let packages: Vec<&str> = prov_merged.iter().map(|p| p.source.package.as_str()).collect();
+        assert!(packages.contains(&"pkg-a"));
+        assert!(packages.contains(&"pkg-b"));
+        assert_eq!(prov_c[0].source.package, "pkg-c");
+
+        // Simulate second merge: merged_ab + C
+        let (final_data, _) = merge_atom_maps(vec![atoms_merged, atoms_c]);
+        let mut final_prov = Vec::new();
+        final_prov.extend(prov_merged);
+        final_prov.extend(prov_c);
+
+        assert_eq!(final_data.len(), 3);
+        assert_eq!(final_prov.len(), 3, "final provenance should have all 3 original sources");
+
+        let final_packages: Vec<&str> = final_prov.iter().map(|p| p.source.package.as_str()).collect();
+        assert!(final_packages.contains(&"pkg-a"));
+        assert!(final_packages.contains(&"pkg-b"));
+        assert!(final_packages.contains(&"pkg-c"));
     }
 }
