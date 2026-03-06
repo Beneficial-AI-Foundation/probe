@@ -1,0 +1,37 @@
+{
+  "schema": "probe-verus/proofs",
+  "schema-version": "2.0",
+  "tool": {
+    "name": "probe-verus",
+    "version": "2.0.0",
+    "command": "verify"
+  },
+  "source": {
+    "repo": "https://github.com/example/crate-a",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "language": "rust",
+    "package": "crate-a",
+    "package-version": "1.0"
+  },
+  "timestamp": "2026-03-05T10:00:00Z",
+  "data": {
+    "probe:crate-a/1.0/lib/main()": {
+      "code-path": "crate-a/src/lib.rs",
+      "code-line": 1,
+      "verified": true,
+      "status": "success"
+    },
+    "probe:crate-a/1.0/lib/process()": {
+      "code-path": "crate-a/src/lib.rs",
+      "code-line": 12,
+      "verified": false,
+      "status": "failure"
+    },
+    "probe:crate-b/1.0/helpers/compute()": {
+      "code-path": "crate-b/src/helpers.rs",
+      "code-line": 5,
+      "verified": false,
+      "status": "failure"
+    }
+  }
+}

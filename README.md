@@ -6,7 +6,7 @@ This repository contains:
 
 - **Specification documents** defining the interchange format for atom files
 - **JSON Schema** for machine-validatable envelope and atom structure
-- **`probe` CLI** for cross-tool operations (currently: `merge-atoms`)
+- **`probe` CLI** for cross-tool operations (currently: `merge`)
 
 ## Specification
 
@@ -21,8 +21,8 @@ This repository contains:
 # Build
 cargo build
 
-# Merge atom files from different probe tools
-probe merge-atoms verus_atoms.json lean_atoms.json -o merged.json
+# Merge data files from different probe tools (atoms, specs, or proofs)
+probe merge verus_atoms.json lean_atoms.json -o merged.json
 
 # Run tests
 cargo test
@@ -78,7 +78,7 @@ curl -sL https://raw.githubusercontent.com/Beneficial-AI-Foundation/probe/main/s
 ### What the schema covers
 
 - **Envelope structure**: `schema`, `schema-version`, `tool`, `source`/`inputs`, `timestamp`, `data`
-- **Single-tool vs merged**: discriminated by the `schema` field (`probe-*/atoms` vs `probe/merged-atoms`)
+- **Single-tool vs merged**: discriminated by the `schema` field (`probe-*/atoms` vs `probe/merged-*`)
 - **Core atom fields**: `display-name`, `dependencies`, `code-module`, `code-path`, `code-text`, `kind`, `language`
 - **Extensions**: `additionalProperties: true` on atoms allows language-specific fields to pass through
 

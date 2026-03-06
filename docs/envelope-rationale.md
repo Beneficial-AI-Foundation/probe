@@ -137,6 +137,8 @@ Known values:
 - `probe-lean/stubs` -- Lean stubs (output of the `stubify` command)
 - `probe-lean/enriched-atoms` -- Lean enriched atoms (atoms augmented with specs/proofs)
 - `probe/merged-atoms` -- merged atoms from multiple tools
+- `probe/merged-specs` -- merged specs from multiple tools
+- `probe/merged-proofs` -- merged proofs from multiple tools
 
 New tools register their schema values by adding them to this list.
 
@@ -250,15 +252,17 @@ the envelope, not parse the filename.
 - **`config.json`**: User/project configuration. Not part of the schema spec; it is a
   tool configuration concern.
 
-## Merged-Atoms Envelope Variant
+## Merged Envelope Variant
 
-When `probe merge-atoms` produces a merged file, the envelope differs from single-tool
-output:
+When `probe merge` produces a merged file, the envelope differs from single-tool output:
 
-- `schema` is `"probe/merged-atoms"`.
+- `schema` is set based on the input category: `"probe/merged-atoms"`,
+  `"probe/merged-specs"`, or `"probe/merged-proofs"`.
 - `source` is **omitted** (a merged file spans multiple projects).
 - `inputs` (array, required) replaces `source`. Each entry records the `schema` and
-  `source` object from one input file, preserving full provenance.
+  `source` object from one input file, preserving full provenance. When a previously
+  merged file is used as input, its `inputs` are flattened into the new output so
+  provenance is carried forward across recursive merges.
 
 ```json
 {
@@ -267,7 +271,7 @@ output:
   "tool": {
     "name": "probe",
     "version": "0.1.0",
-    "command": "merge-atoms"
+    "command": "merge"
   },
   "inputs": [
     {

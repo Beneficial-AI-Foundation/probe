@@ -83,7 +83,7 @@ fn merged_atoms_envelope_is_valid() {
     let doc = json!({
         "schema": "probe/merged-atoms",
         "schema-version": "2.0",
-        "tool": { "name": "probe", "version": "0.1.0", "command": "merge-atoms" },
+        "tool": { "name": "probe", "version": "0.1.0", "command": "merge" },
         "inputs": [
             {
                 "schema": "probe-verus/atoms",

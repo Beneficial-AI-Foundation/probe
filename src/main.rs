@@ -6,7 +6,7 @@ use std::path::PathBuf;
 #[command(
     author,
     version,
-    about = "Cross-tool atom operations for probe-* verification tools"
+    about = "Cross-tool operations for probe-* verification tools"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -15,18 +15,20 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Merge atom files from multiple probe tools into a single file.
+    /// Merge data files from multiple probe tools into a single file.
     ///
-    /// Takes two or more Schema 2.0 atom files (from probe-verus, probe-lean, etc.)
-    /// and produces a merged file with schema "probe/merged-atoms". Stubs are replaced
-    /// by real atoms when the same code-name appears in multiple inputs.
-    MergeAtoms {
-        /// Input atom files (at least 2 required).
+    /// Takes two or more Schema 2.0 files (atoms, specs, or proofs from
+    /// probe-verus, probe-lean, etc.) and produces a merged file. The schema
+    /// category is auto-detected from the inputs; all inputs must be the same
+    /// category. For atoms, stubs are replaced by real entries (first-wins on
+    /// conflict). For specs and proofs, last-wins on conflict.
+    Merge {
+        /// Input files (at least 2 required).
         #[arg(required = true, num_args = 2..)]
         inputs: Vec<PathBuf>,
 
         /// Output file path.
-        #[arg(short, long, default_value = "merged_atoms.json")]
+        #[arg(short, long, default_value = "merged.json")]
         output: PathBuf,
     },
 }
@@ -35,8 +37,8 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::MergeAtoms { inputs, output } => {
-            probe::commands::merge_atoms::cmd_merge_atoms(inputs, output);
+        Commands::Merge { inputs, output } => {
+            probe::commands::merge::cmd_merge(inputs, output);
         }
     }
 }

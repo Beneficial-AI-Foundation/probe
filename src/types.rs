@@ -13,17 +13,23 @@ pub struct AtomEnvelope {
     pub data: BTreeMap<String, Atom>,
 }
 
-/// Schema 2.0 envelope for merged atom files.
+/// Schema 2.0 envelope for merged files, generic over the data-entry type.
+///
+/// For atoms use `MergedEnvelope<Atom>`, for specs/proofs use
+/// `MergedEnvelope<serde_json::Value>`.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct MergedAtomEnvelope {
+pub struct MergedEnvelope<D> {
     pub schema: String,
     #[serde(rename = "schema-version")]
     pub schema_version: String,
     pub tool: Tool,
     pub inputs: Vec<InputProvenance>,
     pub timestamp: String,
-    pub data: BTreeMap<String, Atom>,
+    pub data: BTreeMap<String, D>,
 }
+
+pub type MergedAtomEnvelope = MergedEnvelope<Atom>;
+pub type MergedGenericEnvelope = MergedEnvelope<serde_json::Value>;
 
 /// Tool metadata in the envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,20 +97,80 @@ impl Atom {
     }
 }
 
-/// Result of loading an atom file: data dictionary and provenance entries.
-///
-/// For single-tool files the vec contains one entry (from the `source` field).
-/// For merged files the vec contains the flattened `inputs` array, preserving
-/// the original provenance through repeated merges.
-pub type LoadResult = (BTreeMap<String, Atom>, Vec<InputProvenance>);
+// ---------------------------------------------------------------------------
+// Schema categories
+// ---------------------------------------------------------------------------
 
-/// Load a Schema 2.0 atom file, extracting the data dictionary from the envelope.
+/// The three categories of data files the merge tool can handle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SchemaCategory {
+    Atoms,
+    Specs,
+    Proofs,
+}
+
+impl SchemaCategory {
+    /// The `schema` value used in the merged output envelope.
+    pub fn merged_schema(&self) -> &'static str {
+        match self {
+            SchemaCategory::Atoms => "probe/merged-atoms",
+            SchemaCategory::Specs => "probe/merged-specs",
+            SchemaCategory::Proofs => "probe/merged-proofs",
+        }
+    }
+
+    /// Human-readable label for log messages.
+    pub fn label(&self) -> &'static str {
+        match self {
+            SchemaCategory::Atoms => "atoms",
+            SchemaCategory::Specs => "specs",
+            SchemaCategory::Proofs => "proofs",
+        }
+    }
+}
+
+impl std::fmt::Display for SchemaCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Determine the schema category from a `schema` string.
 ///
-/// Accepts both single-tool and merged-atoms envelopes. For single-tool files
-/// the provenance is built from the top-level `source` object. For merged files
-/// the `inputs` array is returned directly so provenance is carried forward
-/// across recursive merges.
-pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
+/// Returns `None` for unrecognized schemas.
+pub fn detect_category(schema: &str) -> Option<SchemaCategory> {
+    if schema.ends_with("/atoms")
+        || schema.ends_with("/enriched-atoms")
+        || schema == "probe/merged-atoms"
+    {
+        Some(SchemaCategory::Atoms)
+    } else if schema.ends_with("/specs") || schema == "probe/merged-specs" {
+        Some(SchemaCategory::Specs)
+    } else if schema.ends_with("/proofs") || schema == "probe/merged-proofs" {
+        Some(SchemaCategory::Proofs)
+    } else {
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Envelope loading
+// ---------------------------------------------------------------------------
+
+/// Parsed envelope metadata returned by [`load_envelope`].
+pub struct EnvelopeMeta {
+    pub schema: String,
+    pub category: SchemaCategory,
+    pub provenance: Vec<InputProvenance>,
+    /// The raw `data` value, ready to be deserialized into the appropriate type.
+    pub data_value: serde_json::Value,
+}
+
+/// Parse a Schema 2.0 envelope, extracting shared metadata.
+///
+/// Validates the schema-version, detects the [`SchemaCategory`], and extracts
+/// provenance (flattening `inputs` for previously merged files).
+pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
 
@@ -127,24 +193,20 @@ pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| format!("{}: missing \"schema\" field", path.display()))?;
 
-    if !schema.ends_with("/atoms")
-        && !schema.ends_with("/enriched-atoms")
-        && schema != "probe/merged-atoms"
-    {
-        return Err(format!(
-            "{}: unsupported schema \"{schema}\" (expected */atoms, */enriched-atoms, or probe/merged-atoms)",
+    let category = detect_category(schema).ok_or_else(|| {
+        format!(
+            "{}: unsupported schema \"{schema}\" (expected */atoms, */enriched-atoms, */specs, */proofs, or probe/merged-*)",
             path.display()
-        ));
-    }
+        )
+    })?;
 
     let data_value = raw
         .get("data")
-        .ok_or_else(|| format!("{}: missing \"data\" field", path.display()))?;
+        .ok_or_else(|| format!("{}: missing \"data\" field", path.display()))?
+        .clone();
 
-    let data: BTreeMap<String, Atom> = serde_json::from_value(data_value.clone())
-        .map_err(|e| format!("{}: failed to deserialize atoms: {e}", path.display()))?;
-
-    let provenance = if schema == "probe/merged-atoms" {
+    let is_merged = schema.starts_with("probe/merged-");
+    let provenance = if is_merged {
         raw.get("inputs")
             .and_then(|v| serde_json::from_value::<Vec<InputProvenance>>(v.clone()).ok())
             .unwrap_or_default()
@@ -168,5 +230,49 @@ pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
         }]
     };
 
-    Ok((data, provenance))
+    Ok(EnvelopeMeta {
+        schema: schema.to_string(),
+        category,
+        provenance,
+        data_value,
+    })
+}
+
+/// Result of loading an atom file: data dictionary and provenance entries.
+pub type LoadResult = (BTreeMap<String, Atom>, Vec<InputProvenance>);
+
+/// Load a Schema 2.0 atom file (convenience wrapper around [`load_envelope`]).
+///
+/// Returns typed `Atom` entries. Errors if the file is not an atoms-category schema.
+pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
+    let meta = load_envelope(path)?;
+    if meta.category != SchemaCategory::Atoms {
+        return Err(format!(
+            "{}: expected atoms schema, got {} (\"{}\")",
+            path.display(),
+            meta.category,
+            meta.schema
+        ));
+    }
+    let data: BTreeMap<String, Atom> = serde_json::from_value(meta.data_value)
+        .map_err(|e| format!("{}: failed to deserialize atoms: {e}", path.display()))?;
+    Ok((data, meta.provenance))
+}
+
+/// Result of loading a generic data file.
+pub type GenericLoadResult = (
+    BTreeMap<String, serde_json::Value>,
+    Vec<InputProvenance>,
+    SchemaCategory,
+);
+
+/// Load any Schema 2.0 data file as opaque JSON entries.
+///
+/// Works for atoms, specs, and proofs. Returns the data as generic JSON
+/// values along with provenance and the detected category.
+pub fn load_generic_file(path: &std::path::Path) -> Result<GenericLoadResult, String> {
+    let meta = load_envelope(path)?;
+    let data: BTreeMap<String, serde_json::Value> = serde_json::from_value(meta.data_value)
+        .map_err(|e| format!("{}: failed to deserialize data: {e}", path.display()))?;
+    Ok((data, meta.provenance, meta.category))
 }

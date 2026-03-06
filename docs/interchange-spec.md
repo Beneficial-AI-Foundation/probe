@@ -244,22 +244,40 @@ Stubs are identified by:
 - `dependencies` is empty
 
 Stubs allow the dependency graph to reference external functions without requiring
-their source to be indexed. The `merge-atoms` operation can resolve stubs: if a stub
+their source to be indexed. The `merge` operation can resolve stubs: if a stub
 in one file matches a real atom in another, the real atom replaces the stub.
 
-## Merged Atoms
+## Merged Data
+
+The `probe merge` command combines data files of the same category from multiple
+sources. It supports three categories: **atoms**, **specs**, and **proofs**. All
+inputs must be the same category.
+
+### Merged Atoms
 
 A merged atom file combines atoms from multiple sources. Its envelope uses
 `"schema": "probe/merged-atoms"`. The `data` dictionary may contain atoms
 with different `language` values and code-name URI schemes.
 
-Merge rules:
+Atom merge rules (first-wins with stub replacement):
 
 1. If the same code-name appears as a stub in one file and a real atom in another,
    the real atom wins.
 2. If the same code-name appears as a real atom in multiple files, this is a conflict.
    The merge tool should report it and keep the first occurrence.
 3. Atoms with distinct code-names are concatenated.
+
+### Merged Specs and Proofs
+
+Merged spec and proof files use `"schema": "probe/merged-specs"` or
+`"probe/merged-proofs"` respectively. The `data` dictionary values are
+opaque to the merge tool (they differ between tools and languages).
+
+Spec/proof merge rules (last-wins):
+
+1. If the same code-name appears in multiple inputs, the **last** one wins. This is
+   appropriate because re-running `specify` or `verify` should override stale results.
+2. Entries with distinct code-names are concatenated.
 
 The full merge algorithm, including normalization, envelope handling, and cross-language
 considerations, is specified in [merge-algorithm.md](merge-algorithm.md).

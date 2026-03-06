@@ -1,0 +1,55 @@
+{
+  "schema": "probe-verus/specs",
+  "schema-version": "2.0",
+  "tool": {
+    "name": "probe-verus",
+    "version": "2.0.0",
+    "command": "specify"
+  },
+  "source": {
+    "repo": "https://github.com/example/crate-b",
+    "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "language": "rust",
+    "package": "crate-b",
+    "package-version": "1.0"
+  },
+  "timestamp": "2026-03-05T11:00:00Z",
+  "data": {
+    "probe:crate-b/1.0/helpers/compute()": {
+      "specified": true,
+      "code-path": "crate-b/src/helpers.rs",
+      "spec-text": {
+        "lines-start": 5,
+        "lines-end": 8
+      },
+      "kind": "spec",
+      "has_requires": true,
+      "has_ensures": true,
+      "context": "standalone"
+    },
+    "probe:crate-b/1.0/helpers/validate()": {
+      "specified": true,
+      "code-path": "crate-b/src/helpers.rs",
+      "spec-text": {
+        "lines-start": 17,
+        "lines-end": 19
+      },
+      "kind": "proof",
+      "has_requires": true,
+      "has_ensures": false,
+      "context": "impl"
+    },
+    "probe:crate-b/1.0/helpers/internal()": {
+      "specified": false,
+      "code-path": "crate-b/src/helpers.rs",
+      "spec-text": {
+        "lines-start": 0,
+        "lines-end": 0
+      },
+      "kind": "exec",
+      "has_requires": false,
+      "has_ensures": false,
+      "context": "standalone"
+    }
+  }
+}

@@ -1,1 +1,1 @@
-pub mod merge_atoms;
+pub mod merge;
