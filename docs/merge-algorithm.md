@@ -155,12 +155,11 @@ When merging atoms from different languages:
   purely by code-name string equality.
 
 - **Cross-language stub resolution** (e.g., resolving a Lean stub that corresponds to a
-  Rust atom via Aeneas transpilation) requires a translation mapping file. This is an
-  optional feature: if a `--translations <file>` argument is provided, the merge tool
-  loads the mapping and uses it to match code-names across languages before applying the
-  standard merge rules. Translation mappings are defined in the `translations/` folder
-  described in [envelope-rationale.md](envelope-rationale.md). This feature is planned
-  for a future iteration.
+  Rust atom via Aeneas transpilation) requires a translation mapping file. If a
+  `--translations <file>` argument is provided, the merge tool loads the mapping and
+  uses it to add cross-language dependency edges between atoms that represent the same
+  logical function. The translations file format is specified in
+  [translations-spec.md](translations-spec.md).
 
 ## Relationship to probe-verus merge-atoms
 

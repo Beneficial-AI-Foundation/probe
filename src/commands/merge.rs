@@ -1,7 +1,8 @@
 use crate::types::{
-    load_envelope, Atom, MergedAtomEnvelope, MergedGenericEnvelope, SchemaCategory, Tool,
+    load_envelope, load_translations, Atom, MergedAtomEnvelope, MergedGenericEnvelope,
+    SchemaCategory, Tool,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 /// Strip trailing `.` from a code-name (legacy verus-analyzer artifact).
@@ -17,6 +18,7 @@ pub struct MergeStats {
     pub entries_added: usize,
     pub keys_normalized: usize,
     pub conflicts: usize,
+    pub translations_applied: usize,
 }
 
 // ---------------------------------------------------------------------------
@@ -69,13 +71,20 @@ fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, us
     (out, changed)
 }
 
-/// Merge multiple atom maps into one.
+/// Merge multiple atom maps into one, optionally applying cross-language translations.
 ///
 /// The first map is the base. For each subsequent map:
 /// - Stubs in the base are replaced by real atoms from the incoming map.
 /// - New atoms (not in base) are added.
 /// - Real-vs-real conflicts keep the base version (first wins).
-pub fn merge_atom_maps(maps: Vec<BTreeMap<String, Atom>>) -> (BTreeMap<String, Atom>, MergeStats) {
+///
+/// If `translations` is provided, after merging, cross-language dependency edges
+/// are added: for each atom whose dependencies include a code-name with a translation,
+/// the translated code-name is added as an additional dependency.
+pub fn merge_atom_maps(
+    maps: Vec<BTreeMap<String, Atom>>,
+    translations: Option<&(HashMap<String, String>, HashMap<String, String>)>,
+) -> (BTreeMap<String, Atom>, MergeStats) {
     let mut stats = MergeStats {
         total_entries: 0,
         stubs_replaced: 0,
@@ -83,6 +92,7 @@ pub fn merge_atom_maps(maps: Vec<BTreeMap<String, Atom>>) -> (BTreeMap<String, A
         entries_added: 0,
         keys_normalized: 0,
         conflicts: 0,
+        translations_applied: 0,
     };
 
     let mut maps_iter = maps.into_iter();
@@ -111,6 +121,40 @@ pub fn merge_atom_maps(maps: Vec<BTreeMap<String, Atom>>) -> (BTreeMap<String, A
                 None => {
                     base.insert(key, incoming_atom);
                     stats.entries_added += 1;
+                }
+            }
+        }
+    }
+
+    // Apply translations: add cross-language dependency edges
+    if let Some((from_to, to_from)) = translations {
+        let all_keys: Vec<String> = base.keys().cloned().collect();
+        let key_set: std::collections::BTreeSet<String> = all_keys.iter().cloned().collect();
+
+        for key in &all_keys {
+            let mut new_deps = Vec::new();
+
+            if let Some(atom) = base.get(key) {
+                for dep in &atom.dependencies {
+                    if let Some(translated) = from_to.get(dep) {
+                        if key_set.contains(translated) && !atom.dependencies.contains(translated) {
+                            new_deps.push(translated.clone());
+                        }
+                    }
+                    if let Some(translated) = to_from.get(dep) {
+                        if key_set.contains(translated) && !atom.dependencies.contains(translated) {
+                            new_deps.push(translated.clone());
+                        }
+                    }
+                }
+            }
+
+            if !new_deps.is_empty() {
+                if let Some(atom) = base.get_mut(key) {
+                    stats.translations_applied += new_deps.len();
+                    for dep in new_deps {
+                        atom.dependencies.insert(dep);
+                    }
                 }
             }
         }
@@ -160,6 +204,7 @@ pub fn merge_generic_maps(
         entries_added: 0,
         keys_normalized: 0,
         conflicts: 0,
+        translations_applied: 0,
     };
 
     let mut maps_iter = maps.into_iter();
@@ -190,7 +235,7 @@ pub fn merge_generic_maps(
 // ---------------------------------------------------------------------------
 
 /// Execute the `merge` command, auto-detecting the schema category.
-pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf) {
+pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, translations_path: Option<PathBuf>) {
     if inputs.len() < 2 {
         eprintln!("Error: merge requires at least 2 input files");
         std::process::exit(1);
@@ -245,6 +290,26 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf) {
     let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let merged_schema = category.merged_schema().to_string();
 
+    let translations = if let Some(ref t_path) = translations_path {
+        println!("  Loading translations from {}...", t_path.display());
+        match load_translations(t_path) {
+            Ok(t) => {
+                println!(
+                    "    {} from→to mappings, {} to→from mappings",
+                    t.0.len(),
+                    t.1.len()
+                );
+                Some(t)
+            }
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        None
+    };
+
     match category {
         SchemaCategory::Atoms => {
             let maps: Result<Vec<BTreeMap<String, Atom>>, String> = envelopes
@@ -264,7 +329,7 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf) {
                 }
             };
 
-            let (merged, stats) = merge_atom_maps(maps);
+            let (merged, stats) = merge_atom_maps(maps, translations.as_ref());
 
             let envelope = MergedAtomEnvelope {
                 schema: merged_schema,
@@ -334,6 +399,9 @@ fn print_stats(output: &std::path::Path, stats: &MergeStats) {
     if stats.conflicts > 0 {
         println!("  Conflicts:        {}", stats.conflicts);
     }
+    if stats.translations_applied > 0 {
+        println!("  Cross-lang edges: {}", stats.translations_applied);
+    }
     println!();
 }
 
@@ -393,7 +461,7 @@ mod tests {
             make_real_atom("helper", "src/lib.rs", "rust", "exec"),
         );
 
-        let (merged, stats) = merge_atom_maps(vec![base, incoming]);
+        let (merged, stats) = merge_atom_maps(vec![base, incoming], None);
 
         assert_eq!(stats.stubs_replaced, 1);
         assert_eq!(stats.stubs_remaining, 0);
@@ -414,7 +482,7 @@ mod tests {
             make_real_atom("bar", "src/b.rs", "rust", "exec"),
         );
 
-        let (merged, stats) = merge_atom_maps(vec![base, incoming]);
+        let (merged, stats) = merge_atom_maps(vec![base, incoming], None);
 
         assert_eq!(stats.entries_added, 1);
         assert_eq!(merged.len(), 2);
@@ -434,7 +502,7 @@ mod tests {
             make_real_atom("f", "src/other.rs", "rust", "exec"),
         );
 
-        let (merged, stats) = merge_atom_maps(vec![base, incoming]);
+        let (merged, stats) = merge_atom_maps(vec![base, incoming], None);
 
         assert_eq!(stats.conflicts, 1);
         assert_eq!(merged["probe:a/1.0/mod/f()"].code_path, "src/base.rs");
@@ -451,7 +519,7 @@ mod tests {
             make_real_atom("f", "src/lib.rs", "rust", "exec"),
         );
 
-        let (merged, stats) = merge_atom_maps(vec![base, incoming]);
+        let (merged, stats) = merge_atom_maps(vec![base, incoming], None);
 
         assert_eq!(stats.keys_normalized, 1);
         assert_eq!(stats.stubs_replaced, 1);
@@ -473,7 +541,7 @@ mod tests {
             make_real_atom("add", "Curve25519Dalek/Scalar.lean", "lean", "def"),
         );
 
-        let (merged, stats) = merge_atom_maps(vec![rust_atoms, lean_atoms]);
+        let (merged, stats) = merge_atom_maps(vec![rust_atoms, lean_atoms], None);
 
         assert_eq!(stats.entries_added, 1);
         assert_eq!(merged.len(), 2);
@@ -501,10 +569,58 @@ mod tests {
         let mut base = BTreeMap::new();
         base.insert("probe:a/1.0/f()".to_string(), atom);
 
-        let (merged, _) = merge_atom_maps(vec![base]);
+        let (merged, _) = merge_atom_maps(vec![base], None);
 
         let f = &merged["probe:a/1.0/f()"];
         assert!(f.extensions.contains_key("dependencies-with-locations"));
+    }
+
+    #[test]
+    fn test_translations_add_cross_language_edges() {
+        let mut rust_atoms = BTreeMap::new();
+        let mut rust_main = make_real_atom("main", "src/lib.rs", "rust", "exec");
+        rust_main
+            .dependencies
+            .insert("probe:mycrate/1.0/reduce()".to_string());
+        rust_atoms.insert("probe:mycrate/1.0/main()".to_string(), rust_main);
+        rust_atoms.insert(
+            "probe:mycrate/1.0/reduce()".to_string(),
+            make_real_atom("reduce", "src/field.rs", "rust", "exec"),
+        );
+
+        let mut lean_atoms = BTreeMap::new();
+        lean_atoms.insert(
+            "probe:mycrate.field.reduce".to_string(),
+            make_real_atom("reduce", "Field.lean", "lean", "exec"),
+        );
+
+        let translations = {
+            let mut from_to = HashMap::new();
+            let mut to_from = HashMap::new();
+            from_to.insert(
+                "probe:mycrate/1.0/reduce()".to_string(),
+                "probe:mycrate.field.reduce".to_string(),
+            );
+            to_from.insert(
+                "probe:mycrate.field.reduce".to_string(),
+                "probe:mycrate/1.0/reduce()".to_string(),
+            );
+            (from_to, to_from)
+        };
+
+        let (merged, stats) =
+            merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&translations));
+
+        assert_eq!(stats.translations_applied, 1);
+        let main_atom = &merged["probe:mycrate/1.0/main()"];
+        assert!(main_atom.dependencies.contains("probe:mycrate/1.0/reduce()"));
+        assert!(
+            main_atom
+                .dependencies
+                .contains("probe:mycrate.field.reduce"),
+            "main should now depend on Lean reduce via translation"
+        );
+        assert_eq!(merged.len(), 3);
     }
 
     #[test]
@@ -566,7 +682,7 @@ mod tests {
         assert_eq!(prov_b.len(), 1);
         assert_eq!(prov_b[0].source.package, "pkg-b");
 
-        let (merged_data, _stats) = merge_atom_maps(vec![atoms_a, atoms_b]);
+        let (merged_data, _stats) = merge_atom_maps(vec![atoms_a, atoms_b], None);
 
         let mut all_prov = Vec::new();
         all_prov.extend(prov_a);
@@ -635,7 +751,7 @@ mod tests {
         assert!(packages.contains(&"pkg-b"));
         assert_eq!(prov_c[0].source.package, "pkg-c");
 
-        let (final_data, _) = merge_atom_maps(vec![atoms_merged, atoms_c]);
+        let (final_data, _) = merge_atom_maps(vec![atoms_merged, atoms_c], None);
         let mut final_prov = Vec::new();
         final_prov.extend(prov_merged);
         final_prov.extend(prov_c);

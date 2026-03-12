@@ -30,6 +30,14 @@ enum Commands {
         /// Output file path.
         #[arg(short, long, default_value = "merged.json")]
         output: PathBuf,
+
+        /// Translations file for cross-language atom matching.
+        ///
+        /// Maps code-names between languages (e.g., Rust ↔ Lean) so that
+        /// the merge can add cross-language dependency edges. See
+        /// docs/translations-spec.md for the file format.
+        #[arg(short, long)]
+        translations: Option<PathBuf>,
     },
 }
 
@@ -37,8 +45,12 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Merge { inputs, output } => {
-            probe::commands::merge::cmd_merge(inputs, output);
+        Commands::Merge {
+            inputs,
+            output,
+            translations,
+        } => {
+            probe::commands::merge::cmd_merge(inputs, output, translations);
         }
     }
 }

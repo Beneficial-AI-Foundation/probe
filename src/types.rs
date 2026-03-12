@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Schema 2.0 envelope for single-tool atom files.
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,12 +57,19 @@ pub struct InputProvenance {
     pub source: Source,
 }
 
+fn deserialize_code_text<'de, D>(deserializer: D) -> Result<CodeText, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<CodeText>::deserialize(deserializer).map(|opt| opt.unwrap_or_default())
+}
+
 /// Line range of an atom's definition.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CodeText {
-    #[serde(rename = "lines-start")]
+    #[serde(rename = "lines-start", default)]
     pub lines_start: usize,
-    #[serde(rename = "lines-end")]
+    #[serde(rename = "lines-end", default)]
     pub lines_end: usize,
 }
 
@@ -80,7 +87,7 @@ pub struct Atom {
     pub code_module: String,
     #[serde(rename = "code-path")]
     pub code_path: String,
-    #[serde(rename = "code-text")]
+    #[serde(rename = "code-text", default, deserialize_with = "deserialize_code_text")]
     pub code_text: CodeText,
     pub kind: String,
     pub language: String,
@@ -141,6 +148,7 @@ impl std::fmt::Display for SchemaCategory {
 pub fn detect_category(schema: &str) -> Option<SchemaCategory> {
     if schema.ends_with("/atoms")
         || schema.ends_with("/enriched-atoms")
+        || schema.ends_with("/extract")
         || schema == "probe/merged-atoms"
     {
         Some(SchemaCategory::Atoms)
@@ -265,6 +273,60 @@ pub type GenericLoadResult = (
     Vec<InputProvenance>,
     SchemaCategory,
 );
+
+// ---------------------------------------------------------------------------
+// Translations
+// ---------------------------------------------------------------------------
+
+/// A single mapping entry in a translations file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranslationMapping {
+    pub from: String,
+    pub to: String,
+    pub confidence: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
+}
+
+/// A translations file mapping code-names between languages.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TranslationsFile {
+    pub schema: String,
+    #[serde(rename = "schema-version")]
+    pub schema_version: String,
+    pub mappings: Vec<TranslationMapping>,
+}
+
+/// Load a translations file and build bidirectional lookup maps.
+///
+/// Returns two maps: `from → to` and `to → from`.
+pub fn load_translations(
+    path: &std::path::Path,
+) -> Result<(HashMap<String, String>, HashMap<String, String>), String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read translations {}: {e}", path.display()))?;
+
+    let file: TranslationsFile = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse translations {}: {e}", path.display()))?;
+
+    if file.schema != "probe/translations" {
+        return Err(format!(
+            "{}: expected schema \"probe/translations\", got \"{}\"",
+            path.display(),
+            file.schema
+        ));
+    }
+
+    let mut from_to = HashMap::new();
+    let mut to_from = HashMap::new();
+
+    for mapping in &file.mappings {
+        from_to.insert(mapping.from.clone(), mapping.to.clone());
+        to_from.insert(mapping.to.clone(), mapping.from.clone());
+    }
+
+    Ok((from_to, to_from))
+}
 
 /// Load any Schema 2.0 data file as opaque JSON entries.
 ///
