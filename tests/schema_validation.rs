@@ -177,6 +177,80 @@ fn atom_with_extensions_is_valid() {
 }
 
 #[test]
+fn single_tool_rust_extract_envelope_is_valid() {
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+
+    let doc = json!({
+        "schema": "probe-rust/extract",
+        "schema-version": "2.1",
+        "tool": { "name": "probe-rust", "version": "0.1.0", "command": "extract" },
+        "source": {
+            "repo": "https://github.com/org/my-crate",
+            "commit": "abc123",
+            "language": "rust",
+            "package": "my-crate",
+            "package-version": "1.0.0"
+        },
+        "timestamp": "2026-03-17T12:00:00Z",
+        "data": {
+            "probe:my-crate/1.0.0/lib/main()": {
+                "display-name": "main",
+                "dependencies": [],
+                "code-module": "lib",
+                "code-path": "src/lib.rs",
+                "code-text": { "lines-start": 1, "lines-end": 10 },
+                "kind": "exec",
+                "language": "rust"
+            }
+        }
+    });
+
+    let result = validator.validate(&doc);
+    assert!(
+        result.is_ok(),
+        "probe-rust/extract envelope should validate: {result:?}"
+    );
+}
+
+#[test]
+fn single_tool_aeneas_extract_envelope_is_valid() {
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+
+    let doc = json!({
+        "schema": "probe-aeneas/extract",
+        "schema-version": "2.0",
+        "tool": { "name": "probe-aeneas", "version": "0.1.0", "command": "extract" },
+        "source": {
+            "repo": "https://github.com/org/my-project",
+            "commit": "def456",
+            "language": "rust",
+            "package": "my-project",
+            "package-version": "1.0.0"
+        },
+        "timestamp": "2026-03-17T12:00:00Z",
+        "data": {
+            "probe:my-project/1.0.0/lib/f()": {
+                "display-name": "f",
+                "dependencies": [],
+                "code-module": "lib",
+                "code-path": "src/lib.rs",
+                "code-text": { "lines-start": 1, "lines-end": 5 },
+                "kind": "exec",
+                "language": "rust"
+            }
+        }
+    });
+
+    let result = validator.validate(&doc);
+    assert!(
+        result.is_ok(),
+        "probe-aeneas/extract envelope should validate: {result:?}"
+    );
+}
+
+#[test]
 fn missing_required_field_is_rejected() {
     let schema = load_schema();
     let validator = Validator::new(&schema).expect("valid schema");

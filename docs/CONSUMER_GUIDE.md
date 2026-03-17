@@ -145,6 +145,7 @@ Each repo has `docs/USAGE.md` (command reference) and `docs/SCHEMA.md` (JSON sch
 | **[probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md) | Aeneas-specific fields |
 
 Additional reference docs in [`probe/docs/`](https://github.com/Beneficial-AI-Foundation/probe/tree/main/docs):
+- [`TESTING_GUIDE.md`](TESTING_GUIDE.md) — How to test that your visualization correctly represents the probe data
 - [`merge-algorithm.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/merge-algorithm.md) — How `probe merge` combines files
 - [`translations-spec.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/translations-spec.md) — Cross-language translation file format
 - [`envelope-rationale.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/envelope-rationale.md) — Why the metadata envelope exists

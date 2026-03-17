@@ -16,7 +16,7 @@
       "properties": {
         "schema": {
           "type": "string",
-          "pattern": "^probe-(verus|lean|latex)/(atoms|enriched-atoms)$"
+          "pattern": "^probe-(rust|lean|verus|aeneas|latex)/(atoms|enriched-atoms|extract|proofs|specs)$"
         },
         "schema-version": { "$ref": "#/$defs/schemaVersion" },
         "tool": { "$ref": "#/$defs/tool" },
