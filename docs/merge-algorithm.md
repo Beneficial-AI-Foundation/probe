@@ -2,7 +2,7 @@
 
 Version: draft
 Date: 2026-03-06
-Parent document: [interchange-spec.md](interchange-spec.md)
+Parent document: [SCHEMA.md](SCHEMA.md)
 
 This document specifies the algorithm for `probe merge`, which combines data files from
 multiple `probe-*` tools into a single merged file. The merge tool handles three

@@ -2,7 +2,7 @@
 
 Version: draft
 Date: 2026-03-12
-Parent document: [interchange-spec.md](interchange-spec.md)
+Parent document: [SCHEMA.md](SCHEMA.md)
 
 This document specifies the translations file format used by `probe merge` to match
 code-names across languages. Translations enable cross-language merging where the same

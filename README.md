@@ -10,7 +10,7 @@ This repository contains:
 
 ## Specification
 
-- [docs/interchange-spec.md](docs/interchange-spec.md) -- Atom interchange format (Schema 2.0)
+- [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format (Schema 2.0)
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
 - [docs/merge-algorithm.md](docs/merge-algorithm.md) -- Merge algorithm specification
 - [schemas/atom-envelope.schema.json](schemas/atom-envelope.schema.json) -- JSON Schema

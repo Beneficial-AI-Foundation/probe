@@ -26,17 +26,22 @@ to multi-language merging.
 
 The `schema` field identifies the producing tool and data type. Format: `<tool>/<type>`.
 
-| schema | Description |
-|--------|-------------|
-| `probe-verus/atoms` | Rust/Verus call graph atoms |
-| `probe-verus/specs` | Rust/Verus function specifications |
-| `probe-verus/proofs` | Rust/Verus verification results |
-| `probe-lean/atoms` | Lean call graph atoms |
-| `probe-lean/specs` | Lean specification status |
-| `probe-lean/proofs` | Lean verification results (sorry detection) |
-| `probe-lean/enriched-atoms` | Lean atoms + specs + proofs combined |
-| `probe-latex/atoms` | LaTeX atoms (reserved, not yet defined) |
-| `probe/merged-atoms` | Merged atoms from multiple tools |
+| schema | Description | Category |
+|--------|-------------|----------|
+| `probe-rust/extract` | Rust call graph atoms | Atoms |
+| `probe-verus/atoms` | Rust/Verus call graph atoms | Atoms |
+| `probe-verus/extract` | Rust/Verus unified pipeline output (atoms + specs + proofs) | Atoms |
+| `probe-verus/specs` | Rust/Verus function specifications | Specs |
+| `probe-verus/proofs` | Rust/Verus verification results | Proofs |
+| `probe-lean/extract` | Lean unified pipeline output (atoms + specs + verification) | Atoms |
+| `probe-lean/enriched-atoms` | Lean atoms + specs + proofs combined (legacy) | Atoms |
+| `probe-lean/specs` | Lean specification status | Specs |
+| `probe-lean/proofs` | Lean verification results (sorry detection) | Proofs |
+| `probe-aeneas/extract` | Cross-language Rust+Lean merged atoms (Aeneas projects) | Atoms |
+| `probe-latex/atoms` | LaTeX atoms (reserved, not yet defined) | Atoms |
+| `probe/merged-atoms` | Merged atoms from multiple tools | Atoms |
+| `probe/merged-specs` | Merged specs from multiple tools | Specs |
+| `probe/merged-proofs` | Merged proofs from multiple tools | Proofs |
 
 New tools register their `schema` values by adding them to this table.
 
@@ -160,20 +165,18 @@ declarations, not standalone units.
 Anticipated values: `definition`, `theorem`, `lemma`, `proof`, `remark`, `corollary`.
 These will be defined when probe-latex is implemented.
 
-### Optional Extension Fields
+### Common Optional Fields
 
-Tools may add language-specific optional fields to atom objects. Rules:
+These fields are defined across multiple probe tools. When present, they must
+use the names and semantics defined here. All are omitted when not applicable.
 
-1. Optional fields must not conflict with core field names.
-2. Optional fields should use kebab-case naming.
-3. Consumers that do not recognize an optional field must ignore it.
-4. Optional fields should be omitted (not set to null) when not applicable.
-
-Current extensions defined by probe-verus:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `dependencies-with-locations` | array of objects | Per-call location data (only with `--with-locations`) |
+| Field | Type | Producers | Description |
+|-------|------|-----------|-------------|
+| `primary-spec` | string | probe-verus, probe-lean | The primary specification for this atom. In probe-verus: concatenated requires+ensures text (empty string = analyzed but no spec). In probe-lean: code-name of the primary specification theorem. |
+| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, or `"unverified"`. Absent when verification was skipped. |
+| `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | `false` if the function is in scope for analysis; `true` otherwise. Semantics vary by tool. |
+| `specs` | array of strings | probe-lean | Code-names of theorem atoms that reference this atom as a dependency (reverse spec edges). Absent when empty. |
+| `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data (see below). |
 
 Each entry in `dependencies-with-locations` has:
 
@@ -181,15 +184,42 @@ Each entry in `dependencies-with-locations` has:
 - `location` (string): `"precondition"`, `"postcondition"`, or `"inner"`
 - `line` (number): source line of the call
 
-Current extensions defined by probe-lean:
+### Tool-Specific Extension Fields
+
+Tools may add additional language-specific fields. Rules:
+
+1. Extension fields must not conflict with core or common optional field names.
+2. Extension fields should use kebab-case naming.
+3. Consumers that do not recognize an extension field must ignore it.
+4. Extension fields should be omitted (not set to null) when not applicable.
+
+Extensions defined by probe-verus:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `requires-dependencies` | array of strings | Subset of `dependencies` called in `requires` clauses |
+| `ensures-dependencies` | array of strings | Subset of `dependencies` called in `ensures` clauses |
+| `body-dependencies` | array of strings | Subset of `dependencies` called in the function body |
+
+Extensions defined by probe-lean:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type-dependencies` | array of strings | Dependencies from the type signature |
+| `term-dependencies` | array of strings | Dependencies from the value/proof body |
 | `is-hidden` | bool | From `.verilib/config.json` `user.is-hidden` list |
 | `is-extraction-artifact` | bool | Name ends with configured extraction artifact suffix |
 | `is-ignored` | bool | From `.verilib/config.json` `user.is-ignored` list |
 | `is-relevant` | bool | Rust source is from the target crate (Aeneas projects only) |
 | `rust-source` | string or null | Rust source path from Aeneas docstring |
+
+Extensions defined by probe-aeneas:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `translation-name` | string | Code-name of the Lean translation for a Rust atom |
+| `translation-path` | string | File path of the Lean translation |
+| `translation-text` | object | Line range of the Lean translation (`lines-start`, `lines-end`) |
 
 ## Code-Name URI Conventions
 
