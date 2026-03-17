@@ -14,7 +14,7 @@ interactive viewer, deployed at
 
 ## Language toggles
 
-Every atom carries a `language` field (`"rust"`, `"lean"`, or `"latex"`).
+Every atom carries a `language` field (`"rust"`, `"lean"`, or `"verus"`).
 A merged atom file (schema `probe/merged-atoms`) contains atoms from
 multiple languages in the same `data` dictionary. This makes language
 filtering trivial: partition nodes by `language` and expose a toggle.
