@@ -132,17 +132,17 @@ project.
 | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | [`examples/verus_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/examples/verus_curve25519-dalek_4.1.3.json) | `probe-verus/extract` |
 | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) | [`examples/aeneas_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/examples/aeneas_curve25519-dalek_4.1.3.json) | `probe-aeneas/extract` |
 
-## Schema documentation
+## Documentation
 
-Each repo has a `docs/SCHEMA.md` file documenting its output format:
+Each repo has `docs/USAGE.md` (command reference) and `docs/SCHEMA.md` (JSON schema):
 
-| Repo | Schema doc | Scope |
-|------|-----------|-------|
-| **[probe](https://github.com/Beneficial-AI-Foundation/probe)** | [`docs/SCHEMA.md`](SCHEMA.md) | Interchange spec: core fields, common optional fields, extension fields, code-name conventions |
-| **[probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust)** | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/SCHEMA.md) | Rust-specific fields |
-| **[probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean)** | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md) | Lean-specific fields |
-| **[probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus)** | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md) | Verus-specific fields |
-| **[probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas)** | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md) | Aeneas-specific fields |
+| Repo | Usage | Schema | Schema scope |
+|------|-------|--------|-------------|
+| **[probe](https://github.com/Beneficial-AI-Foundation/probe)** | -- | [`docs/SCHEMA.md`](SCHEMA.md) | Interchange spec: core fields, common optional fields, code-name conventions |
+| **[probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/SCHEMA.md) | Rust-specific fields |
+| **[probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md) | Lean-specific fields |
+| **[probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md) | Verus-specific fields |
+| **[probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md) | Aeneas-specific fields |
 
 Additional reference docs in [`probe/docs/`](https://github.com/Beneficial-AI-Foundation/probe/tree/main/docs):
 - [`merge-algorithm.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/merge-algorithm.md) — How `probe merge` combines files
