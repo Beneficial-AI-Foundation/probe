@@ -73,6 +73,11 @@ edges = dependencies). They differ in layout and grouping.
 
 ### Call graph view
 
+> **Reference PoC implementation:**
+> [CALL_GRAPH_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CALL_GRAPH_ALGORITHM.md)
+> describes the layout algorithm (hybrid Sugiyama + force-directed simulation)
+> used by scip-callgraph.
+
 A force-directed (or hierarchical) graph where each node is a single
 atom and each edge is a dependency.
 
@@ -109,6 +114,11 @@ curve25519-dalek. Clicking a callee expands it to show *its* callees.
 
 ### File map view
 
+> **Reference PoC implementation:**
+> [FILE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/FILE_MAP_ALGORITHM.md)
+> describes the compound DAG layout (transitive reduction + dagre/Sugiyama)
+> used by scip-callgraph.
+
 A hierarchical layout that groups atoms by their source file.
 Each file is a compound box containing its atoms as inner nodes.
 Edges between atoms in different files are drawn between the
@@ -138,6 +148,12 @@ dependencies). Group them separately, e.g. under an "External" box,
 or omit them and show them only as edge targets.
 
 ### Crate map view
+
+> **Reference PoC implementation:**
+> [CRATE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CRATE_MAP_ALGORITHM.md)
+> describes the crate aggregation, boundary selection, and three-mode
+> interaction model (collapsed / expanded edge / boundary) used by
+> scip-callgraph.
 
 A high-level overview where each node is a crate (Rust) or package
 (Lean) and edges represent cross-crate function calls.
@@ -171,6 +187,12 @@ questions like "which crates does `curve25519-dalek` depend on?" or
 | Cross-crate edge weight | Count of dependency edges where source and target are in different crates |
 
 ## Filtering dimensions
+
+> **Reference PoC implementation:**
+> [QUERY_PIPELINE.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/QUERY_PIPELINE.md)
+> describes scip-callgraph's composable query pipeline: source/sink
+> queries, pattern matching syntax, kind and call-type filters,
+> traversal vs. display predicates, and URL parameter encoding.
 
 Beyond the language toggle and view selection, the atom schema supports
 several filtering axes that a UI should expose:
@@ -305,3 +327,17 @@ direct link:
 ```
 
 This gives every node a "View source" action.
+
+## scip-callgraph reference documentation
+
+The [scip-callgraph](https://github.com/Beneficial-AI-Foundation/scip-callgraph)
+viewer implements the views and queries described above. Technical
+documentation for the algorithms and query system:
+
+| Document | Covers |
+|----------|--------|
+| [INTERACTIVE_VIEWER.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/docs/guides/INTERACTIVE_VIEWER.md) | User-facing guide to the three views, filtering, and interactions |
+| [CALL_GRAPH_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CALL_GRAPH_ALGORITHM.md) | Hybrid Sugiyama + force-directed layout for the call graph view |
+| [FILE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/FILE_MAP_ALGORITHM.md) | Compound DAG layout (transitive reduction + dagre) for the file map view |
+| [CRATE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CRATE_MAP_ALGORITHM.md) | Quotient graph aggregation and three-mode interaction for the crate map view |
+| [QUERY_PIPELINE.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/QUERY_PIPELINE.md) | Composable query pipeline: source/sink queries, pattern matching, filters, URL parameters |
