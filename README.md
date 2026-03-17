@@ -12,6 +12,7 @@ This repository contains:
 
 - [docs/CONSUMER_GUIDE.md](docs/CONSUMER_GUIDE.md) -- **Start here**: how to use all four probe tools, examples, and working with the data
 - [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format (Schema 2.0)
+- [docs/UI-VIEWS.md](docs/UI-VIEWS.md) -- How a UI should implement language toggles, call graph / file map / crate map views
 - [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
 - [docs/merge-algorithm.md](docs/merge-algorithm.md) -- Merge algorithm specification
