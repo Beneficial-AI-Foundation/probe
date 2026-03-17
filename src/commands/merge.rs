@@ -1,9 +1,9 @@
 use crate::types::{
-    load_envelope, load_translations, Atom, MergedAtomEnvelope, MergedGenericEnvelope,
-    SchemaCategory, Tool,
+    load_atom_file, load_envelope, load_translations, Atom, InputProvenance, MergedAtomEnvelope,
+    MergedGenericEnvelope, SchemaCategory, Tool,
 };
 use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Strip trailing `.` from a code-name (legacy verus-analyzer artifact).
 fn normalize_code_name(name: &str) -> String {
@@ -81,6 +81,7 @@ fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, us
 /// If `translations` is provided, after merging, cross-language dependency edges
 /// are added: for each atom whose dependencies include a code-name with a translation,
 /// the translated code-name is added as an additional dependency.
+#[allow(clippy::type_complexity)]
 pub fn merge_atom_maps(
     maps: Vec<BTreeMap<String, Atom>>,
     translations: Option<&(HashMap<String, String>, HashMap<String, String>)>,
@@ -164,6 +165,28 @@ pub fn merge_atom_maps(
     stats.total_entries = base.len();
 
     (base, stats)
+}
+
+/// Load multiple atom files, flatten their provenance, and merge them.
+///
+/// This is a mid-level convenience between `merge_atom_maps` (pure in-memory)
+/// and `cmd_merge` (full CLI with category detection and envelope writing).
+#[allow(clippy::type_complexity)]
+pub fn merge_atom_files(
+    paths: &[&Path],
+    translations: Option<&(HashMap<String, String>, HashMap<String, String>)>,
+) -> Result<(BTreeMap<String, Atom>, Vec<InputProvenance>, MergeStats), String> {
+    let mut maps = Vec::with_capacity(paths.len());
+    let mut provenance = Vec::new();
+
+    for path in paths {
+        let (atoms, prov) = load_atom_file(path)?;
+        maps.push(atoms);
+        provenance.extend(prov);
+    }
+
+    let (merged, stats) = merge_atom_maps(maps, translations);
+    Ok((merged, provenance, stats))
 }
 
 // ---------------------------------------------------------------------------
@@ -608,12 +631,13 @@ mod tests {
             (from_to, to_from)
         };
 
-        let (merged, stats) =
-            merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&translations));
+        let (merged, stats) = merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&translations));
 
         assert_eq!(stats.translations_applied, 1);
         let main_atom = &merged["probe:mycrate/1.0/main()"];
-        assert!(main_atom.dependencies.contains("probe:mycrate/1.0/reduce()"));
+        assert!(main_atom
+            .dependencies
+            .contains("probe:mycrate/1.0/reduce()"));
         assert!(
             main_atom
                 .dependencies

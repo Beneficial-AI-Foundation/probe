@@ -87,7 +87,11 @@ pub struct Atom {
     pub code_module: String,
     #[serde(rename = "code-path")]
     pub code_path: String,
-    #[serde(rename = "code-text", default, deserialize_with = "deserialize_code_text")]
+    #[serde(
+        rename = "code-text",
+        default,
+        deserialize_with = "deserialize_code_text"
+    )]
     pub code_text: CodeText,
     pub kind: String,
     pub language: String,
@@ -300,6 +304,7 @@ pub struct TranslationsFile {
 /// Load a translations file and build bidirectional lookup maps.
 ///
 /// Returns two maps: `from → to` and `to → from`.
+#[allow(clippy::type_complexity)]
 pub fn load_translations(
     path: &std::path::Path,
 ) -> Result<(HashMap<String, String>, HashMap<String, String>), String> {
