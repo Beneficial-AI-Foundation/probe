@@ -91,6 +91,22 @@ and compare output to golden files using the structural diff:
 
 Run with `cargo test -p probe-extract-check -- --include-ignored` when tools are available.
 
+### Per-probe integration tests
+
+Each individual probe repository also carries its own integration tests that
+validate extract output using `probe-extract-check` as a dev-dependency.
+These run in each probe's CI and call the library API directly (no subprocess).
+
+| Probe | Test file | What it checks |
+|-------|-----------|----------------|
+| [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) | `tests/extract_check.rs` | Loads `examples/rust_curve25519-dalek_4.1.3.json` as `AtomEnvelope`, runs structural checks, validates `probe:` key prefixes and required fields |
+| [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | `tests/extract_check.rs` | Loads `tests/fixtures/unified_test/atoms.json` as `AtomEnvelope`, validates `probe:` prefixes and Verus-specific kinds (exec/proof/spec) |
+| [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) | `tests/extract_check.rs` | Validates `MergedEnvelope` structure via `serde_json::Value`, runs the full merge pipeline via library API with pre-generated JSON (no external tools needed) |
+| [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) | `Tests/Main.lean` | Loads `examples/lean_Curve25519Dalek_0.1.0.json`, validates envelope fields, atom count, `DeclKind` values, and `verification-status` |
+
+The `#[ignore]` live tests in probe-rust and probe-verus additionally call
+`cmd_extract` via the library API (requires scip / verus-analyzer installed).
+
 ## Crate structure
 
 ```
@@ -116,9 +132,20 @@ probe/
 
 ## Test summary
 
+### probe-extract-check (this repo)
+
 | Category | Count |
 |----------|-------|
 | Unit tests (structural, source, deps, properties, golden) | 22 |
 | Integration tests (golden validation + properties) | 25 |
 | Live tool comparison (ignored) | 4 |
 | **Total** | **51** |
+
+### Per-probe integration tests
+
+| Probe | Active | Ignored | Notes |
+|-------|--------|---------|-------|
+| probe-rust | 3 | 1 | Live test needs scip + rust-analyzer |
+| probe-verus | 3 | 1 | Live test needs verus-analyzer + scip |
+| probe-aeneas | 5 | 0 | Merge pipeline runs with pre-generated JSON |
+| probe-lean | 20 | 0 | Envelope + atom + kind + verification checks |
