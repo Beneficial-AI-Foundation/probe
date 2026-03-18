@@ -6,7 +6,8 @@
 
   "oneOf": [
     { "$ref": "#/$defs/singleToolEnvelope" },
-    { "$ref": "#/$defs/mergedAtomsEnvelope" }
+    { "$ref": "#/$defs/mergedAtomsEnvelope" },
+    { "$ref": "#/$defs/mergedGenericEnvelope" }
   ],
 
   "$defs": {
@@ -54,6 +55,41 @@
         },
         "timestamp": { "$ref": "#/$defs/timestamp" },
         "data": { "$ref": "#/$defs/atomDictionary" }
+      },
+      "required": ["schema", "schema-version", "tool", "inputs", "timestamp", "data"],
+      "additionalProperties": false
+    },
+
+    "mergedGenericEnvelope": {
+      "type": "object",
+      "description": "Envelope for merged specs or proofs produced by probe merge.",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^probe/merged-(specs|proofs)$"
+        },
+        "schema-version": { "$ref": "#/$defs/schemaVersion" },
+        "tool": { "$ref": "#/$defs/tool" },
+        "inputs": {
+          "type": "array",
+          "description": "Provenance: one entry per input file that was merged.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schema": { "type": "string" },
+              "source": { "$ref": "#/$defs/source" }
+            },
+            "required": ["schema", "source"],
+            "additionalProperties": false
+          },
+          "minItems": 2
+        },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "data": {
+          "type": "object",
+          "description": "Dictionary keyed by code-name URI. Values are spec or proof entries.",
+          "additionalProperties": true
+        }
       },
       "required": ["schema", "schema-version", "tool", "inputs", "timestamp", "data"],
       "additionalProperties": false

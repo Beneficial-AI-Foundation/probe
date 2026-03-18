@@ -156,7 +156,10 @@ fn get_file_lines<'a>(
     project_path: &Path,
     cache: &'a mut BTreeMap<String, Vec<String>>,
 ) -> Option<&'a Vec<String>> {
-    if std::path::Path::new(code_path).is_absolute() || code_path.contains("..") {
+    if std::path::Path::new(code_path).is_absolute()
+        || code_path.contains("..")
+        || code_path.starts_with('~')
+    {
         return None;
     }
     if !cache.contains_key(code_path) {
