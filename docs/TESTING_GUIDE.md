@@ -150,83 +150,18 @@ Run with `cargo test` in the probe repo.
   normalization, cross-language merge, translation-based edge creation,
   and recursive provenance flattening.
 
-### probe-rust
+### Individual probes
 
-Run with `cargo test` in the probe-rust repo.
+Each probe repository has its own test suite covering extraction
+correctness. See each probe's `TESTING.md` for full test inventory,
+run instructions, and CI details.
 
-- **Code-name derivation** -- SCIP symbols are correctly parsed into
-  code-name URIs, including method vs free function disambiguation.
-- **Display-name enrichment** -- impl methods get their type prepended
-  (e.g. `ct_eq` becomes `CompressedEdwardsY::ct_eq`), while free
-  functions remain unchanged.
-- **External stub generation** -- dependencies referencing functions
-  outside the analyzed crate produce stub atoms with empty `code-path`.
-- **`rust-qualified-name` derivation** -- qualified names are computed
-  from code-path and module structure for cross-language matching.
-- **Serialization** -- the `language` field defaults to `"rust"` when
-  loading older JSON, and trailing dots in code-names are normalized.
+| Probe | Test command | Details |
+|-------|-------------|---------|
+| probe-rust | `cargo test` | [TESTING.md](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/TESTING.md) |
+| probe-verus | `cargo test` | [TESTING.md](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/TESTING.md) |
+| probe-aeneas | `cargo test` | [TESTING.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/TESTING.md) |
+| probe-lean | `lake build tests && .lake/build/bin/tests` | [TESTING.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/TESTING.md) |
 
-### probe-lean
-
-Run with `lake build tests && .lake/build/bin/tests` in the probe-lean
-repo.
-
-- **Atom extraction helpers** -- internal names are filtered, display
-  names are derived, and module-level flags (`is-hidden`,
-  `is-extraction-artifact`, `is-ignored`) are set correctly.
-- **Spec computation** -- `computeSpecs` produces reverse edges from
-  theorems to the definitions they specify, handles multiple specs per
-  atom, excludes theorem-to-theorem dependencies, and applies the
-  `primary-spec` heuristic (suffix matching and attribute overrides).
-- **Sorry detection** -- Lean compiler warnings are parsed to extract
-  file, line, and column; paths are normalized and matched to atoms;
-  verification status is set to `"verified"` or `"unverified"`
-  accordingly.
-- **JSON serialization** -- all output types (`AtomsOutput`,
-  `ProofsOutput`, `MoleculesOutput`, `StubEntry`) round-trip correctly
-  through JSON, including optional fields like `specs`,
-  `type-dependencies`, and `term-dependencies`.
-- **Envelope-aware loading** -- both bare dictionaries and enveloped
-  JSON files are loaded and unwrapped correctly.
-
-### probe-verus
-
-Run with `cargo test` in the probe-verus repo.
-
-- **Call graph extraction** (7 tests) -- uses a pre-built SCIP index
-  from curve25519-dalek to verify that multiple trait implementations
-  (e.g. several `Mul` impls) are all captured with disambiguated
-  code-names including type info, and that no duplicate code-names are
-  produced.
-- **Function coverage** (3 tests) -- checks that critical functions
-  from a tracked-functions list appear in the extracted atoms.
-- **Spec extraction and verification status** (7 tests) -- merges
-  atoms, specs, and proofs fixtures into a unified output and verifies
-  that `primary-spec` text matches `requires`/`ensures` clauses,
-  `verification-status` maps correctly (`success` to `"verified"`,
-  `failure` to `"failed"`, `sorries` to `"unverified"`), and external
-  stubs carry no enrichment fields.
-- **Merge correctness** (3 tests) -- stubs are replaced by real atoms,
-  cross-project edges are preserved, and merged output matches the
-  expected combined fixture.
-- **Unit tests** (~35 tests) -- display-name enrichment (trait impls,
-  inherent impls, free functions), SCIP symbol parsing, external
-  function detection, `rust-qualified-name` derivation, code-name
-  normalization, and envelope-aware loading.
-
-### probe-aeneas
-
-Run with `cargo test` in the probe-aeneas repo.
-
-- **Cross-language merging** -- Rust and Lean atom files are merged
-  with translation mappings that link Rust code-names to their Lean
-  counterparts.
-- **Translation mapping** -- `functions.json` (from `lake exe listfuns`)
-  is parsed to build bidirectional Rust-to-Lean identifier mappings.
-- **Enrichment** -- Rust atoms gain `translation-name`,
-  `translation-path`, `translation-text`, and `is-disabled` fields
-  pointing to their Lean counterparts.
-
-See each repo's README for full details on running its test suite. If
-you suspect an issue with the extracted data, open an issue in the
+If you suspect an issue with the extracted data, open an issue in the
 relevant probe repository.
