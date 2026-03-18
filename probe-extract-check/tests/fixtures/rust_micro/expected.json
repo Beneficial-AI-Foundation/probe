@@ -1,0 +1,170 @@
+{
+  "schema": "probe-rust/extract",
+  "schema-version": "2.0",
+  "tool": { "name": "probe-rust", "version": "0.1.0", "command": "extract" },
+  "source": {
+    "repo": "",
+    "commit": "",
+    "language": "rust",
+    "package": "rust-micro",
+    "package-version": "0.1.0"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "data": {
+    "probe:rust-micro/0.1.0/lib/greet()": {
+      "display-name": "greet",
+      "dependencies": ["probe:rust-micro/0.1.0/lib/capitalize()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 6, "lines-end": 8 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/lib/capitalize()": {
+      "display-name": "capitalize",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 10, "lines-end": 16 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/math/add()": {
+      "display-name": "add",
+      "dependencies": [],
+      "code-module": "math",
+      "code-path": "src/math.rs",
+      "code-text": { "lines-start": 1, "lines-end": 3 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/math/double()": {
+      "display-name": "double",
+      "dependencies": ["probe:rust-micro/0.1.0/math/add()"],
+      "code-module": "math",
+      "code-path": "src/math.rs",
+      "code-text": { "lines-start": 5, "lines-end": 7 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/math/is_even()": {
+      "display-name": "is_even",
+      "dependencies": ["probe:rust-micro/0.1.0/math/is_odd()"],
+      "code-module": "math",
+      "code-path": "src/math.rs",
+      "code-text": { "lines-start": 9, "lines-end": 15 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/math/is_odd()": {
+      "display-name": "is_odd",
+      "dependencies": ["probe:rust-micro/0.1.0/math/is_even()"],
+      "code-module": "math",
+      "code-path": "src/math.rs",
+      "code-text": { "lines-start": 17, "lines-end": 23 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/math/standalone()": {
+      "display-name": "standalone",
+      "dependencies": [],
+      "code-module": "math",
+      "code-path": "src/math.rs",
+      "code-text": { "lines-start": 25, "lines-end": 27 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/shapes/&Circle#impl#[Circle][Area]area()": {
+      "display-name": "area",
+      "dependencies": [],
+      "code-module": "shapes",
+      "code-path": "src/shapes.rs",
+      "code-text": { "lines-start": 10, "lines-end": 13 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/shapes/&Rect#impl#[Rect][Area]area()": {
+      "display-name": "area",
+      "dependencies": [],
+      "code-module": "shapes",
+      "code-path": "src/shapes.rs",
+      "code-text": { "lines-start": 21, "lines-end": 24 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/shapes/total_area()": {
+      "display-name": "total_area",
+      "dependencies": [],
+      "code-module": "shapes",
+      "code-path": "src/shapes.rs",
+      "code-text": { "lines-start": 26, "lines-end": 28 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/shapes/apply_transform()": {
+      "display-name": "apply_transform",
+      "dependencies": [],
+      "code-module": "shapes",
+      "code-path": "src/shapes.rs",
+      "code-text": { "lines-start": 30, "lines-end": 32 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/shapes/scale_areas()": {
+      "display-name": "scale_areas",
+      "dependencies": [
+        "probe:rust-micro/0.1.0/shapes/apply_transform()"
+      ],
+      "code-module": "shapes",
+      "code-path": "src/shapes.rs",
+      "code-text": { "lines-start": 34, "lines-end": 37 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/macros/to_u64()": {
+      "display-name": "to_u64",
+      "dependencies": [],
+      "code-module": "macros",
+      "code-path": "src/macros.rs",
+      "code-text": { "lines-start": 9, "lines-end": 9 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/macros/to_i64()": {
+      "display-name": "to_i64",
+      "dependencies": [],
+      "code-module": "macros",
+      "code-path": "src/macros.rs",
+      "code-text": { "lines-start": 10, "lines-end": 10 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    },
+    "probe:rust-micro/0.1.0/macros/convert_both()": {
+      "display-name": "convert_both",
+      "dependencies": [
+        "probe:rust-micro/0.1.0/macros/to_u64()",
+        "probe:rust-micro/0.1.0/macros/to_i64()"
+      ],
+      "code-module": "macros",
+      "code-path": "src/macros.rs",
+      "code-text": { "lines-start": 12, "lines-end": 14 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false
+    }
+  }
+}

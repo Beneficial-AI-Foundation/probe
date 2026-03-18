@@ -1,0 +1,51 @@
+{
+  "schema": "probe-aeneas/extract",
+  "schema-version": "2.0",
+  "tool": { "name": "probe-aeneas", "version": "0.1.0", "command": "extract" },
+  "source": {
+    "repo": "",
+    "commit": "",
+    "language": "rust",
+    "package": "aeneas-micro",
+    "package-version": "0.1.0"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "data": {
+    "probe:aeneas-micro/0.1.0/lib/clamp()": {
+      "display-name": "clamp",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 1, "lines-end": 3 },
+      "kind": "exec",
+      "language": "rust",
+      "translation-name": "probe:AeneasMicro/0.1.0/AeneasMicro/AeneasMicro.clamp",
+      "is-disabled": false
+    },
+    "probe:aeneas-micro/0.1.0/lib/mask_low()": {
+      "display-name": "mask_low",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 5, "lines-end": 7 },
+      "kind": "exec",
+      "language": "rust",
+      "translation-name": "probe:AeneasMicro/0.1.0/AeneasMicro/AeneasMicro.mask_low",
+      "is-disabled": false
+    },
+    "probe:aeneas-micro/0.1.0/lib/process()": {
+      "display-name": "process",
+      "dependencies": [
+        "probe:aeneas-micro/0.1.0/lib/clamp()",
+        "probe:aeneas-micro/0.1.0/lib/mask_low()"
+      ],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 9, "lines-end": 11 },
+      "kind": "exec",
+      "language": "rust",
+      "translation-name": "probe:AeneasMicro/0.1.0/AeneasMicro/AeneasMicro.process",
+      "is-disabled": false
+    }
+  }
+}

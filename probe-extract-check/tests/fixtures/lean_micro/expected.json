@@ -1,0 +1,115 @@
+{
+  "schema": "probe-lean/extract",
+  "schema-version": "2.0",
+  "tool": { "name": "probe-lean", "version": "0.1.0", "command": "extract" },
+  "source": {
+    "repo": "",
+    "commit": "",
+    "language": "lean",
+    "package": "LeanMicro",
+    "package-version": "0.1.0"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "data": {
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.add": {
+      "display-name": "add",
+      "dependencies": [],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 3, "lines-end": 4 },
+      "kind": "def",
+      "language": "lean",
+      "verification-status": "verified"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.double": {
+      "display-name": "double",
+      "dependencies": ["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.add"],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 6, "lines-end": 7 },
+      "kind": "def",
+      "language": "lean",
+      "verification-status": "verified"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.add_comm": {
+      "display-name": "add_comm",
+      "dependencies": ["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.add"],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 9, "lines-end": 10 },
+      "kind": "theorem",
+      "language": "lean",
+      "verification-status": "verified"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.Point": {
+      "display-name": "Point",
+      "dependencies": [],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 12, "lines-end": 14 },
+      "kind": "structure",
+      "language": "lean"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.Point.origin": {
+      "display-name": "origin",
+      "dependencies": [],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 16, "lines-end": 17 },
+      "kind": "def",
+      "language": "lean"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.Point.translate": {
+      "display-name": "translate",
+      "dependencies": ["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.add"],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 19, "lines-end": 20 },
+      "kind": "def",
+      "language": "lean",
+      "verification-status": "verified"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.double_eq_add_self": {
+      "display-name": "double_eq_add_self",
+      "dependencies": [
+        "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.add",
+        "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.double"
+      ],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 22, "lines-end": 23 },
+      "kind": "theorem",
+      "language": "lean",
+      "verification-status": "verified"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.HasSize": {
+      "display-name": "HasSize",
+      "dependencies": [],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 25, "lines-end": 26 },
+      "kind": "class",
+      "language": "lean"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.instHasSizePoint": {
+      "display-name": "instHasSizePoint",
+      "dependencies": ["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.add"],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 28, "lines-end": 29 },
+      "kind": "instance",
+      "language": "lean",
+      "verification-status": "verified"
+    },
+    "probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.sorry_example": {
+      "display-name": "sorry_example",
+      "dependencies": [],
+      "code-module": "LeanMicro.Basic",
+      "code-path": "LeanMicro/Basic.lean",
+      "code-text": { "lines-start": 31, "lines-end": 32 },
+      "kind": "theorem",
+      "language": "lean",
+      "verification-status": "failed"
+    }
+  }
+}

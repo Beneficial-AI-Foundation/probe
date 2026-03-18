@@ -1,0 +1,70 @@
+{
+  "schema": "probe-verus/extract",
+  "schema-version": "2.0",
+  "tool": { "name": "probe-verus", "version": "3.0.0", "command": "extract" },
+  "source": {
+    "repo": "",
+    "commit": "",
+    "language": "rust",
+    "package": "verus-micro",
+    "package-version": "0.1.0"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "data": {
+    "probe:verus-micro/0.1.0/lib/is_positive()": {
+      "display-name": "is_positive",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 5, "lines-end": 7 },
+      "kind": "spec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:verus-micro/0.1.0/lib/positive_sum()": {
+      "display-name": "positive_sum",
+      "dependencies": ["probe:verus-micro/0.1.0/lib/is_positive()"],
+      "requires-dependencies": ["probe:verus-micro/0.1.0/lib/is_positive()"],
+      "ensures-dependencies": ["probe:verus-micro/0.1.0/lib/is_positive()"],
+      "body-dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 9, "lines-end": 17 },
+      "kind": "proof",
+      "language": "rust",
+      "is-disabled": false,
+      "verification-status": "verified"
+    },
+    "probe:verus-micro/0.1.0/lib/checked_add()": {
+      "display-name": "checked_add",
+      "dependencies": ["probe:verus-micro/0.1.0/lib/is_positive()"],
+      "requires-dependencies": ["probe:verus-micro/0.1.0/lib/is_positive()"],
+      "ensures-dependencies": [],
+      "body-dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 18, "lines-end": 26 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false,
+      "verification-status": "verified"
+    },
+    "probe:verus-micro/0.1.0/lib/double_checked()": {
+      "display-name": "double_checked",
+      "dependencies": [
+        "probe:verus-micro/0.1.0/lib/checked_add()",
+        "probe:verus-micro/0.1.0/lib/is_positive()"
+      ],
+      "requires-dependencies": ["probe:verus-micro/0.1.0/lib/is_positive()"],
+      "ensures-dependencies": [],
+      "body-dependencies": ["probe:verus-micro/0.1.0/lib/checked_add()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 28, "lines-end": 36 },
+      "kind": "exec",
+      "language": "rust",
+      "is-disabled": false,
+      "verification-status": "verified"
+    }
+  }
+}
