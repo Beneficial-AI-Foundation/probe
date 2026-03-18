@@ -75,7 +75,38 @@ pub fn check_source(data: &BTreeMap<String, Atom>, project_path: &Path) -> Vec<D
 }
 
 fn check_atom_source(key: &str, atom: &Atom, project_path: &Path, diags: &mut Vec<Diagnostic>) {
+    if std::path::Path::new(&atom.code_path).is_absolute()
+        || atom.code_path.contains("..")
+        || atom.code_path.starts_with('~')
+    {
+        diags.push(Diagnostic {
+            level: Level::Error,
+            atom_key: Some(key.into()),
+            message: format!(
+                "code-path contains path traversal or absolute path: {}",
+                atom.code_path
+            ),
+        });
+        return;
+    }
+
     let file_path = project_path.join(&atom.code_path);
+
+    if let (Ok(canonical_root), Ok(canonical_file)) =
+        (project_path.canonicalize(), file_path.canonicalize())
+    {
+        if !canonical_file.starts_with(&canonical_root) {
+            diags.push(Diagnostic {
+                level: Level::Error,
+                atom_key: Some(key.into()),
+                message: format!(
+                    "code-path escapes project root (symlink?): {}",
+                    atom.code_path
+                ),
+            });
+            return;
+        }
+    }
 
     // 1. File exists
     if !file_path.is_file() {
@@ -344,5 +375,56 @@ mod tests {
         let diags = check_source(&data, tmp.path());
         let errors: Vec<_> = diags.iter().filter(|d| d.level == Level::Error).collect();
         assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+    }
+
+    // =========================================================================
+    // Security tests: path traversal (V1)
+    // =========================================================================
+
+    /// V1: code_path with `..` components can escape the project directory.
+    #[test]
+    fn test_path_traversal_with_dotdot() {
+        let tmp = TempDir::new().unwrap();
+        let src_dir = tmp.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(src_dir.join("lib.rs"), "fn foo() {}\n").unwrap();
+
+        let mut data = BTreeMap::new();
+        data.insert(
+            "probe:t/1/m/evil()".into(),
+            make_atom("evil", "../../../etc/passwd", 1, 1, "exec", "rust"),
+        );
+
+        let diags = check_source(&data, tmp.path());
+
+        // With V1 bug: the code joins the path and tries to read /etc/passwd.
+        // It should either produce an error about path traversal, or fail to
+        // find the file. Either way, no silent success.
+        let has_error = diags.iter().any(|d| d.level == Level::Error);
+        assert!(
+            has_error,
+            "path traversal with .. should produce an error, got: {diags:?}"
+        );
+    }
+
+    /// V1: code_path with absolute path should not escape the project.
+    #[test]
+    fn test_absolute_path_treated_as_error() {
+        let tmp = TempDir::new().unwrap();
+        let mut data = BTreeMap::new();
+        data.insert(
+            "probe:t/1/m/evil()".into(),
+            make_atom("evil", "/etc/passwd", 1, 1, "exec", "rust"),
+        );
+
+        let diags = check_source(&data, tmp.path());
+
+        // Path::join replaces the base when the right-hand side is absolute.
+        // The code would try to read /etc/passwd directly.
+        let has_error = diags.iter().any(|d| d.level == Level::Error);
+        assert!(
+            has_error,
+            "absolute path should produce an error, got: {diags:?}"
+        );
     }
 }

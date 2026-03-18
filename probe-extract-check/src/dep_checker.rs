@@ -156,8 +156,16 @@ fn get_file_lines<'a>(
     project_path: &Path,
     cache: &'a mut BTreeMap<String, Vec<String>>,
 ) -> Option<&'a Vec<String>> {
+    if std::path::Path::new(code_path).is_absolute() || code_path.contains("..") {
+        return None;
+    }
     if !cache.contains_key(code_path) {
         let full_path = project_path.join(code_path);
+        if let (Ok(root), Ok(resolved)) = (project_path.canonicalize(), full_path.canonicalize()) {
+            if !resolved.starts_with(&root) {
+                return None;
+            }
+        }
         let content = std::fs::read_to_string(&full_path).ok()?;
         let lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
         cache.insert(code_path.to_string(), lines);

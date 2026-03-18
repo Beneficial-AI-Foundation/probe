@@ -48,10 +48,9 @@ fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, us
                 for entry in arr {
                     if let Some(cn) = entry.get("code-name").and_then(|v| v.as_str()) {
                         let norm = normalize_code_name(cn);
-                        entry
-                            .as_object_mut()
-                            .unwrap()
-                            .insert("code-name".to_string(), serde_json::Value::String(norm));
+                        if let Some(obj) = entry.as_object_mut() {
+                            obj.insert("code-name".to_string(), serde_json::Value::String(norm));
+                        }
                     }
                 }
             }
@@ -363,8 +362,17 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, translations_path: Optio
                 data: merged,
             };
 
-            let json = serde_json::to_string_pretty(&envelope).expect("Failed to serialize JSON");
-            std::fs::write(&output, &json).expect("Failed to write output file");
+            let json = match serde_json::to_string_pretty(&envelope) {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("Error: failed to serialize merged atoms: {e}");
+                    std::process::exit(1);
+                }
+            };
+            if let Err(e) = std::fs::write(&output, &json) {
+                eprintln!("Error: failed to write {}: {e}", output.display());
+                std::process::exit(1);
+            }
 
             print_stats(&output, &stats);
         }
@@ -397,8 +405,17 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, translations_path: Optio
                 data: merged,
             };
 
-            let json = serde_json::to_string_pretty(&envelope).expect("Failed to serialize JSON");
-            std::fs::write(&output, &json).expect("Failed to write output file");
+            let json = match serde_json::to_string_pretty(&envelope) {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("Error: failed to serialize merged data: {e}");
+                    std::process::exit(1);
+                }
+            };
+            if let Err(e) = std::fs::write(&output, &json) {
+                eprintln!("Error: failed to write {}: {e}", output.display());
+                std::process::exit(1);
+            }
 
             print_stats(&output, &stats);
         }
@@ -1041,6 +1058,43 @@ mod tests {
         assert_ne!(
             cat_s, cat_a,
             "different categories should be distinguishable"
+        );
+    }
+
+    // =========================================================================
+    // Edge case tests (C8, C9)
+    // =========================================================================
+
+    /// C8: Duplicate translation `from` keys silently overwrite earlier mappings.
+    #[test]
+    fn test_duplicate_translation_from_keys_overwrite() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("translations.json");
+        let content = serde_json::json!({
+            "schema": "probe/translations",
+            "schema-version": "2.0",
+            "mappings": [
+                {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"},
+                {"from": "probe:a/1.0/f()", "to": "probe:a.lean.g", "confidence": "high"}
+            ]
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&content).unwrap()).unwrap();
+
+        let (from_to, _to_from) = load_translations(&path).unwrap();
+
+        // BUG C8: The second mapping overwrites the first.
+        // from_to["probe:a/1.0/f()"] == "probe:a.lean.g" (last wins)
+        // The first mapping to "probe:a.lean.f" is silently lost.
+        let mapped = from_to.get("probe:a/1.0/f()").unwrap();
+        eprintln!(
+            "C8: duplicate from key mapped to {:?} (other mapping silently lost)",
+            mapped
+        );
+        // There's only 1 entry for the duplicate key — the second one.
+        assert_eq!(
+            from_to.len(),
+            1,
+            "duplicate 'from' key should result in a single entry"
         );
     }
 }

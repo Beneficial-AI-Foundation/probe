@@ -326,8 +326,18 @@ pub fn load_translations(
     let mut to_from = HashMap::new();
 
     for mapping in &file.mappings {
-        from_to.insert(mapping.from.clone(), mapping.to.clone());
-        to_from.insert(mapping.to.clone(), mapping.from.clone());
+        if let Some(prev) = from_to.insert(mapping.from.clone(), mapping.to.clone()) {
+            eprintln!(
+                "Warning: duplicate translation 'from' key {:?}: {:?} -> {:?} (was {:?})",
+                mapping.from, mapping.from, mapping.to, prev
+            );
+        }
+        if let Some(prev) = to_from.insert(mapping.to.clone(), mapping.from.clone()) {
+            eprintln!(
+                "Warning: duplicate translation 'to' key {:?}: {:?} -> {:?} (was {:?})",
+                mapping.to, mapping.to, mapping.from, prev
+            );
+        }
     }
 
     Ok((from_to, to_from))

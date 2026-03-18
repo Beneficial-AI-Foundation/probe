@@ -100,7 +100,7 @@
         },
         "language": {
           "type": "string",
-          "enum": ["rust", "lean", "latex"],
+          "enum": ["rust", "lean", "latex", "verus"],
           "description": "Source language."
         },
         "package": {
@@ -172,7 +172,7 @@
         },
         "language": {
           "type": "string",
-          "enum": ["rust", "lean", "latex"],
+          "enum": ["rust", "lean", "latex", "verus"],
           "description": "Source language of this atom."
         }
       },

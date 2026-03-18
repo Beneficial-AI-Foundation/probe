@@ -171,9 +171,12 @@ fn walk_source_files(dir: &Path, extension: &str, f: &mut dyn FnMut(&str)) {
     };
 
     for entry in entries.flatten() {
+        let ft = entry.file_type();
+        if ft.is_ok_and(|t| t.is_symlink()) {
+            continue;
+        }
         let path = entry.path();
         if path.is_dir() {
-            // Skip hidden dirs and build dirs
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             if !name.starts_with('.') && name != "target" && name != ".lake" {
                 walk_source_files(&path, extension, f);
