@@ -178,7 +178,7 @@ fn walk_source_files(dir: &Path, extension: &str, f: &mut dyn FnMut(&str)) {
             if !name.starts_with('.') && name != "target" && name != ".lake" {
                 walk_source_files(&path, extension, f);
             }
-        } else if path.extension().map_or(false, |e| e == extension) {
+        } else if path.extension().is_some_and(|e| e == extension) {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 f(&content);
             }
@@ -248,7 +248,10 @@ mod tests {
 
         let mut diags = Vec::new();
         check_completeness(&data, tmp.path(), &mut diags);
-        assert!(diags.is_empty(), "good ratio should produce no warnings: {diags:?}");
+        assert!(
+            diags.is_empty(),
+            "good ratio should produce no warnings: {diags:?}"
+        );
     }
 
     #[test]
@@ -288,6 +291,9 @@ mod tests {
 
         let mut diags = Vec::new();
         check_completeness(&data, tmp.path(), &mut diags);
-        assert!(diags.is_empty(), "good lean ratio should produce no warnings: {diags:?}");
+        assert!(
+            diags.is_empty(),
+            "good lean ratio should produce no warnings: {diags:?}"
+        );
     }
 }

@@ -23,7 +23,10 @@ struct DeclPatterns {
 fn rust_patterns() -> DeclPatterns {
     DeclPatterns {
         kind_patterns: vec![
-            ("exec".into(), Regex::new(r"\b(pub\s+)?(async\s+)?fn\b").unwrap()),
+            (
+                "exec".into(),
+                Regex::new(r"\b(pub\s+)?(async\s+)?fn\b").unwrap(),
+            ),
             ("proof".into(), Regex::new(r"\bproof\s+fn\b").unwrap()),
             ("spec".into(), Regex::new(r"\bspec\s+fn\b").unwrap()),
         ],
@@ -57,10 +60,7 @@ fn patterns_for_language(lang: &str) -> DeclPatterns {
 }
 
 /// Run source-grounded checks for all non-stub atoms.
-pub fn check_source(
-    data: &BTreeMap<String, Atom>,
-    project_path: &Path,
-) -> Vec<Diagnostic> {
+pub fn check_source(data: &BTreeMap<String, Atom>, project_path: &Path) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
 
     for (key, atom) in data {
@@ -74,12 +74,7 @@ pub fn check_source(
     diags
 }
 
-fn check_atom_source(
-    key: &str,
-    atom: &Atom,
-    project_path: &Path,
-    diags: &mut Vec<Diagnostic>,
-) {
+fn check_atom_source(key: &str, atom: &Atom, project_path: &Path, diags: &mut Vec<Diagnostic>) {
     let file_path = project_path.join(&atom.code_path);
 
     // 1. File exists
@@ -133,7 +128,9 @@ fn check_atom_source(
     // 3. Check display-name appears in span
     let name = &atom.display_name;
     let patterns = patterns_for_language(&atom.language);
-    let name_re_str = patterns.name_pattern_template.replace("{NAME}", &regex::escape(name));
+    let name_re_str = patterns
+        .name_pattern_template
+        .replace("{NAME}", &regex::escape(name));
     let name_re = match Regex::new(&name_re_str) {
         Ok(r) => r,
         Err(_) => {
@@ -149,8 +146,7 @@ fn check_atom_source(
     if !name_re.is_match(&span_text) {
         // Lean instances often have auto-generated names (e.g., instHasSizePoint)
         // that don't appear in source. Skip name check if the span has `instance`.
-        let is_auto_named_instance =
-            atom.kind == "instance" && span_text.contains("instance");
+        let is_auto_named_instance = atom.kind == "instance" && span_text.contains("instance");
         if !is_auto_named_instance {
             diags.push(Diagnostic {
                 level: Level::Error,
@@ -213,9 +209,7 @@ fn check_kind_match(
                 diags.push(Diagnostic {
                     level: Level::Warning,
                     atom_key: Some(key.into()),
-                    message: format!(
-                        "kind is '{kind}' but source span matches '{found_kind}'"
-                    ),
+                    message: format!("kind is '{kind}' but source span matches '{found_kind}'"),
                 });
             }
         }
@@ -224,9 +218,7 @@ fn check_kind_match(
             diags.push(Diagnostic {
                 level: Level::Warning,
                 atom_key: Some(key.into()),
-                message: format!(
-                    "no declaration keyword found in source span for kind '{kind}'"
-                ),
+                message: format!("no declaration keyword found in source span for kind '{kind}'"),
             });
         }
     }
@@ -287,7 +279,9 @@ mod tests {
         );
 
         let diags = check_source(&data, tmp.path());
-        assert!(diags.iter().any(|d| d.message.contains("code-path not found")));
+        assert!(diags
+            .iter()
+            .any(|d| d.message.contains("code-path not found")));
     }
 
     #[test]
@@ -304,7 +298,9 @@ mod tests {
         );
 
         let diags = check_source(&data, tmp.path());
-        assert!(diags.iter().any(|d| d.message.contains("exceeds file length")));
+        assert!(diags
+            .iter()
+            .any(|d| d.message.contains("exceeds file length")));
     }
 
     #[test]
@@ -325,7 +321,9 @@ mod tests {
         );
 
         let diags = check_source(&data, tmp.path());
-        assert!(diags.iter().any(|d| d.message.contains("display-name 'foo' not found")));
+        assert!(diags
+            .iter()
+            .any(|d| d.message.contains("display-name 'foo' not found")));
     }
 
     #[test]

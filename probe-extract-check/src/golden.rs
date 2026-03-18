@@ -30,7 +30,11 @@ impl std::fmt::Display for Diff {
             DiffKind::Missing => write!(f, "MISSING {}", self.path),
             DiffKind::Extra => write!(f, "EXTRA   {}", self.path),
             DiffKind::TypeMismatch { expected, actual } => {
-                write!(f, "TYPE    {} expected={expected}, actual={actual}", self.path)
+                write!(
+                    f,
+                    "TYPE    {} expected={expected}, actual={actual}",
+                    self.path
+                )
             }
             DiffKind::ValueMismatch { expected, actual } => {
                 write!(
@@ -85,7 +89,12 @@ fn compare_values(expected: &Value, actual: &Value, path: &str, diffs: &mut Vec<
                         });
                     }
                 } else {
-                    compare_values(&exp_map[key.as_str()], &act_map[key.as_str()], &child_path, diffs);
+                    compare_values(
+                        &exp_map[key.as_str()],
+                        &act_map[key.as_str()],
+                        &child_path,
+                        diffs,
+                    );
                 }
             }
 
@@ -180,7 +189,10 @@ mod tests {
             "data": {}
         });
         let diffs = compare(&expected, &actual);
-        assert!(diffs.is_empty(), "volatile fields should be ignored, got: {diffs:?}");
+        assert!(
+            diffs.is_empty(),
+            "volatile fields should be ignored, got: {diffs:?}"
+        );
     }
 
     #[test]

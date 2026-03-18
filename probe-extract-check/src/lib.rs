@@ -68,6 +68,5 @@ pub fn check_all(envelope: &AtomEnvelope, project_path: Option<&Path>) -> CheckR
 pub fn load_extract_json(path: &Path) -> Result<AtomEnvelope, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
-    serde_json::from_str(&content)
-        .map_err(|e| format!("failed to parse {}: {e}", path.display()))
+    serde_json::from_str(&content).map_err(|e| format!("failed to parse {}: {e}", path.display()))
 }

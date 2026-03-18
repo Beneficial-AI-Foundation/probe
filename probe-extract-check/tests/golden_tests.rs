@@ -33,7 +33,11 @@ fn check_golden(fixture_name: &str, project_subdir: Option<&str>) {
         report.print_summary();
     }
 
-    let errors: Vec<_> = report.diagnostics.iter().filter(|d| d.level == Level::Error).collect();
+    let errors: Vec<_> = report
+        .diagnostics
+        .iter()
+        .filter(|d| d.level == Level::Error)
+        .collect();
     assert!(
         errors.is_empty(),
         "{fixture_name}: expected no errors, got {} error(s):\n{}",
@@ -121,15 +125,13 @@ fn golden_rust_micro_trait_impls() {
     assert_eq!(circle_area.display_name, "area");
     assert_eq!(circle_area.code_path, "src/shapes.rs");
 
-    let rect_area =
-        &envelope.data["probe:rust-micro/0.1.0/shapes/&Rect#impl#[Rect][Area]area()"];
+    let rect_area = &envelope.data["probe:rust-micro/0.1.0/shapes/&Rect#impl#[Rect][Area]area()"];
     assert_eq!(rect_area.display_name, "area");
     assert_eq!(rect_area.code_path, "src/shapes.rs");
 
     // Different line ranges despite same display-name
     assert_ne!(
-        circle_area.code_text.lines_start,
-        rect_area.code_text.lines_start,
+        circle_area.code_text.lines_start, rect_area.code_text.lines_start,
         "trait impls should have different line ranges"
     );
 }
@@ -268,11 +270,7 @@ fn golden_verus_micro_categorized_deps() {
         .extensions
         .get("body-dependencies")
         .and_then(|v| v.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str())
-                .collect::<Vec<_>>()
-        })
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
         .unwrap_or_default();
     assert!(
         body_deps.contains(&"probe:verus-micro/0.1.0/lib/checked_add()"),
@@ -348,8 +346,7 @@ fn golden_lean_micro_instance() {
     let json_path = Path::new(FIXTURES).join("lean_micro/expected.json");
     let envelope = probe_extract_check::load_extract_json(&json_path).unwrap();
 
-    let inst =
-        &envelope.data["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.instHasSizePoint"];
+    let inst = &envelope.data["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.instHasSizePoint"];
     assert_eq!(inst.kind, "instance");
     assert!(
         inst.dependencies
@@ -363,8 +360,7 @@ fn golden_lean_micro_sorry() {
     let json_path = Path::new(FIXTURES).join("lean_micro/expected.json");
     let envelope = probe_extract_check::load_extract_json(&json_path).unwrap();
 
-    let sorry_thm =
-        &envelope.data["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.sorry_example"];
+    let sorry_thm = &envelope.data["probe:LeanMicro/0.1.0/LeanMicro.Basic/LeanMicro.sorry_example"];
     assert_eq!(sorry_thm.kind, "theorem");
     let status = sorry_thm
         .extensions
@@ -400,7 +396,7 @@ fn golden_aeneas_micro_translations() {
     let json_path = Path::new(FIXTURES).join("aeneas_micro/expected.json");
     let envelope = probe_extract_check::load_extract_json(&json_path).unwrap();
 
-    for (_key, atom) in &envelope.data {
+    for atom in envelope.data.values() {
         let translation = atom
             .extensions
             .get("translation-name")
@@ -472,12 +468,7 @@ fn properties_aeneas_micro() {
 // =========================================================================
 
 /// Run an external tool and compare output to golden file using structural diff.
-fn run_tool_and_compare(
-    tool_binary: &str,
-    args: &[&str],
-    output_path: &Path,
-    golden_path: &Path,
-) {
+fn run_tool_and_compare(tool_binary: &str, args: &[&str], output_path: &Path, golden_path: &Path) {
     use std::process::Command;
 
     let status = Command::new(tool_binary)

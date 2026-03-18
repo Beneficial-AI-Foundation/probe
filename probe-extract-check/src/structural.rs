@@ -84,10 +84,7 @@ fn check_envelope_fields(envelope: &AtomEnvelope, diags: &mut Vec<Diagnostic>) {
 }
 
 /// Verify that all atoms have valid line ranges.
-fn check_line_ranges(
-    data: &std::collections::BTreeMap<String, Atom>,
-    diags: &mut Vec<Diagnostic>,
-) {
+fn check_line_ranges(data: &std::collections::BTreeMap<String, Atom>, diags: &mut Vec<Diagnostic>) {
     for (key, atom) in data {
         // Stubs have 0/0 ranges — skip them.
         if atom.is_stub() {
@@ -179,7 +176,10 @@ mod tests {
     #[test]
     fn test_valid_envelope_no_errors() {
         let mut data = BTreeMap::new();
-        data.insert("probe:t/1/m/a()".into(), make_atom("a", &["probe:t/1/m/b()"], 1, 10));
+        data.insert(
+            "probe:t/1/m/a()".into(),
+            make_atom("a", &["probe:t/1/m/b()"], 1, 10),
+        );
         data.insert("probe:t/1/m/b()".into(), make_atom("b", &[], 12, 20));
         let envelope = make_envelope(data);
         let diags = check_structural(&envelope);
@@ -193,7 +193,9 @@ mod tests {
         data.insert("probe:t/1/m/a()".into(), make_atom("a", &[], 20, 10));
         let envelope = make_envelope(data);
         let diags = check_structural(&envelope);
-        assert!(diags.iter().any(|d| d.message.contains("lines-start (20) > lines-end (10)")));
+        assert!(diags
+            .iter()
+            .any(|d| d.message.contains("lines-start (20) > lines-end (10)")));
     }
 
     #[test]
@@ -205,7 +207,9 @@ mod tests {
         );
         let envelope = make_envelope(data);
         let diags = check_structural(&envelope);
-        assert!(diags.iter().any(|d| d.message.contains("not found in data")));
+        assert!(diags
+            .iter()
+            .any(|d| d.message.contains("not found in data")));
     }
 
     #[test]

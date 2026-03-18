@@ -10,10 +10,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Run dependency checks for all non-stub atoms.
-pub fn check_deps(
-    data: &BTreeMap<String, Atom>,
-    project_path: &Path,
-) -> Vec<Diagnostic> {
+pub fn check_deps(data: &BTreeMap<String, Atom>, project_path: &Path) -> Vec<Diagnostic> {
     let mut diags = Vec::new();
     // Cache file contents to avoid re-reading
     let mut file_cache: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -48,7 +45,7 @@ pub fn check_deps(
         }
 
         // Check dependencies_with_locations if present
-        check_located_deps(key, atom, &lines, data, &mut diags);
+        check_located_deps(key, atom, lines, data, &mut diags);
     }
 
     diags
@@ -204,10 +201,22 @@ mod tests {
         let mut data = BTreeMap::new();
         data.insert(
             "probe:t/1/m/foo()".into(),
-            make_atom("foo", "src/lib.rs", 1, 4, &["probe:t/1/m/bar()", "probe:t/1/m/baz()"]),
+            make_atom(
+                "foo",
+                "src/lib.rs",
+                1,
+                4,
+                &["probe:t/1/m/bar()", "probe:t/1/m/baz()"],
+            ),
         );
-        data.insert("probe:t/1/m/bar()".into(), make_atom("bar", "src/lib.rs", 5, 5, &[]));
-        data.insert("probe:t/1/m/baz()".into(), make_atom("baz", "src/lib.rs", 6, 6, &[]));
+        data.insert(
+            "probe:t/1/m/bar()".into(),
+            make_atom("bar", "src/lib.rs", 5, 5, &[]),
+        );
+        data.insert(
+            "probe:t/1/m/baz()".into(),
+            make_atom("baz", "src/lib.rs", 6, 6, &[]),
+        );
 
         let diags = check_deps(&data, tmp.path());
         assert!(diags.is_empty(), "expected no diagnostics, got: {diags:?}");
@@ -229,9 +238,14 @@ mod tests {
             "probe:t/1/m/foo()".into(),
             make_atom("foo", "src/lib.rs", 1, 3, &["probe:t/1/m/bar()"]),
         );
-        data.insert("probe:t/1/m/bar()".into(), make_atom("bar", "src/lib.rs", 4, 4, &[]));
+        data.insert(
+            "probe:t/1/m/bar()".into(),
+            make_atom("bar", "src/lib.rs", 4, 4, &[]),
+        );
 
         let diags = check_deps(&data, tmp.path());
-        assert!(diags.iter().any(|d| d.message.contains("not found as identifier")));
+        assert!(diags
+            .iter()
+            .any(|d| d.message.contains("not found as identifier")));
     }
 }
