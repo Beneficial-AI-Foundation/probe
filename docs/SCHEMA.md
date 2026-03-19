@@ -1,6 +1,6 @@
 # Probe Atom Interchange Specification
 
-Version: 2.0-draft
+Version: 2.0
 
 ## Purpose
 
@@ -33,10 +33,13 @@ The `schema` field identifies the producing tool and data type. Format: `<tool>/
 | `probe-verus/extract` | Rust/Verus unified pipeline output (atoms + specs + proofs) | Atoms |
 | `probe-verus/specs` | Rust/Verus function specifications | Specs |
 | `probe-verus/proofs` | Rust/Verus verification results | Proofs |
+| `probe-verus/stubs` | Rust/Verus stubs (output of the `stubify` command) | Atoms |
+| `probe-verus/verification-report` | Rust/Verus verification report (output of `verify` without atoms enrichment) | Proofs |
 | `probe-lean/extract` | Lean unified pipeline output (atoms + specs + verification) | Atoms |
 | `probe-lean/enriched-atoms` | Lean atoms + specs + proofs combined (legacy) | Atoms |
 | `probe-lean/specs` | Lean specification status | Specs |
 | `probe-lean/proofs` | Lean verification results (sorry detection) | Proofs |
+| `probe-lean/stubs` | Lean stubs (output of the `stubify` command) | Atoms |
 | `probe-aeneas/extract` | Cross-language Rust+Lean merged atoms (Aeneas projects) | Atoms |
 | `probe-latex/atoms` | LaTeX atoms (reserved, not yet defined) | Atoms |
 | `probe/merged-atoms` | Merged atoms from multiple tools | Atoms |

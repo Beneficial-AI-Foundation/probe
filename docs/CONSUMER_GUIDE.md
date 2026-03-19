@@ -185,6 +185,26 @@ real_atoms = {
 }
 ```
 
+## Validating extract output
+
+The [`probe-extract-check`](https://github.com/Beneficial-AI-Foundation/probe/tree/main/probe-extract-check)
+tool (included in the probe repo) validates extract JSON against the
+source code it was generated from. It checks file existence, line
+ranges, display-name presence, kind correctness, and dependency
+consistency.
+
+```bash
+# Structural checks only (no source needed)
+probe-extract-check output.json
+
+# Full validation against the source project
+probe-extract-check output.json --project /path/to/project
+```
+
+See [extract-check-design.md](extract-check-design.md) for the full
+list of checks and [probe-extract-check/TESTING.md](../probe-extract-check/TESTING.md)
+for the test guide.
+
 ## Installation
 
 For installation instructions, see the README in each probe's

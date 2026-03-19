@@ -7,6 +7,7 @@ This repository contains:
 - **Specification documents** defining the interchange format for atom files
 - **JSON Schema** for machine-validatable envelope and atom structure
 - **`probe` CLI** for cross-tool operations (currently: `merge`)
+- **`probe-extract-check`** -- validator that checks extract JSON correctness against source code
 
 ## Documentation
 
@@ -16,6 +17,10 @@ This repository contains:
 - [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
 - [docs/merge-algorithm.md](docs/merge-algorithm.md) -- Merge algorithm specification
+- [docs/translations-spec.md](docs/translations-spec.md) -- Cross-language translation file format
+- [docs/categorical-framework.md](docs/categorical-framework.md) -- Categorical/algebraic structure of probe merge
+- [docs/extract-check-design.md](docs/extract-check-design.md) -- Design of the extract-check validation tool
+- [probe-extract-check/TESTING.md](probe-extract-check/TESTING.md) -- Test guide for probe-extract-check
 - [schemas/atom-envelope.schema.json](schemas/atom-envelope.schema.json) -- JSON Schema
 
 ## Usage
@@ -87,5 +92,8 @@ curl -sL https://raw.githubusercontent.com/Beneficial-AI-Foundation/probe/main/s
 
 ## Related projects
 
+- [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) -- Rust call graph atoms from SCIP index
 - [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) -- Rust/Verus call graph atoms and verification
 - [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) -- Lean call graph atoms and verification
+- [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) -- Cross-language Rust+Lean merged atoms (Aeneas projects)
+- [scip-callgraph](https://github.com/Beneficial-AI-Foundation/scip-callgraph) -- Interactive web viewer for probe data ([live demo](https://beneficial-ai-foundation.github.io/scip-callgraph/))
