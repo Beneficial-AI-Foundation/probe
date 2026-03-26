@@ -86,7 +86,7 @@ probe-aeneas is not a composition operator. It is a **functor factory** — it p
   1. `rust-qualified-name` match (Charon-derived)
   2. `file+display-name` match
   3. `file+line-overlap` match
-- **`probe-aeneas extract`**: orchestrate the full pipeline — run probe-rust, run probe-lean, generate translations, invoke `probe merge --translations`.
+- **`probe-aeneas extract <project_path>`**: orchestrate the full pipeline — resolve Rust/Lean paths from `aeneas-config.yml`, run probe-rust and probe-lean, generate translations, merge with cross-language edges.
 
 The domain knowledge about how Aeneas transpilation relates Rust names to Lean names lives in probe-aeneas. The generic composition law lives in probe merge. They don't mix.
 

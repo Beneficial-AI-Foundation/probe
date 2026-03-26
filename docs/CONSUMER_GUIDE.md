@@ -23,13 +23,14 @@ The typical command for each tool is:
 probe-rust  extract <project_path>
 probe-lean  extract <project_path>
 probe-verus extract <project_path>
-probe-aeneas extract --rust-project <rust_project_path> --lean-project <lean_project_path>
+probe-aeneas extract <project_path>
 ```
 
-If you already have extracted JSON files (e.g. from previous probe-rust
-/ probe-lean runs), you can pass them directly to skip re-extraction.
-The Lean project path is still needed to compute the mapping between
-Rust and Lean identifiers:
+For probe-aeneas, the project path must be an Aeneas project directory
+containing `aeneas-config.yml`. The tool reads `crate.dir` from the
+config to locate the Rust crate and uses the project root as the Lean
+project. If you already have extracted JSON files, you can use the
+advanced flags instead:
 
 ```bash
 probe-aeneas extract --rust <rust_json> --lean <lean_json> --lean-project <lean_project_path>

@@ -19,6 +19,7 @@ pub fn check_properties(
     let mut diags = Vec::new();
 
     check_location_overlap(data, &mut diags);
+    check_array_ordering(data, &mut diags);
 
     if let Some(path) = project_path {
         check_completeness(data, path, &mut diags);
@@ -58,6 +59,47 @@ fn check_location_overlap(data: &BTreeMap<String, Atom>, diags: &mut Vec<Diagnos
                     keys.join(", ")
                 ),
             });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Array ordering (P14)
+// ---------------------------------------------------------------------------
+
+/// `dependencies-with-locations` must be sorted by (line, code-name) per P14.
+fn check_array_ordering(data: &BTreeMap<String, Atom>, diags: &mut Vec<Diagnostic>) {
+    for (key, atom) in data {
+        if let Some(dwl) = atom.extensions.get("dependencies-with-locations") {
+            if let Some(arr) = dwl.as_array() {
+                let entries: Vec<(u64, &str)> = arr
+                    .iter()
+                    .filter_map(|entry| {
+                        let line = entry.get("line").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let cn = entry
+                            .get("code-name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        Some((line, cn))
+                    })
+                    .collect();
+
+                for window in entries.windows(2) {
+                    let (l1, cn1) = window[0];
+                    let (l2, cn2) = window[1];
+                    if (l1, cn1) > (l2, cn2) {
+                        diags.push(Diagnostic {
+                            level: Level::Warning,
+                            atom_key: Some(key.clone()),
+                            message: format!(
+                                "dependencies-with-locations not sorted by (line, code-name): \
+                                 ({l1}, {cn1}) > ({l2}, {cn2}) — violates P14 (deterministic output)"
+                            ),
+                        });
+                        break;
+                    }
+                }
+            }
         }
     }
 }
@@ -193,6 +235,7 @@ fn walk_source_files(dir: &Path, extension: &str, f: &mut dyn FnMut(&str)) {
 mod tests {
     use super::*;
     use probe::types::CodeText;
+    use serde_json::json;
     use std::collections::BTreeSet;
     use tempfile::TempDir;
 
@@ -298,5 +341,66 @@ mod tests {
             diags.is_empty(),
             "good lean ratio should produce no warnings: {diags:?}"
         );
+    }
+
+    fn make_atom_with_dwl(name: &str, dwl: serde_json::Value) -> Atom {
+        let mut extensions = BTreeMap::new();
+        extensions.insert("dependencies-with-locations".to_string(), dwl);
+        Atom {
+            display_name: name.into(),
+            dependencies: BTreeSet::new(),
+            code_module: "mod".into(),
+            code_path: "src/lib.rs".into(),
+            code_text: CodeText {
+                lines_start: 1,
+                lines_end: 10,
+            },
+            kind: "exec".into(),
+            language: "rust".into(),
+            extensions,
+        }
+    }
+
+    #[test]
+    fn test_sorted_dwl_passes() {
+        let atom = make_atom_with_dwl(
+            "foo",
+            json!([
+                {"code-name": "a", "line": 5, "location": "inner"},
+                {"code-name": "a", "line": 10, "location": "inner"},
+                {"code-name": "b", "line": 10, "location": "inner"},
+            ]),
+        );
+        let mut data = BTreeMap::new();
+        data.insert("probe:test/foo()".into(), atom);
+        let mut diags = Vec::new();
+        check_array_ordering(&data, &mut diags);
+        assert!(diags.is_empty(), "sorted DWL should pass: {diags:?}");
+    }
+
+    #[test]
+    fn test_unsorted_dwl_warns() {
+        let atom = make_atom_with_dwl(
+            "foo",
+            json!([
+                {"code-name": "b", "line": 10, "location": "inner"},
+                {"code-name": "a", "line": 5, "location": "inner"},
+            ]),
+        );
+        let mut data = BTreeMap::new();
+        data.insert("probe:test/foo()".into(), atom);
+        let mut diags = Vec::new();
+        check_array_ordering(&data, &mut diags);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("not sorted"));
+    }
+
+    #[test]
+    fn test_no_dwl_passes() {
+        let mut data = BTreeMap::new();
+        data.insert("a".into(), make_atom("foo", "src/lib.rs", 1, 5, "rust"));
+        let mut diags = Vec::new();
+        check_array_ordering(&data, &mut diags);
+        assert!(diags.is_empty());
     }
 }

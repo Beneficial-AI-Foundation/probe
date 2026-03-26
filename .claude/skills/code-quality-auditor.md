@@ -36,6 +36,20 @@ Check the implementation against KB-defined properties and architectural constra
 - Shared patterns: SCIP caching, auto-install, envelope construction follow documented patterns
 - Naming: code uses terms as defined in `glossary.md`
 
+### Documentation staleness checks
+
+For each tool repo (probe-verus, probe-lean, etc.), verify docs reflect the current state:
+
+- **Version numbers in example JSON**: `"version"` in illustrative JSON blocks should match `Cargo.toml`
+- **Command names**: no references to renamed/removed commands (e.g., old `verify`/`run` when `extract` is current)
+- **CLI flags**: option lists and examples don't reference deprecated flags
+- **Output filenames**: documented filenames match what the code actually produces
+- **Schema names**: envelope `"schema"` values match current implementation
+- **Schema doc version header**: `docs/SCHEMA.md` version tracks the package version
+- **Docker/Action docs**: entrypoint command, flags, and output format examples match current CLI
+
+Common staleness pattern: a breaking rename (command, flag, schema) gets updated in the main README and SCHEMA.md but missed in Docker README, Action README, HOW_IT_WORKS, or format.md.
+
 ### Known bugs
 
 - Check if C6, C7, C8 from `properties.md` are still present or have been fixed

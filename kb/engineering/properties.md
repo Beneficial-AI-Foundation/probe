@@ -109,6 +109,9 @@ All tools produce deterministic output for the same input:
 - File traversal is sorted
 - Merge output keys are sorted
 - Spec extraction uses `BTreeMap` throughout
+- Array fields (e.g. `dependencies-with-locations`) MUST be sorted in a stable, deterministic order — typically `(line, code-name)`. Iterating over `HashSet` or `HashMap` and serializing the result without sorting violates this property.
+
+**Known fix**: probe-verus fixed non-deterministic `dependencies-with-locations` ordering in v5.2.0 by sorting by `(line, code-name)` before serialization. probe-rust has the same issue (tracked).
 
 ## P15. Dependency completeness
 
