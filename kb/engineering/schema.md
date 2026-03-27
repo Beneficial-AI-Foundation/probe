@@ -157,9 +157,11 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `translation-path` — file path of translation
 - `translation-text` — line range of translation
 - `is-disabled` — computed from functions.json
+- `is-public` — Rust item visibility: `true` if declared `pub` per Charon, `false` if private or visibility data unavailable (set on all Rust atoms; preserved from probe-rust when present, defaulted to `false` when absent)
 
 **probe-rust extensions**:
 - `rust-qualified-name` — Charon-derived fully qualified name (optional, with `--with-charon`)
+- `is-public` — whether the Rust item is declared `pub` per Charon LLBC (optional, with `--with-charon`; absent when Charon not used or match failed)
 
 ## Code-name URI format
 
@@ -260,7 +262,7 @@ Confidence levels: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-li
 | Version | Tool | Changes |
 |---------|------|---------|
 | 2.0 | all | Initial Schema 2.0 envelope format |
-| 2.1 | probe-rust | Added optional `rust-qualified-name` and `is-disabled` fields to atoms |
+| 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
 
 ## Package versioning by language
 

@@ -92,14 +92,23 @@ See [P11](../engineering/properties.md#p11-translation-mapping-is-1-to-1). Enfor
 
 ## Enrichment
 
-After merge, probe-aeneas adds Aeneas-specific fields to atoms that have translations:
+After merge, probe-aeneas adds Aeneas-specific fields. Translation-specific fields are added to atoms that have translations; other fields are set on all Rust atoms.
+
+**Translation-specific fields** (only on translated atoms):
 
 | Field | Source | Description |
 |-------|--------|-------------|
 | `translation-name` | functions.json `lean_name` | Corresponding name in other language |
 | `translation-path` | Lean atom's `code-path` | File path of translation |
 | `translation-text` | Lean atom's `code-text` | Line range of translation |
-| `is-disabled` | functions.json flags | `true` if hidden or extraction artifact |
+
+**All Rust atoms**:
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| `is-disabled` | functions.json | `true` if the function's RQN is not in functions.json |
+| `is-relevant` | functions.json | `true` if the function's RQN appears in functions.json |
+| `is-public` | probe-rust (Charon) or default | `true` if declared `pub` per Charon; `false` if private or visibility data unavailable |
 
 ## Subcommands
 

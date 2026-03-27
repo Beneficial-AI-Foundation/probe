@@ -25,7 +25,7 @@ Steps (in `src/commands/extract.rs`):
 4. **Gather metadata** — git info, package name/version from Cargo.toml
 5. **Convert to atoms** — accurate line numbers via syn AST visitor
 6. **Detect duplicates** — error unless `--allow-duplicates` (keeps first)
-7. **Enrich with Charon** (optional, `--with-charon`) — add `rust-qualified-name` for Aeneas compatibility
+7. **Enrich with Charon** (optional, `--with-charon`) — add `rust-qualified-name` and `is-public` (from Charon LLBC `attr_info.public`) for Aeneas compatibility
 8. **Add external stubs** — referenced but unanalyzed dependencies
 9. **Wrap and write** — Schema 2.0 envelope to `.verilib/probes/`
 
@@ -109,4 +109,5 @@ Other differences from probe-verus:
 - `kind` is always `"exec"` (no proof/spec distinction in standard Rust)
 - `dependencies-with-locations` `location` is always `"inner"` (no precondition/postcondition)
 - `rust-qualified-name` is optional (only with `--with-charon`)
+- `is-public` is optional (only with `--with-charon`; `true` if item is declared `pub`, `false` if private, absent when Charon not used or match failed)
 - `is-disabled` is always `false` (no disable concept in standard Rust extraction)

@@ -96,7 +96,7 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean translation mappin
 3. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
 4. Generate translations via three-strategy matching (see [properties.md](properties.md#translation-matching))
 5. Call `probe::merge::merge_atom_maps` with translations
-6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `is-disabled`)
+6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `is-disabled`, `is-relevant`, `is-public`)
 
 **Key insight**: probe-aeneas is a *[functor](glossary.md#functor) factory*. It produces the [translation mapping](glossary.md#translation-mapping); `probe merge` applies it. Domain knowledge about [Aeneas](glossary.md#aeneas) lives here; generic composition lives in probe. (The algebraic structure is detailed in `probe/docs/categorical-framework.md`, a non-normative design document.)
 

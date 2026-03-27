@@ -118,7 +118,7 @@ The project configuration file for [Aeneas](#aeneas)-transpiled repositories. pr
 
 ## Charon
 
-A Rust compiler frontend used by [Aeneas](#aeneas) to extract structured information from Rust code. Charon produces fully qualified names for Rust functions (`rust-qualified-name`), which probe-rust can optionally include (via `--with-charon`) and probe-aeneas uses for high-confidence translation matching (Strategy 1).
+A Rust compiler frontend used by [Aeneas](#aeneas) to extract structured information from Rust code. Charon produces fully qualified names for Rust functions (`rust-qualified-name`) and item-level visibility (`is-public` from LLBC `attr_info.public`), which probe-rust can optionally include (via `--with-charon`). probe-aeneas uses qualified names for high-confidence translation matching (Strategy 1) and propagates visibility to merged atoms.
 
 ## RQN
 
