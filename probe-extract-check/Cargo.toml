@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Validates probe extract JSON against source code"
 license = "MIT"
+repository = "https://github.com/Beneficial-AI-Foundation/probe"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

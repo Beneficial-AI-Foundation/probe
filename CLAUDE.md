@@ -104,6 +104,15 @@ The KB covers the entire probe ecosystem, not just the probe hub. When working i
 - Use terminology from `../probe/kb/engineering/glossary.md`.
 ```
 
+## Versioning and Changelog
+
+When modifying code in any of the 5 probes (`probe`, `probe-rust`, `probe-verus`, `probe-lean`, `probe-aeneas`), always check whether the change warrants:
+
+1. **A version bump** — update `version` in `Cargo.toml` (or the equivalent manifest). Use semver: patch for bug fixes, minor for new features/backward-compatible changes, major for breaking changes.
+2. **A `CHANGELOG.md` entry** — add a concise entry under an `## [Unreleased]` section (create one if it doesn't exist). Group entries by `Added`, `Changed`, `Fixed`, or `Removed`.
+
+Skip both for purely internal changes that don't affect behavior (comment edits, formatting, CI config tweaks).
+
 ## Commit Message Style
 
 Conventional commits. Reference KB files when applicable:

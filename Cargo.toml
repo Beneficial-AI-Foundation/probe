@@ -7,6 +7,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Cross-tool atom merging for probe-* verification tools"
 license = "MIT"
+repository = "https://github.com/Beneficial-AI-Foundation/probe"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
@@ -17,3 +18,12 @@ serde_json = "1"
 [dev-dependencies]
 jsonschema = "0.28"
 tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+
+[profile.dist]
+inherits = "release"

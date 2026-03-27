@@ -5,6 +5,7 @@ use std::process;
 #[derive(Parser)]
 #[command(name = "probe-extract-check")]
 #[command(about = "Validate probe extract JSON against source code")]
+#[command(version)]
 struct Cli {
     /// Path to the extract JSON file.
     json: PathBuf,
