@@ -5,6 +5,7 @@ use crate::types::{
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
 /// Strip trailing `.` from a code-name (legacy verus-analyzer artifact).
 fn normalize_code_name(name: &str) -> String {
     name.strip_suffix('.').unwrap_or(name).to_string()
@@ -70,6 +71,8 @@ fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, us
     (out, changed)
 }
 
+// @kb: kb/engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement
+// @kb: kb/engineering/properties.md#p13-cross-language-edges-require-existence
 /// Merge multiple atom maps into one, optionally applying cross-language translations.
 ///
 /// The first map is the base. For each subsequent map:
@@ -211,6 +214,7 @@ fn normalize_generic(
     (out, changed)
 }
 
+// @kb: kb/engineering/properties.md#p7-specsproofs-merge-is-last-wins
 /// Merge multiple generic data maps into one (for specs and proofs).
 ///
 /// Uses **last-wins** semantics: when the same code-name appears in multiple
@@ -256,6 +260,8 @@ pub fn merge_generic_maps(
 // Unified merge command
 // ---------------------------------------------------------------------------
 
+// @kb: kb/tools/probe-merge.md — end-to-end merge pipeline
+// @kb: kb/engineering/properties.md#p17-schema-category-consistency
 /// Execute the `merge` command, auto-detecting the schema category.
 pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, translations_path: Option<PathBuf>) {
     if inputs.len() < 2 {

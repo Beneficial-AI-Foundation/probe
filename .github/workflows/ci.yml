@@ -31,6 +31,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets --all-features -- -D warnings
 
+  kb-links:
+    name: KB Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/check-kb-links.sh
+
   test:
     name: Test
     runs-on: ubuntu-latest

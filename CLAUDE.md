@@ -32,6 +32,25 @@ cargo clippy --all-targets --all-features -- -D warnings
 - If you find a contradiction between your implementation and the KB, the implementation is wrong. Fix the code to match the spec.
 - Reference KB files in commit messages when a change is driven by a KB property or design decision.
 
+### Finding Relevant KB Sections
+
+When you need to find which KB section covers a topic:
+- Search KB headings: `rg '^#{1,3} ' kb/ --no-filename` to see all section titles.
+- Search by keyword: `rg 'stub|translation|merge' kb/` to find sections mentioning a concept.
+- Check the glossary first: `kb/engineering/glossary.md` defines every major term and links to the relevant specs.
+- Follow `@kb:` annotations in code: source files use `// @kb: kb/path#section` comments to link implementation back to KB sections. Search with `rg '@kb:' src/` to find which code maps to which spec.
+
+### Code-to-KB Annotations (`@kb:`)
+
+Source files annotate key types, functions, and implementations with `// @kb:` comments that reference the KB section they implement. This creates traceability from code to spec.
+
+```rust
+// @kb: kb/engineering/properties.md#p3-stub-detection-is-structural
+pub fn is_stub(&self) -> bool { ... }
+```
+
+When adding or modifying code that implements a KB-specified behavior, add or update the `// @kb:` comment. The annotation format is `// @kb: kb/<path>#<heading-slug>`. Run `./scripts/check-kb-links.sh` to validate all KB cross-references.
+
 ## Development Loop (Ralph Loop)
 
 For every implementation task:

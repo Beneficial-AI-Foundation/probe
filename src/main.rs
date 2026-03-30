@@ -1,3 +1,6 @@
+// @kb: kb/tools/probe-merge.md — CLI entry point
+// @kb: kb/product/spec.md
+
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 

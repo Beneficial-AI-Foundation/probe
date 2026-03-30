@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+// @kb: kb/engineering/schema.md#envelope
 /// Schema 2.0 envelope for single-tool atom files.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AtomEnvelope {
@@ -13,6 +14,7 @@ pub struct AtomEnvelope {
     pub data: BTreeMap<String, Atom>,
 }
 
+// @kb: kb/engineering/schema.md#envelope — merged variant with provenance
 /// Schema 2.0 envelope for merged files, generic over the data-entry type.
 ///
 /// For atoms use `MergedEnvelope<Atom>`, for specs/proofs use
@@ -73,6 +75,7 @@ pub struct CodeText {
     pub lines_end: usize,
 }
 
+// @kb: kb/engineering/schema.md#atom — core fields; P10 for extensions
 /// A single atom with typed core fields and passthrough extensions.
 ///
 /// The `extensions` field captures any language-specific optional fields
@@ -100,6 +103,7 @@ pub struct Atom {
 }
 
 impl Atom {
+    // @kb: kb/engineering/properties.md#p3-stub-detection-is-structural
     /// An atom is a stub when it has no source location.
     pub fn is_stub(&self) -> bool {
         self.code_path.is_empty()
@@ -112,6 +116,7 @@ impl Atom {
 // Schema categories
 // ---------------------------------------------------------------------------
 
+// @kb: kb/engineering/glossary.md#schema-category
 /// The three categories of data files the merge tool can handle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SchemaCategory {
@@ -178,6 +183,8 @@ pub struct EnvelopeMeta {
     pub data_value: serde_json::Value,
 }
 
+// @kb: kb/engineering/properties.md#p1-envelope-completeness
+// @kb: kb/engineering/properties.md#p9-provenance-is-preserved
 /// Parse a Schema 2.0 envelope, extracting shared metadata.
 ///
 /// Validates the schema-version, detects the [`SchemaCategory`], and extracts
@@ -282,6 +289,8 @@ pub type GenericLoadResult = (
 // Translations
 // ---------------------------------------------------------------------------
 
+// @kb: kb/engineering/schema.md#translations-file-format
+// @kb: kb/engineering/properties.md#p11-translation-mapping-is-1-to-1
 /// A single mapping entry in a translations file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslationMapping {
