@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-lean"
-last-updated: 2026-03-19
+last-updated: 2026-04-02
 status: draft
 ---
 
@@ -42,8 +42,9 @@ probe-lean is a Lean program that imports and analyzes other Lean programs. This
 
 Lean projects must be built before environment walking works. probe-lean:
 1. Parses `lakefile.toml` to discover library names
-2. Runs `lake build <libs>` (for Mathlib projects, requires `lake exe cache get` first for pre-built `.olean`)
-3. Only then can it inspect the environment
+2. For Mathlib-dependent projects, auto-downloads the pre-built `.olean` cache via `lake exe cache get` if not already present (falls back gracefully on failure)
+3. Runs `lake build <libs>`
+4. Only then can it inspect the environment
 
 Use `--skip-build` if the project is already built.
 

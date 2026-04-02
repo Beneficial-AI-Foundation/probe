@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-aeneas"
-last-updated: 2026-03-26
+last-updated: 2026-04-02
 status: draft
 ---
 
@@ -28,14 +28,15 @@ The `extract` command is the full pipeline (`src/extract.rs`):
 inputs → parallel extraction → load functions.json → translate → merge → enrich → envelope
 ```
 
-1. **Resolve project** — if positional `PROJECT` given, parse `aeneas-config.yml` to derive Rust/Lean paths and optional functions.json
-2. **Validate inputs** — exactly one Rust source + one Lean source + functions.json
-3. **Resolve inputs** — if project paths given, run extractors; if JSON given, use directly
-4. **Parallel extraction** — when both project paths given, run probe-rust and probe-lean in parallel via scoped threads
-4. **Generate translations** — three-strategy matching against functions.json (see below)
-5. **Merge** — call `merge_atom_maps()` from probe crate with translations
-6. **Enrich** — add Aeneas-specific metadata to merged atoms
-7. **Wrap** — Schema 2.0 envelope with `probe-aeneas/extract` schema
+1. **Resolve project** — if positional `PROJECT` given, parse `aeneas-config.yml` to derive Rust/Lean paths, optional functions.json, and Charon config
+2. **Pre-generate Charon LLBC** — if `aeneas-config.yml` has a `charon` section, run `charon` with the full project-specific settings (cargo args, start-from, exclude, opaque) and cache at `<rust_project>/data/charon.llbc`. This ensures `probe-rust --with-charon` finds a pre-built LLBC with the correct compilation flags.
+3. **Validate inputs** — exactly one Rust source + one Lean source + functions.json
+4. **Resolve inputs** — if project paths given, run extractors; if JSON given, use directly
+5. **Parallel extraction** — when both project paths given, run probe-rust and probe-lean in parallel via scoped threads
+6. **Generate translations** — three-strategy matching against functions.json (see below)
+7. **Merge** — call `merge_atom_maps()` from probe crate with translations
+8. **Enrich** — add Aeneas-specific metadata to merged atoms
+9. **Wrap** — Schema 2.0 envelope with `probe-aeneas/extract` schema
 
 ### Input modes
 
@@ -168,12 +169,13 @@ Parsed from `"L<start>-L<end>"` format.
 | Tool | Required | Auto-install | Notes |
 |------|----------|-------------|-------|
 | probe-rust | yes (if `--rust-project`) | yes (cargo install) | |
-| probe-lean | yes (if `--lean-project`) | yes (clone + lake build) | |
+| probe-lean | yes (if `--lean-project`) | yes (pre-built binary or source build) | |
+| charon | yes (if `charon` section in `aeneas-config.yml`) | no (managed by probe-rust `--auto-install`) | Pre-generates LLBC with full project config |
 | lake | yes (for listfuns) | no | Lean toolchain |
 
 ## Dependency on probe crate
 
-probe-aeneas imports `probe` as a local path dependency (`../probe`). Uses:
+probe-aeneas imports `probe` as a git dependency (`git = "https://github.com/Beneficial-AI-Foundation/probe"`). Uses:
 - `probe::commands::merge::merge_atom_files` — merge algorithm (file-level convenience over `merge_atom_maps`)
 - `probe::types::Atom`, `TranslationMapping`, `MergedAtomEnvelope`, `InputProvenance`, `Tool`
 
