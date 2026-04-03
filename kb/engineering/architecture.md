@@ -26,10 +26,10 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean translation mappin
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
 - `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--translations`
-- `src/commands/query.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies
+- `src/commands/summary.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies
 - `probe-extract-check/` — Validator that checks extract JSON against actual source code
 
-**Subcommands**: `merge`, `query`
+**Subcommands**: `merge`, `summary`
 
 **Dependencies**: None (leaf crate).
 

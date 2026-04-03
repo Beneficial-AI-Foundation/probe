@@ -14,9 +14,9 @@ No test asserts `merge(A, empty) = A`. `merge_atom_maps` supports an empty tail 
 
 The KB calls for validation that no `Cargo.toml` uses a `path = "..."` dependency that resolves outside the repository root. This repository has **no** automated test or script (beyond manual review) that enforces P19 across probe-* crates.
 
-### `probe query` subcommand
+### `probe summary` subcommand
 
-`src/commands/query.rs` exposes `cmd_query` (entrypoints vs verified-dependencies partition) with **no** `#[cfg(test)]` module, no integration test under `tests/`, and no CLI invocation via `CARGO_BIN_EXE_probe`. This is a functional surface with zero regression safety.
+`src/commands/summary.rs` exposes `cmd_summary` (entrypoints vs verified-dependencies partition) with unit tests in `#[cfg(test)]` module covering partition correctness, stub/test filtering, and dependency logic.
 
 ---
 
@@ -72,11 +72,11 @@ Coverage is implicit (maps keyed by code-name; merge fixtures assume unique keys
 
 Golden / `verus_micro` workflows (`extract_check`, `extract_backward_compat`) can assert P20 on **real** extractor output when those tests run with tooling installed; they are optional/skipped in minimal environments. Strengthening golden JSON (`tests/fixtures/extract_golden/golden.json`) to include at least one `spec` with `"language": "verus"` would lock the contract without relying on skipped tests.
 
-### `probe query` — Recommended tests
+### `probe summary` — Recommended tests
 
-1. **Unit** (in `query.rs` or `tests/` with `load_atom_file`): verified + non-stub + `language == "rust"` + `kind == "exec"` + not appearing in any `dependencies` → entrypoint; same but listed as a dependency → verified_deps; stub verified → verified_deps; `kind == "spec"` / `proof` or `language == "verus"` → never entrypoint; `code_module` / `display_name` containing `"test"` → excluded from entrypoints; partition size `entrypoints.len() + verified_deps.len()` equals count of verified atoms.
-2. **Integration**: `CARGO_BIN_EXE_probe query` on a small fixture file, assert stdout JSON schema for `entrypoints` / `verified_dependencies` and optional `-o` file write.
-3. **P20 linkage**: entrypoint detection **depends** on exec atoms carrying `language: "rust"` (see `query.rs`); a regression test with a verified exec incorrectly tagged `verus` should not list it as an entrypoint—documents interaction between P20 and query behavior.
+1. **Unit** (in `summary.rs` or `tests/` with `load_atom_file`): verified + non-stub + `language == "rust"` + `kind == "exec"` + not appearing in any `dependencies` → entrypoint; same but listed as a dependency → verified_functions; stub verified → verified_functions; `kind == "spec"` / `proof` or `language == "verus"` → verified_lemmas; `code_module` / `display_name` containing `"test"` → excluded from entrypoints; partition size `entrypoints.len() + verified_functions.len() + verified_lemmas.len()` equals count of verified atoms.
+2. **Integration**: `CARGO_BIN_EXE_probe summary` on a small fixture file, assert stdout JSON schema for `entrypoints` / `verified_functions` / `verified_lemmas` and optional `-o` file write.
+3. **P20 linkage**: entrypoint detection **depends** on exec atoms carrying `language: "rust"` (see `summary.rs`); a regression test with a verified exec incorrectly tagged `verus` should not list it as an entrypoint—documents interaction between P20 and summary behavior.
 
 ### Property-based testing
 

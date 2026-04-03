@@ -8,9 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `probe summary` subcommand: partitions verified atoms into entrypoints, verified functions, and verified lemmas (schema `probe/summary`)
 - KB link-checker script (`scripts/check-kb-links.sh`) that validates all cross-references between `kb/` markdown files, including heading anchors
 - CI job (`kb-links`) that runs the link checker on every push/PR
-- `// @kb:` code-to-spec annotations in `types.rs`, `merge.rs`, and `main.rs` linking implementations to their KB sections
+- `// @kb:` code-to-spec annotations in `types.rs`, `merge.rs`, `summary.rs`, and `main.rs` linking implementations to their KB sections
 - KB discoverability guide in `CLAUDE.md` (searching headings, following `@kb:` annotations, using the glossary)
 
 ### Fixed

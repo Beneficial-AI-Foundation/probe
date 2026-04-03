@@ -7,23 +7,24 @@ use crate::types::{load_atom_file, Atom, InputProvenance, Tool};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-/// Schema 2.0 envelope for query output.
+/// Schema 2.0 envelope for summary output.
 #[derive(serde::Serialize)]
-struct QueryEnvelope {
+struct SummaryEnvelope {
     schema: &'static str,
     #[serde(rename = "schema-version")]
     schema_version: &'static str,
     tool: Tool,
     inputs: Vec<InputProvenance>,
     timestamp: String,
-    data: QueryResult,
+    data: SummaryResult,
 }
 
-/// Payload of a query result.
+/// Payload of a summary result.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct QueryResult {
-    pub entrypoints: Vec<String>,
-    pub verified_dependencies: Vec<String>,
+pub struct SummaryResult {
+    pub verified_entrypoints: Vec<String>,
+    pub verified_functions: Vec<String>,
+    pub verified_lemmas: Vec<String>,
 }
 
 fn is_test(atom: &Atom) -> bool {
@@ -42,23 +43,28 @@ fn is_rust_exec(atom: &Atom) -> bool {
     atom.language == "rust" && atom.kind == "exec"
 }
 
-/// Partition verified atoms into entrypoints and verified dependencies.
+/// Partition verified atoms into entrypoints, verified functions, and lemmas.
 ///
 /// **Entrypoints**: verified, non-stub, non-test Rust `exec` atoms whose
-/// code-name never appears in any atom's `dependencies` array.
+/// code-name never appears in any non-test atom's `dependencies` array.
 ///
-/// **Verified dependencies**: all remaining verified atoms.
+/// **Verified functions**: remaining verified Rust `exec` atoms (depended-upon
+/// helpers, stubs, test functions).
 ///
-/// The two lists are a partition: `entrypoints + verified_deps == total verified`.
-pub fn query_atoms(atoms: &BTreeMap<String, Atom>) -> QueryResult {
+/// **Verified lemmas**: verified Verus `proof`/`spec` atoms.
+///
+/// The three lists partition all verified atoms.
+pub fn summarize_atoms(atoms: &BTreeMap<String, Atom>) -> SummaryResult {
     let depended_upon: BTreeSet<&str> = atoms
         .values()
+        .filter(|atom| !is_test(atom))
         .flat_map(|atom| atom.dependencies.iter())
         .map(String::as_str)
         .collect();
 
-    let mut entrypoints: Vec<String> = Vec::new();
-    let mut verified_deps: Vec<String> = Vec::new();
+    let mut verified_entrypoints: Vec<String> = Vec::new();
+    let mut verified_functions: Vec<String> = Vec::new();
+    let mut verified_lemmas: Vec<String> = Vec::new();
 
     for (code_name, atom) in atoms {
         if !is_verified(atom) {
@@ -70,20 +76,35 @@ pub fn query_atoms(atoms: &BTreeMap<String, Atom>) -> QueryResult {
             && !depended_upon.contains(code_name.as_str());
 
         if is_entrypoint {
-            entrypoints.push(code_name.clone());
+            verified_entrypoints.push(code_name.clone());
+        } else if is_rust_exec(atom) {
+            verified_functions.push(code_name.clone());
         } else {
-            verified_deps.push(code_name.clone());
+            verified_lemmas.push(code_name.clone());
         }
     }
 
-    QueryResult {
-        entrypoints,
-        verified_dependencies: verified_deps,
+    SummaryResult {
+        verified_entrypoints,
+        verified_functions,
+        verified_lemmas,
     }
 }
 
-/// CLI entry point: load atom file, compute query, emit envelope.
-pub fn cmd_query(input: &Path, output: Option<&Path>) {
+/// Derive a default output filename from provenance: `summary_<package>_<version>.json`.
+fn default_output_name(provenance: &[InputProvenance]) -> String {
+    if let Some(first) = provenance.first() {
+        let pkg = &first.source.package;
+        let ver = &first.source.package_version;
+        if !pkg.is_empty() && !ver.is_empty() {
+            return format!("summary_{pkg}_{ver}.json");
+        }
+    }
+    "summary.json".to_string()
+}
+
+/// CLI entry point: load atom file, compute summary, emit envelope.
+pub fn cmd_summary(input: &Path, output: Option<&Path>) {
     let (atoms, provenance) = match load_atom_file(input) {
         Ok(result) => result,
         Err(e) => {
@@ -92,40 +113,47 @@ pub fn cmd_query(input: &Path, output: Option<&Path>) {
         }
     };
 
-    let result = query_atoms(&atoms);
+    let result = summarize_atoms(&atoms);
 
+    let total = result.verified_entrypoints.len()
+        + result.verified_functions.len()
+        + result.verified_lemmas.len();
     eprintln!(
-        "Verified: {}  |  Entrypoints: {}  |  Verified deps: {}",
-        result.entrypoints.len() + result.verified_dependencies.len(),
-        result.entrypoints.len(),
-        result.verified_dependencies.len()
+        "Verified: {total}  |  Entrypoints: {}  |  Functions: {}  |  Lemmas: {}",
+        result.verified_entrypoints.len(),
+        result.verified_functions.len(),
+        result.verified_lemmas.len()
     );
 
-    let envelope = QueryEnvelope {
-        schema: "probe/query",
+    let envelope = SummaryEnvelope {
+        schema: "probe/summary",
         schema_version: "2.0",
         tool: Tool {
             name: "probe".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-            command: "query".to_string(),
+            command: "summary".to_string(),
         },
-        inputs: provenance,
+        inputs: provenance.clone(),
         timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         data: result,
     };
 
     let json = serde_json::to_string_pretty(&envelope).expect("failed to serialize output");
 
-    match output {
-        Some(path) => {
-            std::fs::write(path, &json).unwrap_or_else(|e| {
-                eprintln!("Error writing {}: {e}", path.display());
-                std::process::exit(1);
-            });
-            eprintln!("Wrote {}", path.display());
+    let default_name;
+    let out_path = match output {
+        Some(p) => p,
+        None => {
+            default_name = default_output_name(&provenance);
+            Path::new(&default_name)
         }
-        None => println!("{json}"),
-    }
+    };
+
+    std::fs::write(out_path, &json).unwrap_or_else(|e| {
+        eprintln!("Error writing {}: {e}", out_path.display());
+        std::process::exit(1);
+    });
+    eprintln!("Wrote {}", out_path.display());
 }
 
 #[cfg(test)]
@@ -179,11 +207,12 @@ mod tests {
         add_dep(&mut caller, "probe:pkg/1.0/reduce()");
         atoms.insert("probe:pkg/1.0/caller()".to_string(), caller);
 
-        let result = query_atoms(&atoms);
-        let total_verified = 3;
+        let result = summarize_atoms(&atoms);
         assert_eq!(
-            result.entrypoints.len() + result.verified_dependencies.len(),
-            total_verified
+            result.verified_entrypoints.len()
+                + result.verified_functions.len()
+                + result.verified_lemmas.len(),
+            3
         );
     }
 
@@ -195,9 +224,10 @@ mod tests {
         set_verified(&mut stub);
         atoms.insert("probe:alloc/1.0/alloc_fn()".to_string(), stub);
 
-        let result = query_atoms(&atoms);
-        assert!(result.entrypoints.is_empty());
-        assert_eq!(result.verified_dependencies.len(), 1);
+        let result = summarize_atoms(&atoms);
+        assert!(result.verified_entrypoints.is_empty());
+        assert_eq!(result.verified_functions.len(), 1);
+        assert!(result.verified_lemmas.is_empty());
     }
 
     #[test]
@@ -212,9 +242,10 @@ mod tests {
             test_atom,
         );
 
-        let result = query_atoms(&atoms);
-        assert!(result.entrypoints.is_empty());
-        assert_eq!(result.verified_dependencies.len(), 1);
+        let result = summarize_atoms(&atoms);
+        assert!(result.verified_entrypoints.is_empty());
+        assert_eq!(result.verified_functions.len(), 1);
+        assert!(result.verified_lemmas.is_empty());
     }
 
     #[test]
@@ -229,9 +260,10 @@ mod tests {
         set_verified(&mut proof);
         atoms.insert("probe:pkg/1.0/lemmas/my_lemma()".to_string(), proof);
 
-        let result = query_atoms(&atoms);
-        assert!(result.entrypoints.is_empty());
-        assert_eq!(result.verified_dependencies.len(), 2);
+        let result = summarize_atoms(&atoms);
+        assert!(result.verified_entrypoints.is_empty());
+        assert!(result.verified_functions.is_empty());
+        assert_eq!(result.verified_lemmas.len(), 2);
     }
 
     #[test]
@@ -241,9 +273,31 @@ mod tests {
         let unverified = make_atom("rust", "exec", "src/lib.rs", "foo");
         atoms.insert("probe:pkg/1.0/foo()".to_string(), unverified);
 
-        let result = query_atoms(&atoms);
-        assert!(result.entrypoints.is_empty());
-        assert!(result.verified_dependencies.is_empty());
+        let result = summarize_atoms(&atoms);
+        assert!(result.verified_entrypoints.is_empty());
+        assert!(result.verified_functions.is_empty());
+        assert!(result.verified_lemmas.is_empty());
+    }
+
+    #[test]
+    fn test_test_deps_dont_disqualify_entrypoints() {
+        let mut atoms = BTreeMap::new();
+
+        let mut func = make_atom("rust", "exec", "src/lib.rs", "compress");
+        set_verified(&mut func);
+        atoms.insert("probe:pkg/1.0/compress()".to_string(), func);
+
+        let mut test_fn = make_atom("rust", "exec", "src/tests.rs", "test_compress");
+        test_fn.code_module = "tests".to_string();
+        set_verified(&mut test_fn);
+        add_dep(&mut test_fn, "probe:pkg/1.0/compress()");
+        atoms.insert("probe:pkg/1.0/tests/test_compress()".to_string(), test_fn);
+
+        let result = summarize_atoms(&atoms);
+        assert_eq!(
+            result.verified_entrypoints,
+            vec!["probe:pkg/1.0/compress()"]
+        );
     }
 
     #[test]
@@ -259,8 +313,12 @@ mod tests {
         add_dep(&mut outer, "probe:pkg/1.0/reduce()");
         atoms.insert("probe:pkg/1.0/compress()".to_string(), outer);
 
-        let result = query_atoms(&atoms);
-        assert_eq!(result.entrypoints, vec!["probe:pkg/1.0/compress()"]);
-        assert_eq!(result.verified_dependencies, vec!["probe:pkg/1.0/reduce()"]);
+        let result = summarize_atoms(&atoms);
+        assert_eq!(
+            result.verified_entrypoints,
+            vec!["probe:pkg/1.0/compress()"]
+        );
+        assert_eq!(result.verified_functions, vec!["probe:pkg/1.0/reduce()"]);
+        assert!(result.verified_lemmas.is_empty());
     }
 }

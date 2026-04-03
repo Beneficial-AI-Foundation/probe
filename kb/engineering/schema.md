@@ -84,7 +84,7 @@ Note: Legacy schema values `probe-lean/atoms`, `probe-lean/enriched-atoms`, `pro
 - `probe/merged-atoms`, `probe/merged-specs`, `probe/merged-proofs`
 
 **Analysis**:
-- `probe/query`
+- `probe/summary`
 
 **Special**:
 - `probe/translations` — cross-language translation mappings

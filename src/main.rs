@@ -43,24 +43,25 @@ enum Commands {
         translations: Option<PathBuf>,
     },
 
-    /// Partition verified atoms into entrypoints and verified dependencies.
+    /// Summarize verified atoms: entrypoints, functions, and lemmas.
     ///
     /// Reads a Schema 2.0 atom file and partitions all atoms with
-    /// "verification-status": "verified" into two lists:
+    /// "verification-status": "verified" into three lists:
     ///
     /// Entrypoints — verified, non-stub, non-test, Rust `exec` atoms whose
-    /// code-name never appears in any atom's dependency list.
+    /// code-name never appears in any non-test atom's dependency list.
     ///
-    /// Verified dependencies — all remaining verified atoms (stubs, specs,
-    /// proofs, test functions, and depended-upon exec functions).
+    /// Verified functions — remaining verified Rust `exec` atoms.
     ///
-    /// Output is a Schema 2.0 envelope with schema "probe/query".
-    Query {
+    /// Verified lemmas — verified Verus `proof`/`spec` atoms.
+    ///
+    /// Output is a Schema 2.0 envelope with schema "probe/summary".
+    Summary {
         /// Input atom file (Schema 2.0).
         #[arg(required = true)]
         input: PathBuf,
 
-        /// Output file path (defaults to stdout).
+        /// Output file path (defaults to summary_<package>_<version>.json).
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -77,8 +78,8 @@ fn main() {
         } => {
             probe::commands::merge::cmd_merge(inputs, output, translations);
         }
-        Commands::Query { input, output } => {
-            probe::commands::query::cmd_query(&input, output.as_deref());
+        Commands::Summary { input, output } => {
+            probe::commands::summary::cmd_summary(&input, output.as_deref());
         }
     }
 }

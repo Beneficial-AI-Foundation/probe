@@ -46,7 +46,7 @@ The probe ecosystem extracts structured data from multi-language verification pr
 
 **5. Entrypoint analysis** — Identify which verified functions are API entrypoints (not depended upon by other atoms) vs internal dependencies.
 
-- probe query: partitions verified atoms into entrypoints and verified dependencies
+- probe summary: partitions verified atoms into entrypoints and verified dependencies
 
 **6. Validation** — Check that extracted data is consistent with source code.
 

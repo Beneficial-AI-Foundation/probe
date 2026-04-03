@@ -11,8 +11,8 @@ Focused pass on fixes for **W2**, **W5**, and **W8** from the prior report. **Re
 | ID | Resolution (verified) |
 |----|------------------------|
 | **W2** | `kb/engineering/architecture.md` “Why separate directories” now references `decisions/001-separate-repos.md` without *(planned)*, consistent with ADR-001 `status: accepted`. |
-| **W5** | `probe query` is documented: `kb/index.md` links `tools/probe-query.md`; architecture lists `src/commands/query.rs` and subcommands `merge`, `query`; `kb/product/spec.md` adds capability **5. Entrypoint analysis**; `kb/tools/probe-query.md` specifies behavior, CLI, output, and properties. |
-| **W8** | P20-related files called out previously now carry `last-updated: 2026-04-03` (`properties.md`, `schema.md`, `glossary.md`, `probe-verus.md`), along with other KB files touched in this round (`index.md`, `architecture.md`, `spec.md`, `probe-query.md`). |
+| **W5** | `probe summary` is documented: `kb/index.md` links `tools/probe-summary.md`; architecture lists `src/commands/summary.rs` and subcommands `merge`, `summary`; `kb/product/spec.md` adds capability **5. Entrypoint analysis**; `kb/tools/probe-summary.md` specifies behavior, CLI, output, and properties. |
+| **W8** | P20-related files called out previously now carry `last-updated: 2026-04-03` (`properties.md`, `schema.md`, `glossary.md`, `probe-verus.md`), along with other KB files touched in this round (`index.md`, `architecture.md`, `spec.md`, `probe-summary.md`). |
 
 ## Critical
 
@@ -81,5 +81,5 @@ Normative texts reviewed (including P20, Verus `language` assignment, and cross-
 
 ### [I7] tools/index LOC/complexity snapshot may drift
 - **Location**: `kb/tools/index.md` (table approx. lines 13–19)
-- **Issue**: Figures (e.g. probe ~1.5K LOC) are approximate and not tied to a refresh policy; hub growth (`query`, etc.) isn’t reflected.
+- **Issue**: Figures (e.g. probe ~1.5K LOC) are approximate and not tied to a refresh policy; hub growth (`summary`, etc.) isn’t reflected.
 - **Recommendation**: Treat as indicative only or add “approx / see repo” disclaimer; update when tooling changes significantly.

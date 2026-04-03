@@ -100,11 +100,12 @@ The following invariants (from `kb/engineering/properties.md`) are most commonly
 
 ```
 src/
-  main.rs          # CLI: `probe merge`
+  main.rs          # CLI: `probe merge`, `probe summary`
   lib.rs           # Module exports
   types.rs         # Atom, AtomEnvelope, MergedEnvelope, SchemaCategory, loading
   commands/
     merge.rs       # Merge algorithm, normalization, translation application
+    summary.rs     # Verified-atom partitioning: entrypoints, functions, lemmas
 probe-extract-check/  # Validator for extract output vs source code
 kb/                   # Knowledge base (source of truth)
 docs/                 # Design documents (reference, not normative)
