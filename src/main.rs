@@ -42,6 +42,28 @@ enum Commands {
         #[arg(short, long)]
         translations: Option<PathBuf>,
     },
+
+    /// Partition verified atoms into entrypoints and verified dependencies.
+    ///
+    /// Reads a Schema 2.0 atom file and partitions all atoms with
+    /// "verification-status": "verified" into two lists:
+    ///
+    /// Entrypoints — verified, non-stub, non-test, Rust `exec` atoms whose
+    /// code-name never appears in any atom's dependency list.
+    ///
+    /// Verified dependencies — all remaining verified atoms (stubs, specs,
+    /// proofs, test functions, and depended-upon exec functions).
+    ///
+    /// Output is a Schema 2.0 envelope with schema "probe/query".
+    Query {
+        /// Input atom file (Schema 2.0).
+        #[arg(required = true)]
+        input: PathBuf,
+
+        /// Output file path (defaults to stdout).
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -54,6 +76,9 @@ fn main() {
             translations,
         } => {
             probe::commands::merge::cmd_merge(inputs, output, translations);
+        }
+        Commands::Query { input, output } => {
+            probe::commands::query::cmd_query(&input, output.as_deref());
         }
     }
 }

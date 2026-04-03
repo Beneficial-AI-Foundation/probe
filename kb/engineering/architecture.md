@@ -1,6 +1,6 @@
 ---
 title: Architecture
-last-updated: 2026-03-19
+last-updated: 2026-04-03
 status: draft
 ---
 
@@ -26,9 +26,10 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean translation mappin
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
 - `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--translations`
+- `src/commands/query.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies
 - `probe-extract-check/` — Validator that checks extract JSON against actual source code
 
-**Subcommands**: `merge`
+**Subcommands**: `merge`, `query`
 
 **Dependencies**: None (leaf crate).
 
@@ -126,7 +127,7 @@ All JSON → scip-callgraph (web UI consumer)
 
 ## Why separate directories
 
-See [decisions/001-separate-repos.md](../decisions/001-separate-repos.md) *(planned)*.
+See [decisions/001-separate-repos.md](../decisions/001-separate-repos.md).
 
 Summary:
 1. **probe-lean requires Lean toolchain** — cannot be a Cargo workspace member

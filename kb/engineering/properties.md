@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-03-19
+last-updated: 2026-04-03
 status: draft
 ---
 
@@ -156,6 +156,18 @@ All `Cargo.toml` dependencies referencing crates in a **different** git reposito
 **Why**: Path deps pointing outside the repo root break `cargo install --git`, CI builds, and any standalone consumer. Cargo validates all path deps during manifest parsing, even for dev-dependencies it won't build.
 
 **Validation**: No `Cargo.toml` in any probe-* repo contains a `path = "..."` dependency where the resolved path exits the repository root.
+
+## P20. Language is derived from kind, not lexical scope
+
+For probe-verus atoms, the `language` field is determined by the atom's `kind`, not by whether the function appears inside a `verus!{}` block:
+
+- `kind == "exec"` → `language: "rust"` — exec functions are Rust code, even when annotated with Verus specifications
+- `kind == "proof"` → `language: "verus"` — proof functions are Verus-only constructs, erased at compilation
+- `kind == "spec"` → `language: "verus"` — spec functions are Verus-only constructs, erased at compilation
+
+**Why**: Verus exec functions (e.g. `compress`, `decompress`, `mul`) are real Rust code that compiles to machine instructions. They happen to sit inside `verus!{}` blocks because that's where their specs live, but they are not "Verus constructs" — they are Rust functions with formal contracts. Tagging them `language: "verus"` would exclude them from any Rust-specific analysis (e.g. entrypoint detection, call graph filtering).
+
+**Implemented in**: `probe-verus/src/lib.rs` (language assignment in `convert_to_atoms_with_lines_internal`).
 
 ## Known bugs and edge cases
 

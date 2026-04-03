@@ -1,6 +1,6 @@
 ---
 title: Schema 2.0 Interchange Specification
-last-updated: 2026-03-19
+last-updated: 2026-04-03
 status: draft
 ---
 
@@ -83,6 +83,9 @@ Note: Legacy schema values `probe-lean/atoms`, `probe-lean/enriched-atoms`, `pro
 **Merged schemas**:
 - `probe/merged-atoms`, `probe/merged-specs`, `probe/merged-proofs`
 
+**Analysis**:
+- `probe/query`
+
 **Special**:
 - `probe/translations` — cross-language translation mappings
 
@@ -112,7 +115,7 @@ When `schema` identifies an atoms-category file, `data` is a dictionary keyed by
 | `code-path` | string | Relative path to source file from project root. Empty string for [stubs](glossary.md#stub). |
 | `code-text` | object | `{"lines-start": N, "lines-end": N}` (1-based, inclusive). `{0, 0}` for stubs. |
 | `kind` | string | Language-specific classification (see below) |
-| `language` | string | `"rust"`, `"lean"`, `"latex"` |
+| `language` | string | `"rust"`, `"verus"`, `"lean"`, `"latex"` |
 
 ### Kind values
 
@@ -121,6 +124,18 @@ When `schema` identifies an atoms-category file, `data` is a dictionary keyed by
 | Rust (standard) | `exec` | Always `exec` for non-Verus Rust |
 | Rust (Verus) | `exec`, `proof`, `spec` | `exec` = compiled+verified, `proof` = verified+erased, `spec` = specification+erased |
 | Lean | `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot` | Maps to Lean declaration kinds |
+
+### Language assignment for Verus atoms
+
+For probe-verus output, `language` is determined by `kind`, not by lexical scope:
+
+| `kind` | `language` | Rationale |
+|--------|------------|-----------|
+| `exec` | `"rust"` | Exec functions are Rust code, even when annotated with Verus specs inside `verus!{}` blocks |
+| `proof` | `"verus"` | Proof functions are Verus-only constructs (erased at compilation) |
+| `spec` | `"verus"` | Spec functions are Verus-only constructs (erased at compilation) |
+
+See [P20](properties.md#p20-language-is-derived-from-kind-not-lexical-scope).
 
 Note: `"latex"` appears as a reserved `source.language` value in some envelope examples. No probe tool currently handles LaTeX — this is a placeholder for potential future support. Do not implement LaTeX handling without a dedicated tool and KB entry.
 

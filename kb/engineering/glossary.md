@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-03-19
+last-updated: 2026-04-03
 status: draft
 ---
 
@@ -62,7 +62,7 @@ An Aeneas-generated file mapping Rust function names to their Lean translations.
 
 ## kind
 
-A classification of what an [atom](#atom) represents in its language. Rust: `exec`, `proof`, `spec`. Lean: `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot`. Determines how the atom is treated in analysis and visualization.
+A classification of what an [atom](#atom) represents in its language. Rust: `exec`, `proof`, `spec`. Lean: `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot`. Determines how the atom is treated in analysis and visualization. For probe-verus output, `kind` also determines the `language` field: `exec` → `"rust"`, `proof`/`spec` → `"verus"` (see [P20](properties.md#p20-language-is-derived-from-kind-not-lexical-scope)).
 
 ## extensions
 

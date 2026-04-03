@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-verus"
-last-updated: 2026-03-19
+last-updated: 2026-04-03
 status: draft
 ---
 
@@ -33,6 +33,10 @@ Output atoms are enriched with optional fields:
 See [P15](../engineering/properties.md#p15-dependency-completeness) and [P16](../engineering/properties.md#p16-verification-status-mapping).
 
 ## Key challenges
+
+### Language assignment
+
+The `language` field on atoms is derived from the declaration `kind`, not from lexical scope (inside/outside `verus!{}` blocks). Exec functions get `language: "rust"` because they are compiled Rust code, even when they carry Verus specifications. Proof and spec functions get `language: "verus"` because they are Verus-only constructs erased at compilation. See [P20](../engineering/properties.md#p20-language-is-derived-from-kind-not-lexical-scope).
 
 ### Dual AST parsing
 
