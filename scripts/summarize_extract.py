@@ -42,6 +42,15 @@ TOOL_CONFIG = {
         "remaining_kinds": ("def", "abbrev", "opaque"),
         "remaining_label": "Lean",
     },
+    "aeneas": {
+        "verifier_name": "Lean (via Aeneas)",
+        "axiom_reasons": ("axiom",),
+        "external_reasons": ("external",),
+        "axiom_description": "Axioms — propositions assumed without proof.",
+        "lemma_kinds": ("theorem",),
+        "remaining_kinds": ("def", "abbrev", "opaque"),
+        "remaining_label": "Lean",
+    },
     "rust": {
         "verifier_name": "probe-rust",
         "axiom_reasons": (),
@@ -57,7 +66,7 @@ TOOL_CONFIG = {
 def detect_tool(extract: dict) -> str:
     schema = extract.get("schema", "")
     tool_name = extract.get("tool", {}).get("name", "")
-    for key in ("verus", "lean", "rust"):
+    for key in ("aeneas", "verus", "lean", "rust"):
         if key in schema or key in tool_name:
             return key
     return "verus"
@@ -84,10 +93,21 @@ def bullet_list(ids: list[str], annotation_fn=None) -> str:
     for pid in ids:
         if annotation_fn:
             ann = annotation_fn(pid)
-            lines.append(f"- `{pid}` {ann}")
+            lines.append(f"- `{pid}` {ann}" if ann else f"- `{pid}`")
         else:
             lines.append(f"- `{pid}`")
     return "\n".join(lines) + "\n"
+
+
+def resolve_primary_spec(data: dict, atom: dict) -> str | None:
+    """Follow atom -> translation-name -> primary-spec for aeneas extracts."""
+    translation = atom.get("translation-name")
+    if translation is None:
+        return None
+    lean_atom = data.get(translation)
+    if lean_atom is None:
+        return None
+    return lean_atom.get("primary-spec")
 
 
 def trust_label(reason: str | None) -> str:
@@ -111,6 +131,14 @@ def generate_report(extract: dict) -> str:
 
     out = []
 
+    show_specs = tool in ("lean", "aeneas")
+
+    def spec_annotation(pid: str) -> str:
+        spec = resolve_primary_spec(data, data[pid])
+        if spec is None:
+            return ""
+        return f"(spec: `{spec}`)"
+
     # --- Header ---
     out.append(f"# Verification report: {pkg_name} {pkg_version}\n")
 
@@ -122,7 +150,10 @@ def generate_report(extract: dict) -> str:
         and get_val(a, "verification-status") == "verified",
     )
     out.append(f"## 1. Verified public API functions ({len(verified_pub)})\n")
-    out.append(bullet_list(verified_pub))
+    out.append(bullet_list(
+        verified_pub,
+        annotation_fn=spec_annotation if show_specs else None,
+    ))
 
     # --- 2. Trusted public API ---
     # jq: [.data | to_entries[] | select(.value["is-public-api"] == true and .value["verification-status"] == "trusted") | .key] | sort
@@ -132,11 +163,17 @@ def generate_report(extract: dict) -> str:
         and get_val(a, "verification-status") == "trusted",
     )
     out.append(f"## 2. Trusted public API functions ({len(trusted_pub)})\n")
+
+    def trusted_annotation(pid: str) -> str:
+        parts = [f"({trust_label(get_val(data[pid], 'trusted-reason'))})"]
+        if show_specs:
+            s = spec_annotation(pid)
+            if s:
+                parts.append(s)
+        return " ".join(parts)
+
     out.append(
-        bullet_list(
-            trusted_pub,
-            annotation_fn=lambda pid: f"({trust_label(get_val(data[pid], 'trusted-reason'))})",
-        )
+        bullet_list(trusted_pub, annotation_fn=trusted_annotation)
     )
 
     # --- 3. Trust base ---
@@ -206,7 +243,10 @@ def generate_report(extract: dict) -> str:
     out.append(
         f"## 5. Verified remaining {remaining_label} functions ({len(verified_remaining)})\n"
     )
-    out.append(bullet_list(verified_remaining))
+    out.append(bullet_list(
+        verified_remaining,
+        annotation_fn=spec_annotation if show_specs else None,
+    ))
 
     # --- 6. Lemmas ---
     lemma_kinds = cfg["lemma_kinds"]
