@@ -115,6 +115,7 @@ def generate_report(extract: dict) -> str:
     out.append(f"# Verification report: {pkg_name} {pkg_version}\n")
 
     # --- 1. Verified public API ---
+    # jq: [.data | to_entries[] | select(.value["is-public-api"] == true and .value["verification-status"] == "verified") | .key] | sort
     verified_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
@@ -124,6 +125,7 @@ def generate_report(extract: dict) -> str:
     out.append(bullet_list(verified_pub))
 
     # --- 2. Trusted public API ---
+    # jq: [.data | to_entries[] | select(.value["is-public-api"] == true and .value["verification-status"] == "trusted") | .key] | sort
     trusted_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
@@ -141,6 +143,8 @@ def generate_report(extract: dict) -> str:
     out.append("## 3. Trust base\n")
 
     # 3a. Axioms
+    # jq (verus):  [.data | to_entries[] | select(.value["trusted-reason"] == "admit") | .key] | sort
+    # jq (lean):   [.data | to_entries[] | select(.value["trusted-reason"] == "axiom") | .key] | sort
     axioms = filtered_ids(
         data,
         lambda a: get_val(a, "trusted-reason") in all_axiom_reasons,
@@ -151,6 +155,8 @@ def generate_report(extract: dict) -> str:
     out.append(bullet_list(axioms))
 
     # 3b. External functions
+    # jq (verus):  [.data | to_entries[] | select(.value["trusted-reason"] == "external-body" or .value["trusted-reason"] == "assume-specification") | .key] | sort
+    # jq (lean):   [.data | to_entries[] | select(.value["trusted-reason"] == "external") | .key] | sort
     external_trusted = filtered_ids(
         data,
         lambda a: get_val(a, "trusted-reason") in all_external_reasons,
@@ -166,9 +172,11 @@ def generate_report(extract: dict) -> str:
     )
 
     # --- 4. Unverified and failed ---
+    # jq: [.data | to_entries[] | select(.value["verification-status"] == "failed") | .key] | sort
     failed = filtered_ids(
         data, lambda a: get_val(a, "verification-status") == "failed"
     )
+    # jq: [.data | to_entries[] | select(.value["verification-status"] == "unverified") | .key] | sort
     unverified = filtered_ids(
         data, lambda a: get_val(a, "verification-status") == "unverified"
     )
@@ -187,6 +195,8 @@ def generate_report(extract: dict) -> str:
     # --- 5. Verified remaining functions ---
     remaining_kinds = cfg["remaining_kinds"]
     remaining_label = cfg["remaining_label"]
+    # jq (verus/rust): [.data | to_entries[] | select(.value.kind == "exec" and .value["verification-status"] == "verified" and .value["is-public-api"] != true) | .key] | sort
+    # jq (lean):       [.data | to_entries[] | select((.value.kind == "def" or .value.kind == "abbrev" or .value.kind == "opaque") and .value["verification-status"] == "verified" and .value["is-public-api"] != true) | .key] | sort
     verified_remaining = filtered_ids(
         data,
         lambda a: get_val(a, "kind") in remaining_kinds
@@ -200,6 +210,8 @@ def generate_report(extract: dict) -> str:
 
     # --- 6. Lemmas ---
     lemma_kinds = cfg["lemma_kinds"]
+    # jq (verus): [.data | to_entries[] | select(.value.kind == "proof" and .value["verification-status"] == "verified") | .key] | sort
+    # jq (lean):  [.data | to_entries[] | select(.value.kind == "theorem" and .value["verification-status"] == "verified") | .key] | sort
     lemmas = filtered_ids(
         data,
         lambda a: get_val(a, "kind") in lemma_kinds
@@ -212,6 +224,7 @@ def generate_report(extract: dict) -> str:
         out.append("None\n")
 
     # --- 7. Out-of-scope public API ---
+    # jq: [.data | to_entries[] | select(.value["is-public-api"] == true and (.value["verification-status"] == null or (has("verification-status") | not))) | .key] | sort
     oos_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
