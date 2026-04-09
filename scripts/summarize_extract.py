@@ -6,6 +6,7 @@ Works with probe-verus and probe-aeneas extract JSON.
 Usage:
     python scripts/summarize_extract.py path/to/extract.json -o summary.md
     python scripts/summarize_extract.py path/to/extract.json  # stdout
+    python scripts/summarize_extract.py path/to/repo          # auto-discover from .verilib/probes/
 """
 
 import argparse
@@ -302,16 +303,77 @@ def generate_report(extract: dict) -> str:
     return "\n".join(out)
 
 
+def find_extract_json(repo_dir: Path) -> Path:
+    """Find the main extract JSON inside a repo's .verilib/probes/ directory.
+
+    The main extract is identified by having both "source" and "data" top-level
+    keys, distinguishing it from derived files (summaries, atoms, specs, etc.).
+    """
+    probes_dir = repo_dir / ".verilib" / "probes"
+    if not probes_dir.is_dir():
+        print(f"Error: {probes_dir} does not exist or is not a directory.", file=sys.stderr)
+        sys.exit(1)
+
+    candidates = []
+    for json_file in sorted(probes_dir.glob("*.json")):
+        try:
+            with open(json_file) as f:
+                obj = json.load(f)
+            schema = obj.get("schema", "")
+            if schema.endswith("/extract"):
+                candidates.append(json_file)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+    if not candidates:
+        print(f"Error: no extract JSON found in {probes_dir}.", file=sys.stderr)
+        sys.exit(1)
+    if len(candidates) > 1:
+        names = ", ".join(c.name for c in candidates)
+        print(
+            f"Error: multiple extract JSONs found in {probes_dir}: {names}\n"
+            f"Pass the specific file path instead.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    return candidates[0]
+
+
+def load_package_summary(repo_dir: Path) -> str:
+    """Load .verilib/package-summary.md or return an empty section."""
+    summary_path = repo_dir / ".verilib" / "package-summary.md"
+    if summary_path.is_file():
+        return summary_path.read_text().rstrip("\n") + "\n"
+    return "# Package Summary\n\n_No package summary available._\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate a markdown verification report from a probe extract JSON."
     )
-    parser.add_argument("input", help="Path to the extract JSON file")
+    parser.add_argument(
+        "input",
+        help="Path to an extract JSON file, or a repo directory containing .verilib/probes/",
+    )
     parser.add_argument("-o", "--output", help="Output markdown file (default: stdout)")
     args = parser.parse_args()
 
-    extract = load_extract(args.input)
+    input_path = Path(args.input)
+    package_summary = None
+
+    if input_path.is_dir():
+        json_path = find_extract_json(input_path)
+        package_summary = load_package_summary(input_path)
+        print(f"Using extract: {json_path}", file=sys.stderr)
+    else:
+        json_path = input_path
+
+    extract = load_extract(str(json_path))
     report = generate_report(extract)
+
+    if package_summary is not None:
+        report = package_summary + "\n---\n\n" + report
 
     if args.output:
         Path(args.output).write_text(report)
