@@ -1,58 +1,32 @@
 ---
 auditor: code-quality-auditor
-date: 2026-04-03
-status: 0 critical, 0 warnings, 5 info
+date: 2026-04-07
+scope: probe-lean after `trusted-reason` (v0.4.5)
+status: 0 critical, 1 warning, 8 info
 ---
-
-## Summary by property (P1–P20)
-
-| Property | Scope of this audit | Result |
-|----------|---------------------|--------|
-| P1 Envelope completeness | `probe summary` output | **Satisfied** — `SummaryEnvelope` wraps payload ([C1] resolved; see verification below) |
-| P2 Atom identity / unique keys | Hub types + merge + summary | Satisfied (`BTreeMap` keys; summary reads same model) |
-| P3 Stub detection | `summary.rs` | Satisfied (`Atom::is_stub()`); `@kb` present |
-| P4–P5 Merge associativity / identity | `merge.rs` | Satisfied (unchanged; tested) |
-| P6–P7 Atom / specs-proofs merge | `merge.rs` | Satisfied (unchanged) |
-| P8 Code-name normalization | `merge.rs` | Satisfied (unchanged) |
-| P9 Provenance | `merge.rs` / `load_atom_file` / summary | Satisfied; summary forwards `inputs` from loaded envelope via `load_atom_file` |
-| P10 Extensions through merge | `merge.rs` + `summary.rs` | Satisfied; summary reads `extensions` for `verification-status` |
-| P11–P13 Translation rules | `merge.rs` | Satisfied (unchanged); summary N/A |
-| P14 Deterministic output | `summary.rs` | Satisfied for payload ordering: `BTreeMap` iteration; lists follow sorted code-name order. Envelope `timestamp` is wall-clock (same pattern as `merge.rs`) |
-| P15 Dependency completeness | probe-verus extract | Fixtures unchanged; not hub-owned |
-| P16 Verification status mapping | probe-verus | Unchanged |
-| P17 Schema category consistency | `merge.rs` / loaders | Satisfied; summary only loads atoms-category files |
-| P18 Lean `specified` | N/A | N/A to files audited |
-| P19 Cross-repo path deps | Not re-scanned | No change indicated |
-| P20 Language from kind | `summary.rs` (`is_rust_exec`) | Satisfied; `@kb` links [schema.md](../engineering/schema.md#language-assignment-for-verus-atoms) |
 
 ## Critical
 
-**None.** Previous **[C1]** is **resolved**.
-
-**Verification**: `src/commands/summary.rs` defines `SummaryEnvelope` with `schema: "probe/summary"`, `schema-version: "2.0"` (via `schema_version` field + serde rename), `tool` (`Tool` struct), `inputs: Vec<InputProvenance>` populated from `load_atom_file` provenance, RFC3339 `timestamp`, and `data: SummaryResult`. This matches the Schema 2.0 merged-envelope variant ([schema.md](../engineering/schema.md#merged-envelope-variant)) and [P1](../engineering/properties.md#p1-envelope-completeness).
+None
 
 ## Warnings
 
-**None.** Previous findings addressed:
-
-- **[W1]**: Seven unit tests in `summary.rs` cover partition size, stubs, test heuristic, Verus spec/proof exclusion, unverified exclusion, test-dep non-disqualification, and depended-upon vs entrypoint. `cargo test` passes.
-- **[W2]**: `kb/engineering/architecture.md` lists `src/commands/summary.rs`, hub **Subcommands**: `merge`, `summary`.
-- **[I1]** (prior): `@kb` annotations added on `summary.rs` for [P1](../engineering/properties.md#p1-envelope-completeness), [P3](../engineering/properties.md#p3-stub-detection-is-structural), [P14](../engineering/properties.md#p14-deterministic-output), [P20](../engineering/properties.md#p20-language-is-derived-from-kind-not-lexical-scope), and [language assignment](../engineering/schema.md#language-assignment-for-verus-atoms).
-- **[I2]** (prior): `src/main.rs` `Summary` docs match implementation and mention schema `probe/summary`.
+- **README example `tool.version` is stale:** The “Example Output” JSON in [README.md](../../../probe-lean/README.md) still shows `"version": "0.2.0"` while [lakefile.toml](../../../probe-lean/lakefile.toml), [ProbeLean/Version.lean](../../../probe-lean/ProbeLean/Version.lean), [docs/USAGE.md](../../../probe-lean/docs/USAGE.md), and [docs/SCHEMA.md](../../../probe-lean/docs/SCHEMA.md) are aligned on **0.4.5**. This undermines the documented single-source-of-truth story for newcomers reading the README first.
 
 ## Info
 
-### [I3] Glossary-aligned terminology (residual, low)
-[product/spec.md](../product/spec.md) now documents **Entrypoint analysis** and `probe summary` under Core capabilities. A dedicated [glossary](../engineering/glossary.md) term for "entrypoint" remains optional for discoverability.
+- **P16 vs implementation:** [Extract.lean](../../../probe-lean/ProbeLean/Extract.lean) `mapVerifyStatus` maps sorry outcomes to `verified` / `unverified` / `failed` as in [P16](../engineering/properties.md#p16-verification-status-mapping). `trustedReason` returns `some "axiom"` when `kind == axiom`, else `some "external"` when `codePath.endsWith "External.lean"`, else `none` — matching [probe-lean.md](../tools/probe-lean.md) (axiom precedence over external when both apply). `unifyAtom` sets `verificationStatus` to `trusted` iff `trustedReason` is `some`, and assigns `trustedReason` in parallel; non-trusted atoms omit both `verification-status` and `trusted-reason` in JSON via [Types.lean](../../../probe-lean/ProbeLean/Types.lean) `ToJson` (optional fields omitted when `none`).
 
-### [I4] `probe-verus` extract fixtures align with P20
-No change; still consistent with [P20](../engineering/properties.md#p20-language-is-derived-from-kind-not-lexical-scope) and [schema.md](../engineering/schema.md#language-assignment-for-verus-atoms).
+- **P16 KB surface:** Canonical [properties.md](../engineering/properties.md#p16-verification-status-mapping) documents `verification-status` only; `trusted-reason` is specified in [probe-lean.md](../tools/probe-lean.md), [schema.md](../engineering/schema.md), and [glossary.md](../engineering/glossary.md). No contradiction — consider a one-line cross-reference under P16 for readers who use properties.md alone.
 
-### [I5] `probe/summary` listed under "Registered schema values" in schema.md
-Implementation and [probe-summary.md](../tools/probe-summary.md) use `schema: "probe/summary"`, registered in [schema.md](../engineering/schema.md#registered-schema-values) under Analysis.
+- **Version consistency (0.4.5):** `lakefile.toml`, generated `ProbeLean/Version.lean`, `CHANGELOG.md` [0.4.5] entry, `docs/USAGE.md` and `docs/SCHEMA.md` examples, and [Tests/Main.lean](../../../probe-lean/Tests/Main.lean) `testVersionConsistency` / `ProbeLean.version` checks are aligned. Stale tooling doc: [docs/manual-test-schema-2.0.md](../../../probe-lean/docs/manual-test-schema-2.0.md) still lists `tool.version` **0.1.0** in checklist rows (pre-existing drift; same class of issue as README).
 
-### [I6] `kb/tools/index.md` table includes `probe-summary.md`
-[kb/index.md](../index.md) links [probe-summary.md](../tools/probe-summary.md); [tools/index.md](../tools/index.md) file table includes the row.
+- **Tests:** `lake build tests` and `.lake/build/bin/tests` report **303 passed, 0 failed** (verified 2026-04-07). [Tests/Main.lean](../../../probe-lean/Tests/Main.lean) covers `trustedReason` precedence and negatives, `unifyAtom` `trustedReason` / override behavior, and example JSON invariants (`all trusted atoms have trusted-reason`, valid reason strings, non-trusted atoms omit the field).
 
-### [I7] Optional: envelope shape not covered by JSON-schema tests
-`tests/schema_validation.rs` validates representative tool envelopes but not a `probe/summary` output. Low risk given struct-driven serialization; add a fixture test if regressions on P1 are a concern.
+- **TESTING.md drift:** [TESTING.md](../../../probe-lean/TESTING.md) still describes `testTrustedStatus` only in terms of `isTrustedAtom` and older `unifyAtom` bullets; it does not mention `trustedReason` or the six checks in `testExampleJsonVerificationStatus` (table still says “3” for that function).
+
+- **Serialization / P14:** [Types.lean](../../../probe-lean/ProbeLean/Types.lean) emits `trusted-reason` only when `trustedReason` is `some`, immediately after `verification-status` when present — stable field order for trusted atoms. [testDeterminismInvariants](../../../probe-lean/Tests/Main.lean) uses pairwise sorted key checks for example `data` (prior audit’s bogus `keysSorted` issue is resolved).
+
+- **`--skip-verify`:** When verification is skipped, `proofEntry` is absent so `verificationStatus` stays `none` for non-trusted atoms; trusted atoms still get `trusted` + `trusted-reason`. Matches “absent when skipped” language in schema docs.
+
+- **viewify:** [View.lean](../../../probe-lean/ProbeLean/View.lean) / [Loader.lean](../../../probe-lean/ProbeLean/Loader.lean) continue to load `AtomsOutput` (`Atom`); unified-only fields are not required for molecules. No change needed for `trusted-reason` on that path.

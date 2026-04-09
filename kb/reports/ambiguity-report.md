@@ -1,85 +1,55 @@
 ---
 auditor: ambiguity-auditor
-date: 2026-04-03
-status: 0 critical, 5 warnings, 7 info
+date: 2026-04-07
+pass: trusted-reason (probe-lean KB + cross-file consistency)
+status: 0 critical, 3 warnings, 8 info
 ---
 
-## Re-audit (2026-04-03)
+## Scope
 
-Focused pass on fixes for **W2**, **W5**, and **W8** from the prior report. **Resolved:**
-
-| ID | Resolution (verified) |
-|----|------------------------|
-| **W2** | `kb/engineering/architecture.md` “Why separate directories” now references `decisions/001-separate-repos.md` without *(planned)*, consistent with ADR-001 `status: accepted`. |
-| **W5** | `probe summary` is documented: `kb/index.md` links `tools/probe-summary.md`; architecture lists `src/commands/summary.rs` and subcommands `merge`, `summary`; `kb/product/spec.md` adds capability **5. Entrypoint analysis**; `kb/tools/probe-summary.md` specifies behavior, CLI, output, and properties. |
-| **W8** | P20-related files called out previously now carry `last-updated: 2026-04-03` (`properties.md`, `schema.md`, `glossary.md`, `probe-verus.md`), along with other KB files touched in this round (`index.md`, `architecture.md`, `spec.md`, `probe-summary.md`). |
+Audit focused on **`trusted-reason`** and **`verification-status: "trusted"`** after KB updates to [schema.md](../engineering/schema.md), [probe-lean.md](../tools/probe-lean.md), and [glossary.md](../engineering/glossary.md). Requested files were read in full; [probe-verus.md](../tools/probe-verus.md) was additionally scanned because it is the paired Verus tool doc and [schema.md](../engineering/schema.md) documents `trusted-reason` for both tools.
 
 ## Critical
 
 None.
 
-Normative texts reviewed (including P20, Verus `language` assignment, and cross-links between `schema.md`, `properties.md`, `glossary.md`, and `tools/probe-verus.md`) are mutually consistent on **atom-level** `language` vs `kind` for probe-verus. No contradiction was found between P20 and the schema or glossary.
-
 ## Warnings
 
-### [W1] P16 omits probe-lean `verification-status: "failed"`
-- **Location**: `kb/engineering/properties.md`, §P16 (approx. lines 128–138)
-- **Issue**: P16 documents only sorry-based `"unverified"` vs otherwise `"verified"` for probe-lean. `kb/tools/probe-lean.md` additionally specifies build failure → `"failed"`. That third state is not part of the cross-tool invariant list, so correctness checks against `properties.md` alone can miss it.
-- **Recommendation**: Extend P16 with the same three-way table as in `probe-lean.md` (or a single sentence referencing build failure), and add a cross-link from `probe-lean.md` to the updated property.
-
-### [W3] ADR-001 vs P19 / probe-aeneas on how probe-aeneas depends on probe
-- **Location**: `kb/decisions/001-separate-repos.md`, “Consequences” (approx. lines 47–49); `kb/tools/probe-aeneas.md` “Dependency on probe crate” (approx. lines 176–182); `kb/engineering/properties.md` P19
-- **Issue**: ADR-001 states probe-aeneas imports probe via a **local path** dependency and that moving directories breaks it. The tool KB documents a **git** URL dependency and P19 mandates git (not path) across repositories. Readers cannot tell which is normative for published/consumed layouts vs monorepo-style checkouts.
-- **Recommendation**: Amend ADR-001 consequences to distinguish local dev (path/patch) from published dependency policy, and reference P19. Ensure `probe-aeneas.md` remains the operational source of truth for the dependency declaration.
-
-### [W4] Contradictory Charon installation guidance (probe-aeneas vs probe-rust)
-- **Location**: `kb/tools/probe-aeneas.md`, “External tool dependencies”, Charon row (approx. line 173); `kb/tools/probe-rust.md`, same table (approx. line 102)
-- **Issue**: probe-aeneas says Charon is “managed by probe-rust `--auto-install`”. probe-rust lists Charon as not auto-installed (`no` / `no`). Operators get conflicting instructions.
-- **Recommendation**: Reconcile both tables with actual probe-rust behavior; if Charon is never auto-installed, drop the probe-aeneas note or replace it with the real mechanism (e.g. user-installed, or probe-aeneas pre-generation only).
-
-### [W6] P14 “probe-rust … tracked” has no anchor or tracker
-- **Location**: `kb/engineering/properties.md`, P14 (approx. lines 114–115)
-- **Issue**: The known non-determinism in probe-rust is acknowledged but not tied to an issue, ADR, or KB section, so “tracked” is unverifiable and may go stale.
-- **Recommendation**: Add a decision link, issue link, or explicit KB “known gaps” bullet with acceptance criteria.
-
-### [W7] Property coverage: stub `dependencies` not stated in properties
-- **Location**: `kb/engineering/glossary.md` §stub; `kb/engineering/schema.md` §Stubs; `kb/engineering/properties.md` P3
-- **Issue**: Glossary and schema say stubs have `dependencies: []`. P3 defines stub detection only via `code-path` and `code-text`. Nothing in P1–P20 requires empty dependencies for stubs, so an extractor could theoretically diverge while still satisfying P3.
-- **Recommendation**: Either add a one-line invariant under P3 (or a short P21) that stubs MUST have `dependencies: []`, or soften glossary/schema wording if empty dependencies are illustrative only.
+| ID | Topic | Notes |
+|----|--------|--------|
+| **W1** | [probe-verus.md](../tools/probe-verus.md) vs [schema.md](../engineering/schema.md) | **Stale / contradictory.** Output fields list gives `verification-status` as only `"verified"`, `"failed"`, `"unverified"` and does not mention `"trusted"` or `trusted-reason`. [schema.md](../engineering/schema.md) and [glossary.md](../engineering/glossary.md) state probe-verus emits `trusted-reason` when status is `"trusted"` (values `"admit"`, `"external-body"`, `"assume-specification"`). Readers using the tool page alone will mis-implement consumers or think the schema table is wrong. |
+| **W2** | [P16](../engineering/properties.md#p16-verification-status-mapping) incomplete for probe-verus | **Normative gap.** P16 documents Verus run output mapping (`success` / `failure` / `sorries` / `warning`) but never states when atoms are `"trusted"` or how that relates to `trusted-reason`. Trust-base behavior for Verus is only implied elsewhere ([glossary](../engineering/glossary.md#trusted-verification-status), [schema optional fields](../engineering/schema.md#core-fields-required-for-all-languages)). P16 should either add a Verus `"trusted"` row/table or explicitly defer to glossary/schema for trust-base + `trusted-reason`. |
+| **W3** | [glossary.md](../engineering/glossary.md#trusted-verification-status) “trusted” lede | **Vague / easy to misread.** The opening sentence describes only Lean (`axiom`, `*External.lean`) before the list that covers Verus. A quick read suggests `"trusted"` is Lean-only; the full entry is cross-tool. Consider leading with “Cross-tool value” or splitting into probe-lean vs probe-verus sentences up front. |
 
 ## Info
 
-### [I1] No files exceed 30-day staleness (as of 2026-04-03)
-- **Location**: all `last-updated` fields under `kb/`
-- **Issue**: None — dates range from 2026-03-19 through 2026-04-03, i.e. newer than 2026-03-04.
-- **Recommendation**: None required for the 30-day rule; keep updating dates when normative text changes.
+1. **P16 vs probe-lean detail:** [probe-lean.md](../tools/probe-lean.md) documents `trusted-reason` per row and **axiom vs external precedence**; [P16](../engineering/properties.md#p16-verification-status-mapping) gives Lean `verification-status` only. Precedence is tool-doc-specific, which is acceptable, but P16 does not cross-link `trusted-reason` or [glossary](../engineering/glossary.md#trusted-verification-status) for the Lean trust base.
 
-### [I2] ADR-002 example schema value is legacy
-- **Location**: `kb/decisions/002-schema-2.0.md` (approx. line 27)
-- **Issue**: Rationale uses `probe-lean/atoms` as an example discriminator; `kb/engineering/schema.md` notes current probe-lean outputs use `probe-lean/extract` / `viewify` with legacy values only for older files.
-- **Recommendation**: Swap the example to a current schema string to avoid teaching deprecated identifiers.
+2. **Schema version history:** [schema.md § Version history](../engineering/schema.md#version-history) still only records probe-rust 2.1 optional fields. Introduction of `trusted-reason` (and normative pairing with `"trusted"`) for probe-verus / probe-lean is not reflected there — optional for traceability, useful for consumers asking “when did this field appear?”.
 
-### [I3] P12 vs schema: `heuristic` confidence
-- **Location**: `kb/engineering/properties.md` P12; `kb/engineering/schema.md`, translations / confidence list (approx. line 264)
-- **Issue**: Schema lists `heuristic` as a confidence level; P12 enumerates only the four strategy-driven levels. Readers cannot map `heuristic` to a strategy or invariant.
-- **Recommendation**: Add a sentence in P12 or schema stating when `heuristic` is produced, or remove it from the schema list if unused.
+3. **product/spec.md:** [§ Core capabilities — Verification status](../product/spec.md#core-capabilities) mentions Lean axioms / `*External.lean` as trusted but does not mention **`trusted-reason`** as the machine-readable classifier or Verus trust-base categories. Low priority for product-level doc.
 
-### [I4] Merge “commutativity for disjoint keys” lacks a property ID
-- **Location**: `kb/tools/probe-merge.md`, “Categorical framework” (approx. line 73)
-- **Issue**: Associativity and identity are tied to P4/P5; commutativity for disjoint keys is not listed in `properties.md`, yet merge order is emphasized elsewhere (P6 first-wins base).
-- **Recommendation**: Add a short property or a non-normative note clarifying that commutativity applies only when there are no overlapping keys (or rephrase if the claim is informal).
+4. **Glossary cross-links:** Under [trusted (verification-status)](../engineering/glossary.md#trusted-verification-status), the see-also points at P16 and probe-lean; adding [probe-verus.md](../tools/probe-verus.md) (once fixed) would balance cross-navigation.
 
-### [I5] “Lexical scope” used in P20 / tool docs but not in glossary
-- **Location**: `kb/engineering/properties.md` P20; `kb/tools/probe-verus.md` “Language assignment”
-- **Issue**: The term is understandable in context but is not a defined glossary entry for consistency audits.
-- **Recommendation**: Optional one-line gloss under **kind** or a footnote pointing to P20.
+5. **index.md metadata:** [index.md](../index.md) `last-updated: 2026-04-03` lags pages touched for `trusted-reason` (`2026-04-07`). Cosmetic only.
 
-### [I6] Product spec does not distinguish envelope `source.language` from atom `language`
-- **Location**: `kb/product/spec.md`; `kb/engineering/schema.md` envelope vs atom tables
-- **Issue**: After P20, Verus exec atoms carry `language: "rust"` while the project may still be described at envelope level as Rust; the product layer does not warn consumers not to conflate the two fields.
-- **Recommendation**: One short paragraph in the Output / Schema reference path (with links to schema + P20).
+6. **viewify and `trusted-reason`:** [probe-lean.md](../tools/probe-lean.md) documents `trusted-reason` on extract output but does not state whether **`viewify` preserves** the field on molecules. If molecules are a strict subset/projection, stating pass-through or omission would remove ambiguity for UI authors.
 
-### [I7] tools/index LOC/complexity snapshot may drift
-- **Location**: `kb/tools/index.md` (table approx. lines 13–19)
-- **Issue**: Figures (e.g. probe ~1.5K LOC) are approximate and not tied to a refresh policy; hub growth (`summary`, etc.) isn’t reflected.
-- **Recommendation**: Treat as indicative only or add “approx / see repo” disclaimer; update when tooling changes significantly.
+7. **Prior P14 warning (unchanged):** [P14](../engineering/properties.md#p14-deterministic-output) headline still reads as universal deterministic output while probe-rust caveat remains below; unrelated to `trusted-reason` but still a clarity hazard (same as prior ambiguity-auditor finding W1).
+
+8. **Code-name pattern `*External.lean`:** Used consistently; [glossary](../engineering/glossary.md#trusted-verification-status) ties it to Aeneas convention. No contradiction found with [probe-lean.md](../tools/probe-lean.md) table (`code-path` ends with `External.lean`).
+
+## Consistency checks (clean)
+
+- [schema.md](../engineering/schema.md) optional-field description of `trusted-reason` matches [glossary.md](../engineering/glossary.md) enumerations for both tools.
+- [probe-lean.md](../tools/probe-lean.md) verification table and Lean-specific fields table align with [schema.md](../engineering/schema.md) and with [trust base](../engineering/glossary.md#trust-base) wording.
+- [trust base](../engineering/glossary.md#trust-base) correctly references both tools and `trusted-reason`.
+- No conflict found between “`trusted-reason` present only when `verification-status` is `"trusted"`” across schema, glossary, and probe-lean tool doc.
+
+## Files read (this pass)
+
+`kb/index.md`, `kb/engineering/properties.md`, `kb/engineering/schema.md`, `kb/engineering/glossary.md`, `kb/tools/probe-lean.md`, `kb/product/spec.md`
+
+## Additional KB file scanned
+
+`kb/tools/probe-verus.md` (for `trusted-reason` / `"trusted"` alignment with schema)

@@ -36,3 +36,13 @@ exec fn double_checked(x: u32) -> (result: u32)
 }
 
 } // verus!
+
+/// Simple wrapper for testing trait impl visibility in atoms.
+pub struct Counter(pub u32);
+
+impl core::ops::Add for Counter {
+    type Output = Counter;
+    fn add(self, rhs: Counter) -> Counter {
+        Counter(self.0 + rhs.0)
+    }
+}

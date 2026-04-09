@@ -1,6 +1,6 @@
 ---
 title: Schema 2.0 Interchange Specification
-last-updated: 2026-04-03
+last-updated: 2026-04-07
 status: draft
 ---
 
@@ -144,7 +144,8 @@ Note: `"latex"` appears as a reserved `source.language` value in some envelope e
 | Field | Type | Tools | Description |
 |-------|------|-------|-------------|
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification text (verus) or code-name of primary spec theorem (lean) |
-| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, or `"unverified"` |
+| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, `"unverified"`, or `"trusted"` for trust-base atoms |
+| `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
 | `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
 | `specs` | array of strings | probe-lean | Theorem atoms referencing this atom |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data: `{code-name, location, line}` |

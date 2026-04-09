@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-04-03
+last-updated: 2026-04-07
 status: draft
 ---
 
@@ -135,7 +135,16 @@ For probe-verus, Verus verification output maps to `verification-status` as:
 | `sorries` | `"unverified"` |
 | `warning` | `"unverified"` |
 
-For probe-lean, sorry detection in build output determines status: definitions with sorry warnings are `"unverified"`, otherwise `"verified"`.
+For probe-lean, verification status is determined by sorry detection and trust-base classification:
+
+| Condition | `verification-status` |
+|---|---|
+| `kind == "axiom"` or `code-path` ends with `External.lean` | `"trusted"` |
+| No sorry warnings | `"verified"` |
+| Has sorry warnings | `"unverified"` |
+| Build failure | `"failed"` |
+
+**Precedence**: `"trusted"` overrides sorry-based status — an axiom or `*External.lean` declaration is always `"trusted"` regardless of build output.
 
 ## P17. Schema category consistency
 
@@ -168,6 +177,32 @@ For probe-verus atoms, the `language` field is determined by the atom's `kind`, 
 **Why**: Verus exec functions (e.g. `compress`, `decompress`, `mul`) are real Rust code that compiles to machine instructions. They happen to sit inside `verus!{}` blocks because that's where their specs live, but they are not "Verus constructs" — they are Rust functions with formal contracts. Tagging them `language: "verus"` would exclude them from any Rust-specific analysis (e.g. entrypoint detection, call graph filtering).
 
 **Implemented in**: `probe-verus/src/lib.rs` (language assignment in `convert_to_atoms_with_lines_internal`).
+
+## P21. Cross-tool RQN alignment
+
+When probe-rust and probe-verus process the same Rust source project, `rust-qualified-name` values must be identical for all functions that both tools discover:
+
+- Both tools use `derive_rust_qualified_name(code_path, display_name)` with the same algorithm
+- `display_name` for trait impl methods must be `SelfType::method` (not `TraitName::method`)
+- `code_path` must use `crate-name/src/...` format (workspace prefix included)
+
+When both tools run with `--with-public-api`, `is-public-api` values must agree for every function with a matching RQN.
+
+**Implemented in**: `probe-verus/src/lib.rs` (`build_call_graph` re-enriches display names for single-hash trait impl symbols using the self-type from the SCIP pre-pass), `probe-verus/src/public_api.rs` (RQN-based matching against `cargo public-api`).
+
+## P22. Cross-tool trust-reason vocabulary
+
+Each probe tool emits tool-specific `trusted-reason` values that reflect the source language's constructs. Cross-tool consumers (dashboards, summary scripts) must normalize these to a common vocabulary:
+
+| Canonical category | probe-verus value | probe-lean value | Meaning |
+|--------------------|-------------------|------------------|---------|
+| `axiom` | `"admit"` | `"axiom"` | Property assumed without proof |
+| `external` | `"external-body"` | `"external"` | Implementation trusted without checking |
+| `assumed spec` | `"assume-specification"` | — | External function whose declared spec is not proved |
+
+Tools must NOT rename their `trusted-reason` values to match another tool — the values are part of each tool's public contract. Normalization happens in consumers (e.g., `scripts/summarize_extract.py`).
+
+**Implemented in**: `probe/scripts/summarize_extract.py` (`TRUST_LABELS` mapping and `TOOL_CONFIG` per-tool configuration).
 
 ## Known bugs and edge cases
 

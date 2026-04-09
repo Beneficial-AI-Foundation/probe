@@ -1,6 +1,6 @@
 ---
 title: Product Specification
-last-updated: 2026-04-03
+last-updated: 2026-04-07
 status: draft
 ---
 
@@ -34,10 +34,10 @@ The probe ecosystem extracts structured data from multi-language verification pr
 - probe-verus: parses verus_syn AST for requires/ensures text, classifies with TOML taxonomy
 - probe-lean: computes specs as reverse dependencies (theorems that reference a definition)
 
-**3. Verification status** — Determine which definitions are verified, failed, or unverified.
+**3. Verification status** — Determine which definitions are verified, failed, unverified, or trusted (assumed correct without proof).
 
 - probe-verus: runs `cargo verus`, parses output, maps errors to functions
-- probe-lean: detects sorry warnings in build output
+- probe-lean: detects sorry warnings in build output; axioms and `*External.lean` declarations (hand-written models of external code) are reported as `"trusted"`
 
 **4. Cross-language merging** — Combine data from different languages into a single graph with cross-language dependency edges.
 

@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-04-03
+last-updated: 2026-04-07
 status: draft
 ---
 
@@ -123,6 +123,21 @@ A Rust compiler frontend used by [Aeneas](#aeneas) to extract structured informa
 ## RQN
 
 Abbreviation for `rust-qualified-name` — a [Charon](#charon)-derived fully qualified name for a Rust function. Used as the highest-confidence matching strategy in probe-aeneas translation generation. Example: `my_crate::module::MyStruct::method`.
+
+## trusted (verification-status)
+
+A `verification-status` value (see [P16](properties.md#p16-verification-status-mapping) and [probe-lean tool doc](../tools/probe-lean.md)) indicating that a declaration is assumed correct without formal proof. Applies to Lean [axioms](#kind) and declarations in `*External.lean` files (Aeneas convention for hand-written models of external Rust functions/types). These form the **trust base** of a verified project — assumptions the rest of the proofs rely on.
+
+When `verification-status` is `"trusted"`, a `trusted-reason` field is also present:
+- `"axiom"` — Lean `axiom` keyword (probe-lean)
+- `"external"` — `*External.lean` file convention (probe-lean)
+- `"admit"` — `admit()` call (probe-verus)
+- `"external-body"` — `#[verifier::external_body]` attribute (probe-verus)
+- `"assume-specification"` — `assume_specification` declaration (probe-verus)
+
+## trust base
+
+The set of declarations in a verified project that are assumed correct without proof. In probe-lean: axioms and hand-written models in `*External.lean` files. In probe-verus: `admit()` axioms, `#[verifier::external_body]` functions, and `assume_specification` targets. Both tools mark these with `verification-status: "trusted"` and a `trusted-reason` for classification. Everything outside the trust base must be proven (or is `"unverified"` / `"failed"`).
 
 ## probe-extract-check
 

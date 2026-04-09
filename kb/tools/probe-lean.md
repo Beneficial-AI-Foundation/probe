@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-lean"
-last-updated: 2026-04-02
+last-updated: 2026-04-07
 status: draft
 ---
 
@@ -46,7 +46,7 @@ Lean projects must be built before environment walking works. probe-lean:
 3. Runs `lake build <libs>`
 4. Only then can it inspect the environment
 
-Use `--skip-build` if the project is already built.
+Building is automatically skipped when the build cache is up-to-date.
 
 ### Type vs term dependencies
 
@@ -61,11 +61,15 @@ The `dependencies` field is the deduplicated union of both. See [P15](../enginee
 A Lean definition with `sorry` is unverified (it uses an axiom that makes the proof trivially true). probe-lean detects sorries by parsing build output warnings, not by inspecting the term structure.
 
 Verification status mapping:
-| Condition | `verification-status` |
-|-----------|----------------------|
-| No sorry | `"verified"` |
-| Has sorry | `"unverified"` |
-| Build failure | `"failed"` |
+| Condition | `verification-status` | `trusted-reason` |
+|-----------|----------------------|-----------------|
+| `kind == "axiom"` | `"trusted"` | `"axiom"` |
+| `code-path` ends with `External.lean` | `"trusted"` | `"external"` |
+| No sorry | `"verified"` | absent |
+| Has sorry | `"unverified"` | absent |
+| Build failure | `"failed"` | absent |
+
+**Precedence**: `"trusted"` overrides sorry-based status. When both conditions apply (axiom in `*External.lean`), `"axiom"` takes precedence as the more specific classification. The `trusted-reason` field enables automated trust-base classification without inspecting `kind` or `code-path`.
 
 ### Declaration filtering
 
@@ -98,7 +102,6 @@ Unified pipeline producing atoms with verification status and specs.
 | `--output` | `.verilib/probes/lean_<pkg>_<ver>.json` | Output path |
 | `--module` | all | Restrict to specific module |
 | `--skip-verify` | false | Skip sorry detection |
-| `--skip-build` | false | Skip `lake build` (project must be pre-built) |
 | `--from-file` | none | Read atoms from file instead of environment |
 
 ### `viewify`
@@ -142,7 +145,14 @@ Output goes to `.verilib/views/`.
 | `rust-source` | string/null | Rust source path from Aeneas docstring |
 | `specs` | array | Theorem code-names depending on this. Absent when empty. |
 | `primary-spec` | string | Primary spec theorem code-name. Absent when none. |
-| `verification-status` | string | `"verified"`, `"unverified"`, `"failed"`. Absent when skipped. |
+| `verification-status` | string | `"verified"`, `"unverified"`, `"failed"`, `"trusted"`. Absent when skipped. |
+| `trusted-reason` | string | `"axiom"` or `"external"`. Present only when `verification-status` is `"trusted"`. |
+
+## Determinism (P14)
+
+probe-lean `extract` must produce byte-identical JSON (ignoring `timestamp`) for the same project, commit, and toolchain. See [P14](../engineering/properties.md#p14-deterministic-output) for the full requirement.
+
+**Current status:** Deterministic since v0.4.3. Violations C9–C12 resolved: declarations sorted by name, dependency/specs/attributes arrays sorted lexicographically, sorries sorted by line number, modules sorted before import, JSON keys deterministic via Lean's `RBNode` ordering. Verified by running extract twice on the same project and confirming byte-identical output (ignoring `timestamp`).
 
 ## Build performance rules
 
