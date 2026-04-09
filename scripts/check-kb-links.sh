@@ -6,6 +6,7 @@
 set -euo pipefail
 
 KB_DIR="kb"
+REPO_ROOT=$(pwd)
 
 if [ ! -d "$KB_DIR" ]; then
     echo "Error: $KB_DIR directory not found. Run from repo root."
@@ -72,6 +73,12 @@ while IFS= read -r src_file; do
             echo "  ERROR: $src_file -> $path (cannot resolve)" >> "$ERRFILE"
             continue
         fi
+
+        # Skip cross-repo links (targets outside the repo root)
+        case "$target" in
+            "$REPO_ROOT"/*) ;;
+            *) continue ;;
+        esac
 
         if [ ! -e "$target" ]; then
             echo "  ERROR: $src_file -> $path (file not found)" >> "$ERRFILE"
