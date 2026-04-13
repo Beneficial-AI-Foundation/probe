@@ -1,12 +1,28 @@
 #!/usr/bin/env python3
 """Generate a markdown verification report from a probe extract JSON file.
 
-Works with probe-verus and probe-aeneas extract JSON.
+Works with probe-verus, probe-aeneas, and probe-lean extract JSON.
 
 Usage:
+    python scripts/summarize_extract.py <input> [OPTIONS]
+
+Arguments:
+    input                Path to an extract JSON file, or a repo directory
+                         containing .verilib/probes/
+
+Options:
+    -o, --output PATH                  Output markdown file (default: stdout)
+    --package-summary PATH             Markdown file prepended to the report
+    --package-assumptions PATH         Markdown file appended to the report
+
+Examples:
     python scripts/summarize_extract.py path/to/extract.json -o summary.md
     python scripts/summarize_extract.py path/to/extract.json  # stdout
     python scripts/summarize_extract.py path/to/repo          # auto-discover from .verilib/probes/
+    python scripts/summarize_extract.py path/to/extract.json \\
+        --package-summary summary.md \\
+        --package-assumptions assumptions.md \\
+        -o report.md
 """
 
 import argparse
@@ -21,6 +37,7 @@ TRUST_LABELS = {
     "assume-specification": "assumed spec",
     "axiom": "axiom",
     "external": "external",
+    "auto-generated": "auto-generated",
 }
 
 # Tool-specific configuration keyed by detected tool family.
@@ -29,6 +46,7 @@ TOOL_CONFIG = {
         "verifier_name": "Verus",
         "axiom_reasons": ("admit",),
         "external_reasons": ("external-body", "assume-specification"),
+        "auto_generated_reasons": (),
         "axiom_description": "Functions using `admit()` — the solver accepts the proof without checking.",
         "lemma_kinds": ("proof",),
         "remaining_kinds": ("exec",),
@@ -38,24 +56,27 @@ TOOL_CONFIG = {
         "verifier_name": "Lean",
         "axiom_reasons": ("axiom",),
         "external_reasons": ("external",),
+        "auto_generated_reasons": ("auto-generated",),
         "axiom_description": "Axioms — propositions assumed without proof.",
         "lemma_kinds": ("theorem",),
-        "remaining_kinds": ("def", "abbrev", "opaque"),
+        "remaining_kinds": ("def", "abbrev", "opaque", "instance", "class", "structure", "inductive"),
         "remaining_label": "Lean",
     },
     "aeneas": {
         "verifier_name": "Lean (via Aeneas)",
         "axiom_reasons": ("axiom",),
         "external_reasons": ("external",),
+        "auto_generated_reasons": ("auto-generated",),
         "axiom_description": "Axioms — propositions assumed without proof.",
         "lemma_kinds": ("theorem",),
-        "remaining_kinds": ("def", "abbrev", "opaque"),
+        "remaining_kinds": ("def", "abbrev", "opaque", "instance"),
         "remaining_label": "Lean",
     },
     "rust": {
         "verifier_name": "probe-rust",
         "axiom_reasons": (),
         "external_reasons": (),
+        "auto_generated_reasons": (),
         "axiom_description": "",
         "lemma_kinds": (),
         "remaining_kinds": ("exec",),
@@ -101,14 +122,19 @@ def bullet_list(ids: list[str], annotation_fn=None) -> str:
 
 
 def resolve_primary_spec(data: dict, atom: dict) -> str | None:
-    """Follow atom -> translation-name -> primary-spec for aeneas extracts."""
+    """Resolve primary-spec for an atom.
+
+    Aeneas: follow translation-name -> lean atom -> primary-spec.
+    Lean: read primary-spec directly from the atom.
+    """
     translation = atom.get("translation-name")
-    if translation is None:
-        return None
-    lean_atom = data.get(translation)
-    if lean_atom is None:
-        return None
-    return lean_atom.get("primary-spec")
+    if translation is not None:
+        lean_atom = data.get(translation)
+        if lean_atom is not None:
+            ps = lean_atom.get("primary-spec")
+            if ps is not None:
+                return ps
+    return atom.get("primary-spec")
 
 
 def trust_label(reason: str | None) -> str:
@@ -117,21 +143,185 @@ def trust_label(reason: str | None) -> str:
     return TRUST_LABELS.get(reason, reason)
 
 
-def generate_report(extract: dict) -> str:
-    source = extract.get("source", {})
-    pkg_name = source.get("package", "unknown")
-    pkg_version = source.get("package-version", "unknown")
-    data = extract.get("data", {})
+# ---------------------------------------------------------------------------
+# Shared report sections (used by both Lean and non-Lean reports)
+# ---------------------------------------------------------------------------
 
-    tool = detect_tool(extract)
-    cfg = TOOL_CONFIG[tool]
-    verifier = cfg["verifier_name"]
+def _trust_base_section(out, data, cfg):
+    """Section 3: Trust base — axioms, external functions, auto-generated."""
     all_axiom_reasons = cfg["axiom_reasons"]
     all_external_reasons = cfg["external_reasons"]
-    all_trust_reasons = all_axiom_reasons + all_external_reasons
+    all_auto_generated_reasons = cfg.get("auto_generated_reasons", ())
 
-    out = []
+    out.append("## 3. Trust base\n")
 
+    # 3a. Axioms
+    axioms = filtered_ids(
+        data,
+        lambda a: get_val(a, "trusted-reason") in all_axiom_reasons,
+    )
+    out.append(f"### 3a. Properties assumed to hold ({len(axioms)} axioms)\n")
+    if cfg["axiom_description"]:
+        out.append(f"{cfg['axiom_description']}\n")
+    out.append(bullet_list(axioms))
+
+    # 3b. External functions
+    external_trusted = filtered_ids(
+        data,
+        lambda a: get_val(a, "trusted-reason") in all_external_reasons,
+    )
+    out.append(
+        f"### 3b. External functions assumed correct w.r.t. their specs ({len(external_trusted)})\n"
+    )
+    out.append(
+        bullet_list(
+            external_trusted,
+            annotation_fn=lambda pid: f"({trust_label(get_val(data[pid], 'trusted-reason'))})",
+        )
+    )
+
+    # 3c. Auto-generated declarations (Lean and Aeneas)
+    if all_auto_generated_reasons:
+        auto_gen = filtered_ids(
+            data,
+            lambda a: get_val(a, "trusted-reason") in all_auto_generated_reasons,
+        )
+        if auto_gen:
+            out.append(
+                f"### 3c. Auto-generated declarations ({len(auto_gen)})\n"
+            )
+            out.append(
+                "Kernel-synthesized declarations without source location (congruence lemmas, eliminators, etc.).\n"
+            )
+            out.append(bullet_list(auto_gen))
+
+
+def _unverified_section(out, data):
+    """Section 4: Unverified and failed functions."""
+    failed = filtered_ids(
+        data, lambda a: get_val(a, "verification-status") == "failed"
+    )
+    unverified = filtered_ids(
+        data, lambda a: get_val(a, "verification-status") == "unverified"
+    )
+    combined = len(failed) + len(unverified)
+    out.append(f"## 4. Unverified and failed functions ({combined})\n")
+    if combined == 0:
+        out.append("None\n")
+    else:
+        if failed:
+            out.append(
+                bullet_list(failed, annotation_fn=lambda _pid: "[FAILED]")
+            )
+        if unverified:
+            out.append(bullet_list(unverified))
+    return combined
+
+
+def _lemmas_section(out, data, cfg):
+    """Section 6: Verified lemmas."""
+    lemma_kinds = cfg["lemma_kinds"]
+    lemmas = filtered_ids(
+        data,
+        lambda a: get_val(a, "kind") in lemma_kinds
+        and get_val(a, "verification-status") == "verified",
+    )
+    out.append(f"## 6. Verified lemmas ({len(lemmas)})\n")
+    if lemmas:
+        out.append(bullet_list(lemmas))
+    else:
+        out.append("None\n")
+    return lemmas
+
+
+# ---------------------------------------------------------------------------
+# Lean-specific report generation
+# ---------------------------------------------------------------------------
+
+def _generate_lean_report(out, data, cfg):
+    """Generate sections 1, 2, 5, 7, and footer for Lean projects.
+
+    Lean has no public/private API distinction, so:
+    - Section 1 lists all verified definitions
+    - Section 2 lists all trusted definitions
+    - Section 5 is empty (all captured in section 1)
+    - Section 7 is empty (no public API concept)
+    """
+    remaining_kinds = cfg["remaining_kinds"]
+    remaining_label = cfg["remaining_label"]
+
+    def spec_annotation(pid: str) -> str:
+        spec = resolve_primary_spec(data, data[pid])
+        if spec is None:
+            return ""
+        return f"(spec: `{spec}`)"
+
+    # --- 1. Verified definitions ---
+    verified_defs = filtered_ids(
+        data,
+        lambda a: get_val(a, "kind") in remaining_kinds
+        and get_val(a, "verification-status") == "verified",
+    )
+    out.append(f"## 1. Verified definitions ({len(verified_defs)})\n")
+    out.append(bullet_list(verified_defs, annotation_fn=spec_annotation))
+
+    # --- 2. Trusted definitions ---
+    trusted_defs = filtered_ids(
+        data,
+        lambda a: get_val(a, "kind") in remaining_kinds
+        and get_val(a, "verification-status") == "trusted",
+    )
+    out.append(f"## 2. Trusted definitions ({len(trusted_defs)})\n")
+
+    def trusted_annotation(pid: str) -> str:
+        parts = [f"({trust_label(get_val(data[pid], 'trusted-reason'))})"]
+        s = spec_annotation(pid)
+        if s:
+            parts.append(s)
+        return " ".join(parts)
+
+    out.append(bullet_list(trusted_defs, annotation_fn=trusted_annotation))
+
+    # --- 3. Trust base (shared) ---
+    _trust_base_section(out, data, cfg)
+
+    # --- 4. Unverified and failed (shared) ---
+    combined = _unverified_section(out, data)
+
+    # --- 5. Verified remaining (empty for Lean) ---
+    out.append(f"## 5. Verified remaining {remaining_label} functions (0)\n")
+    out.append("All verified definitions are listed in section 1.\n")
+
+    # --- 6. Lemmas (shared) ---
+    lemmas = _lemmas_section(out, data, cfg)
+
+    # --- 7. Out-of-scope (not applicable for Lean) ---
+    out.append("## 7. Out-of-scope functions (0)\n")
+    out.append("Not applicable — Lean does not have a public/private API distinction.\n")
+
+    # --- Accounting footer ---
+    out.append("---\n")
+    out.append("## Verification accounting\n")
+    out.append("| Category | Count |")
+    out.append("|----------|------:|")
+    out.append(f"| Verified definitions | {len(verified_defs)} |")
+    out.append(f"| Trusted definitions | {len(trusted_defs)} |")
+    out.append(f"| Verified lemmas | {len(lemmas)} |")
+    out.append(f"| Unverified / failed | {combined} |")
+    total = len(verified_defs) + len(trusted_defs) + len(lemmas) + combined
+    out.append(f"| **Total** | **{total}** |")
+    out.append("")
+
+
+# ---------------------------------------------------------------------------
+# Non-Lean report generation (Verus, Aeneas, Rust)
+# ---------------------------------------------------------------------------
+
+def _generate_non_lean_report(out, data, cfg, tool):
+    """Generate sections 1, 2, 5, 7, and footer for tools with public API."""
+    verifier = cfg["verifier_name"]
+    remaining_kinds = cfg["remaining_kinds"]
+    remaining_label = cfg["remaining_label"]
     show_specs = tool in ("lean", "aeneas")
 
     def spec_annotation(pid: str) -> str:
@@ -140,11 +330,7 @@ def generate_report(extract: dict) -> str:
             return ""
         return f"(spec: `{spec}`)"
 
-    # --- Header ---
-    out.append(f"# Verification report: {pkg_name} {pkg_version}\n")
-
     # --- 1. Verified public API ---
-    # jq: [.data | to_entries[] | select(.value["is-public-api"] == true and .value["verification-status"] == "verified") | .key] | sort
     verified_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
@@ -157,7 +343,6 @@ def generate_report(extract: dict) -> str:
     ))
 
     # --- 2. Trusted public API ---
-    # jq: [.data | to_entries[] | select(.value["is-public-api"] == true and .value["verification-status"] == "trusted") | .key] | sort
     trusted_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
@@ -173,68 +358,15 @@ def generate_report(extract: dict) -> str:
                 parts.append(s)
         return " ".join(parts)
 
-    out.append(
-        bullet_list(trusted_pub, annotation_fn=trusted_annotation)
-    )
+    out.append(bullet_list(trusted_pub, annotation_fn=trusted_annotation))
 
-    # --- 3. Trust base ---
-    out.append("## 3. Trust base\n")
+    # --- 3. Trust base (shared) ---
+    _trust_base_section(out, data, cfg)
 
-    # 3a. Axioms
-    # jq (verus):  [.data | to_entries[] | select(.value["trusted-reason"] == "admit") | .key] | sort
-    # jq (lean):   [.data | to_entries[] | select(.value["trusted-reason"] == "axiom") | .key] | sort
-    axioms = filtered_ids(
-        data,
-        lambda a: get_val(a, "trusted-reason") in all_axiom_reasons,
-    )
-    out.append(f"### 3a. Properties assumed to hold ({len(axioms)} axioms)\n")
-    if cfg["axiom_description"]:
-        out.append(f"{cfg['axiom_description']}\n")
-    out.append(bullet_list(axioms))
-
-    # 3b. External functions
-    # jq (verus):  [.data | to_entries[] | select(.value["trusted-reason"] == "external-body" or .value["trusted-reason"] == "assume-specification") | .key] | sort
-    # jq (lean):   [.data | to_entries[] | select(.value["trusted-reason"] == "external") | .key] | sort
-    external_trusted = filtered_ids(
-        data,
-        lambda a: get_val(a, "trusted-reason") in all_external_reasons,
-    )
-    out.append(
-        f"### 3b. External functions assumed correct w.r.t. their specs ({len(external_trusted)})\n"
-    )
-    out.append(
-        bullet_list(
-            external_trusted,
-            annotation_fn=lambda pid: f"({trust_label(get_val(data[pid], 'trusted-reason'))})",
-        )
-    )
-
-    # --- 4. Unverified and failed ---
-    # jq: [.data | to_entries[] | select(.value["verification-status"] == "failed") | .key] | sort
-    failed = filtered_ids(
-        data, lambda a: get_val(a, "verification-status") == "failed"
-    )
-    # jq: [.data | to_entries[] | select(.value["verification-status"] == "unverified") | .key] | sort
-    unverified = filtered_ids(
-        data, lambda a: get_val(a, "verification-status") == "unverified"
-    )
-    combined = len(failed) + len(unverified)
-    out.append(f"## 4. Unverified and failed functions ({combined})\n")
-    if combined == 0:
-        out.append("None\n")
-    else:
-        if failed:
-            out.append(
-                bullet_list(failed, annotation_fn=lambda _pid: "[FAILED]")
-            )
-        if unverified:
-            out.append(bullet_list(unverified))
+    # --- 4. Unverified and failed (shared) ---
+    _unverified_section(out, data)
 
     # --- 5. Verified remaining functions ---
-    remaining_kinds = cfg["remaining_kinds"]
-    remaining_label = cfg["remaining_label"]
-    # jq (verus/rust): [.data | to_entries[] | select(.value.kind == "exec" and .value["verification-status"] == "verified" and .value["is-public-api"] != true) | .key] | sort
-    # jq (lean):       [.data | to_entries[] | select((.value.kind == "def" or .value.kind == "abbrev" or .value.kind == "opaque") and .value["verification-status"] == "verified" and .value["is-public-api"] != true) | .key] | sort
     verified_remaining = filtered_ids(
         data,
         lambda a: get_val(a, "kind") in remaining_kinds
@@ -249,23 +381,10 @@ def generate_report(extract: dict) -> str:
         annotation_fn=spec_annotation if show_specs else None,
     ))
 
-    # --- 6. Lemmas ---
-    lemma_kinds = cfg["lemma_kinds"]
-    # jq (verus): [.data | to_entries[] | select(.value.kind == "proof" and .value["verification-status"] == "verified") | .key] | sort
-    # jq (lean):  [.data | to_entries[] | select(.value.kind == "theorem" and .value["verification-status"] == "verified") | .key] | sort
-    lemmas = filtered_ids(
-        data,
-        lambda a: get_val(a, "kind") in lemma_kinds
-        and get_val(a, "verification-status") == "verified",
-    )
-    out.append(f"## 6. Verified lemmas ({len(lemmas)})\n")
-    if lemmas:
-        out.append(bullet_list(lemmas))
-    else:
-        out.append("None\n")
+    # --- 6. Lemmas (shared) ---
+    _lemmas_section(out, data, cfg)
 
     # --- 7. Out-of-scope public API ---
-    # jq: [.data | to_entries[] | select(.value["is-public-api"] == true and (.value["verification-status"] == null or (has("verification-status") | not))) | .key] | sort
     oos_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
@@ -299,6 +418,28 @@ def generate_report(extract: dict) -> str:
     total_pub = len(verified_pub) + len(trusted_pub) + len(oos_pub)
     out.append(f"| **Total public API** | **{total_pub}** |")
     out.append("")
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+def generate_report(extract: dict) -> str:
+    source = extract.get("source", {})
+    pkg_name = source.get("package", "unknown")
+    pkg_version = source.get("package-version", "unknown")
+    data = extract.get("data", {})
+
+    tool = detect_tool(extract)
+    cfg = TOOL_CONFIG[tool]
+
+    out = []
+    out.append(f"# Verification report: {pkg_name} {pkg_version}\n")
+
+    if tool == "lean":
+        _generate_lean_report(out, data, cfg)
+    else:
+        _generate_non_lean_report(out, data, cfg, tool)
 
     return "\n".join(out)
 
@@ -348,6 +489,14 @@ def load_package_summary(repo_dir: Path) -> str:
     return "# Package Summary\n\n_No package summary available._\n"
 
 
+def load_markdown_file(path: Path) -> str | None:
+    """Load a markdown file and return its content, or None if not found."""
+    if not path.is_file():
+        print(f"Warning: {path} not found, skipping.", file=sys.stderr)
+        return None
+    return path.read_text().rstrip("\n") + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate a markdown verification report from a probe extract JSON."
@@ -357,14 +506,26 @@ def main():
         help="Path to an extract JSON file, or a repo directory containing .verilib/probes/",
     )
     parser.add_argument("-o", "--output", help="Output markdown file (default: stdout)")
+    parser.add_argument(
+        "--package-summary",
+        help="Path to a markdown file with the package summary (prepended to the report)",
+    )
+    parser.add_argument(
+        "--package-assumptions",
+        help="Path to a markdown file with trust assumptions (appended to the report)",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
     package_summary = None
 
+    if args.package_summary:
+        package_summary = load_markdown_file(Path(args.package_summary))
+    elif input_path.is_dir():
+        package_summary = load_package_summary(input_path)
+
     if input_path.is_dir():
         json_path = find_extract_json(input_path)
-        package_summary = load_package_summary(input_path)
         print(f"Using extract: {json_path}", file=sys.stderr)
     else:
         json_path = input_path
@@ -374,6 +535,11 @@ def main():
 
     if package_summary is not None:
         report = package_summary + "\n---\n\n" + report
+
+    if args.package_assumptions:
+        assumptions = load_markdown_file(Path(args.package_assumptions))
+        if assumptions is not None:
+            report = report + "\n---\n\n" + assumptions
 
     if args.output:
         Path(args.output).write_text(report)
