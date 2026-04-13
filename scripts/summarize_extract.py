@@ -4,9 +4,25 @@
 Works with probe-verus, probe-aeneas, and probe-lean extract JSON.
 
 Usage:
+    python scripts/summarize_extract.py <input> [OPTIONS]
+
+Arguments:
+    input                Path to an extract JSON file, or a repo directory
+                         containing .verilib/probes/
+
+Options:
+    -o, --output PATH                  Output markdown file (default: stdout)
+    --package-summary PATH             Markdown file prepended to the report
+    --package-assumptions PATH         Markdown file appended to the report
+
+Examples:
     python scripts/summarize_extract.py path/to/extract.json -o summary.md
     python scripts/summarize_extract.py path/to/extract.json  # stdout
     python scripts/summarize_extract.py path/to/repo          # auto-discover from .verilib/probes/
+    python scripts/summarize_extract.py path/to/extract.json \\
+        --package-summary summary.md \\
+        --package-assumptions assumptions.md \\
+        -o report.md
 """
 
 import argparse
@@ -473,6 +489,14 @@ def load_package_summary(repo_dir: Path) -> str:
     return "# Package Summary\n\n_No package summary available._\n"
 
 
+def load_markdown_file(path: Path) -> str | None:
+    """Load a markdown file and return its content, or None if not found."""
+    if not path.is_file():
+        print(f"Warning: {path} not found, skipping.", file=sys.stderr)
+        return None
+    return path.read_text().rstrip("\n") + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate a markdown verification report from a probe extract JSON."
@@ -482,14 +506,26 @@ def main():
         help="Path to an extract JSON file, or a repo directory containing .verilib/probes/",
     )
     parser.add_argument("-o", "--output", help="Output markdown file (default: stdout)")
+    parser.add_argument(
+        "--package-summary",
+        help="Path to a markdown file with the package summary (prepended to the report)",
+    )
+    parser.add_argument(
+        "--package-assumptions",
+        help="Path to a markdown file with trust assumptions (appended to the report)",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
     package_summary = None
 
+    if args.package_summary:
+        package_summary = load_markdown_file(Path(args.package_summary))
+    elif input_path.is_dir():
+        package_summary = load_package_summary(input_path)
+
     if input_path.is_dir():
         json_path = find_extract_json(input_path)
-        package_summary = load_package_summary(input_path)
         print(f"Using extract: {json_path}", file=sys.stderr)
     else:
         json_path = input_path
@@ -499,6 +535,11 @@ def main():
 
     if package_summary is not None:
         report = package_summary + "\n---\n\n" + report
+
+    if args.package_assumptions:
+        assumptions = load_markdown_file(Path(args.package_assumptions))
+        if assumptions is not None:
+            report = report + "\n---\n\n" + assumptions
 
     if args.output:
         Path(args.output).write_text(report)
