@@ -37,7 +37,6 @@ TRUST_LABELS = {
     "assume-specification": "assumed spec",
     "axiom": "axiom",
     "external": "external",
-    "auto-generated": "auto-generated",
 }
 
 # Tool-specific configuration keyed by detected tool family.
@@ -46,7 +45,6 @@ TOOL_CONFIG = {
         "verifier_name": "Verus",
         "axiom_reasons": ("admit",),
         "external_reasons": ("external-body", "assume-specification"),
-        "auto_generated_reasons": (),
         "axiom_description": "Functions using `admit()` — the solver accepts the proof without checking.",
         "lemma_kinds": ("proof",),
         "remaining_kinds": ("exec",),
@@ -56,27 +54,24 @@ TOOL_CONFIG = {
         "verifier_name": "Lean",
         "axiom_reasons": ("axiom",),
         "external_reasons": ("external",),
-        "auto_generated_reasons": ("auto-generated",),
         "axiom_description": "Axioms — propositions assumed without proof.",
         "lemma_kinds": ("theorem",),
-        "remaining_kinds": ("def", "abbrev", "opaque", "instance", "class", "structure", "inductive"),
+        "remaining_kinds": ("def", "abbrev", "projection", "opaque", "instance", "class", "structure", "inductive"),
         "remaining_label": "Lean",
     },
     "aeneas": {
         "verifier_name": "Lean (via Aeneas)",
         "axiom_reasons": ("axiom",),
         "external_reasons": ("external",),
-        "auto_generated_reasons": ("auto-generated",),
         "axiom_description": "Axioms — propositions assumed without proof.",
         "lemma_kinds": ("theorem",),
-        "remaining_kinds": ("def", "abbrev", "opaque", "instance"),
+        "remaining_kinds": ("def", "abbrev", "projection", "opaque", "instance"),
         "remaining_label": "Lean",
     },
     "rust": {
         "verifier_name": "probe-rust",
         "axiom_reasons": (),
         "external_reasons": (),
-        "auto_generated_reasons": (),
         "axiom_description": "",
         "lemma_kinds": (),
         "remaining_kinds": ("exec",),
@@ -148,10 +143,9 @@ def trust_label(reason: str | None) -> str:
 # ---------------------------------------------------------------------------
 
 def _trust_base_section(out, data, cfg):
-    """Section 3: Trust base — axioms, external functions, auto-generated."""
+    """Section 3: Trust base — axioms and external functions."""
     all_axiom_reasons = cfg["axiom_reasons"]
     all_external_reasons = cfg["external_reasons"]
-    all_auto_generated_reasons = cfg.get("auto_generated_reasons", ())
 
     out.append("## 3. Trust base\n")
 
@@ -179,21 +173,6 @@ def _trust_base_section(out, data, cfg):
             annotation_fn=lambda pid: f"({trust_label(get_val(data[pid], 'trusted-reason'))})",
         )
     )
-
-    # 3c. Auto-generated declarations (Lean and Aeneas)
-    if all_auto_generated_reasons:
-        auto_gen = filtered_ids(
-            data,
-            lambda a: get_val(a, "trusted-reason") in all_auto_generated_reasons,
-        )
-        if auto_gen:
-            out.append(
-                f"### 3c. Auto-generated declarations ({len(auto_gen)})\n"
-            )
-            out.append(
-                "Kernel-synthesized declarations without source location (congruence lemmas, eliminators, etc.).\n"
-            )
-            out.append(bullet_list(auto_gen))
 
 
 def _unverified_section(out, data):
