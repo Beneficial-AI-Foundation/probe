@@ -176,24 +176,22 @@ def _trust_base_section(out, data, cfg):
 
 
 def _unverified_section(out, data):
-    """Section 4: Unverified and failed functions."""
-    failed = filtered_ids(
-        data, lambda a: get_val(a, "verification-status") == "failed"
-    )
+    """Section 4: Unverified and failed functions (separate subsections)."""
     unverified = filtered_ids(
         data, lambda a: get_val(a, "verification-status") == "unverified"
     )
-    combined = len(failed) + len(unverified)
+    failed = filtered_ids(
+        data, lambda a: get_val(a, "verification-status") == "failed"
+    )
+    combined = len(unverified) + len(failed)
     out.append(f"## 4. Unverified and failed functions ({combined})\n")
-    if combined == 0:
-        out.append("None\n")
-    else:
-        if failed:
-            out.append(
-                bullet_list(failed, annotation_fn=lambda _pid: "[FAILED]")
-            )
-        if unverified:
-            out.append(bullet_list(unverified))
+
+    out.append(f"### 4a. Unverified functions ({len(unverified)})\n")
+    out.append(bullet_list(unverified))
+
+    out.append(f"### 4b. Failed functions ({len(failed)})\n")
+    out.append(bullet_list(failed))
+
     return combined
 
 
