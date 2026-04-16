@@ -132,7 +132,8 @@ Aeneas translates Rust functions to Lean definitions, which can then be specifie
 |-----------|--------------|---------------|-------|
 | Primary spec proven | `verified` | `specified` | Green |
 | Primary spec has `sorry` | `unverified` | `specified` | Blue |
-| No primary spec, translation compiles | `unverified` | `unspecified` | White |
+| No primary spec, has translation | `unverified` | `unspecified` | White |
+| No primary spec, no translation | `unverified` | `unspecified` | White |
 | External stub | `trusted` | — | Grey |
 
 ## Open Questions
