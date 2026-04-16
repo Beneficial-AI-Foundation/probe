@@ -80,8 +80,7 @@ All functions are **Grey** (`null`). No formal verification is performed.
 |-----------|--------------|---------------|-------|
 | Has `requires`/`ensures`, proofs complete | `verified` | `specified` | Green |
 | Has `requires`/`ensures`, has `assume` | `unverified` | `specified` | Blue |
-| No pre/post conditions, proofs complete | `verified` | `unspecified` | Green |
-| No pre/post conditions, has `assume` | `unverified` | `unspecified` | White |
+| Subject to verification, but no pre/post conditions yet  | `unverified` | `unspecified` | White |
 | `#[verifier::external]` | `trusted` | — | Grey |
 | `#[test]` function | `null` | — | Grey |
 
@@ -91,6 +90,7 @@ All functions are **Grey** (`null`). No formal verification is performed.
 |-----------|--------------|-------|
 | Proofs complete | `verified` | Green |
 | Has `assume` or incomplete | `unverified` | Blue |
+| Trusted assumption | `trusted` | Grey |
 
 ### Lean Only
 
@@ -100,8 +100,8 @@ All functions are **Grey** (`null`). No formal verification is performed.
 |-----------|--------------|---------------|-------|
 | Has specs, all proven | `verified` | `specified` | Green |
 | Has specs, contains `sorry` | `unverified` | `specified` | Blue |
-| No specs | `verified` | `unspecified` | Green |
-| No specs, contains `sorry` | `unverified` | `unspecified` | White |
+| Subject to verification, but no specs | `unverified` | `unspecified` | White |
+| Not subject to verification | `null` | `unspecified` | Grey |
 
 **Specifications (`theorem`, `lemma`, standalone `def`):**
 
@@ -133,7 +133,6 @@ Aeneas translates Rust functions to Lean definitions, which can then be specifie
 | Primary spec proven | `verified` | `specified` | Green |
 | Primary spec has `sorry` | `unverified` | `specified` | Blue |
 | No primary spec, translation compiles | `unverified` | `unspecified` | White |
-| No primary spec, has `sorry` | `unverified` | `unspecified` | White |
 | External stub | `trusted` | — | Grey |
 
 ## Open Questions
