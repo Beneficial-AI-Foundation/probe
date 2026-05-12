@@ -1,0 +1,93 @@
+---
+description: Commit and release workflows - when the user asks to commit or release, follow the appropriate pipeline
+alwaysApply: true
+---
+
+# Commit & Release Workflows
+
+This rule defines two pipelines based on what the user asks for. For trivial changes (typo fix, comment edit), ask whether any pipeline is needed at all.
+
+---
+
+## Path A: "commit" (default for non-trivial changes)
+
+Triggered when the user says "commit", "commit this", etc.
+
+### 1. Ralph Loop (audit until clean)
+
+Run the three auditor skills from the probe repo against the working tree.
+Repeat: audit → fix → audit until all three pass cleanly.
+
+- **Code quality**: Read and follow `/home/lacra/git_repos/baif/probe/.claude/skills/code-quality-auditor.md`
+- **Test quality**: Read and follow `/home/lacra/git_repos/baif/probe/.claude/skills/test-quality-auditor.md`
+- **Ambiguity**: Read and follow `/home/lacra/git_repos/baif/probe/.claude/skills/ambiguity-auditor.md`
+
+After auditors pass, run: `cargo fmt --all && cargo clippy --all-targets -- -D warnings && cargo test`
+
+### 2. Update CHANGELOG
+
+Add entries for the changes under the `[Unreleased]` section in `CHANGELOG.md`. Do not create a version header — that only happens during a release.
+
+### 3. Documentation staleness check
+
+Audit docs listed in CLAUDE.md § Documentation Quality Audit for stale info caused by the current changes. Update any stale docs.
+
+### 4. Confirmation gate
+
+Show the user a summary: files changed and the proposed commit message. Wait for approval before committing.
+
+### 5. Commit
+
+Stage all relevant files and commit with a conventional-commit message.
+
+### 6. Push (ask)
+
+Ask the user whether to push. If yes, run `git push`.
+
+---
+
+## Path B: "release" (explicit request only)
+
+Triggered when the user says "release", "release commit", or "cut a release".
+
+### 1. Ralph Loop (audit until clean)
+
+Same as Path A step 1.
+
+### 2. Version bump
+
+Determine the bump level from the changes (see CLAUDE.md § Versioning Policy):
+- **major**: breaking CLI or output-schema changes
+- **minor**: new additive features
+- **patch**: bug fixes, docs, perf improvements
+
+Update `version` in `Cargo.toml` and move the `[Unreleased]` section in `CHANGELOG.md` under a new `[X.Y.Z] - YYYY-MM-DD` header, leaving an empty `[Unreleased]` above it.
+
+### 3. Documentation staleness check
+
+Same as Path A step 3.
+
+### 4. Confirmation gate
+
+Show the user a summary: version bump rationale, files changed, and the proposed commit message. Wait for approval before committing.
+
+### 5. Commit
+
+Stage all relevant files and commit with a conventional-commit message.
+
+### 6. Push
+
+```bash
+git push
+```
+
+CI (`ci.yml`) detects the version bump, creates the `vX.Y.Z` tag, and triggers the release workflow which builds binaries and creates a GitHub Release.
+
+### 7. GitHub issue
+
+Create a GitHub issue assigned to `astefano` describing the problem that was fixed (or feature that was added), then close it referencing the release version and commit.
+
+```bash
+gh issue create --title "<short description>" --assignee astefano --body "<problem + fix summary>"
+gh issue close <number> --reason completed --comment "Fixed in vX.Y.Z (commit <sha>)."
+```
