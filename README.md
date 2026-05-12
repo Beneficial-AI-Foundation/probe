@@ -6,7 +6,7 @@ This repository contains:
 
 - **Specification documents** defining the interchange format for atom files
 - **JSON Schema** for machine-validatable envelope and atom structure
-- **`probe` CLI** for cross-tool operations (currently: `merge`)
+- **`probe` CLI** for cross-tool operations (`merge`, `propagate-verification-status`, `summary`)
 - **`probe-extract-check`** -- validator that checks extract JSON correctness against source code
 
 ## Documentation
@@ -31,6 +31,14 @@ cargo build
 
 # Merge data files from different probe tools (atoms, specs, or proofs)
 probe merge verus_atoms.json lean_atoms.json -o merged.json
+
+# Compute transitive verification status
+# Enriches each verified atom with "transitive-verification-status": "transitive"
+# when the atom and all its transitive deps are verified or trusted
+probe propagate-verification-status extract_output.json -o enriched.json
+
+# Summarize verified atoms (entrypoints, functions, lemmas)
+probe summary merged.json -o summary.json
 
 # Run tests
 cargo test

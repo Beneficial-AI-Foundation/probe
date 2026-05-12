@@ -40,13 +40,13 @@ Colors provide visual feedback based on verification progress. The scheme follow
 
 **Verification scope:** Green comes in two strengths depending on how far we look for sorries:
 
-- **Transitively verified**: The function body is sorry-free AND all its transitive dependencies are also sorry-free.
-- **Locally-scoped verified**: The function body itself is sorry-free, but we do not check whether transitive dependencies contain sorries.
+- **Transitively verified**: The function body is sorry-free AND all its transitive dependencies are also sorry-free. Trusted (axiomatic) dependencies count as verified for this purpose — they are intentional assumptions, not incomplete work.
+- **Locally-scoped verified**: The function body itself is sorry-free, but at least one transitive dependency is explicitly unverified or failed.
 
 | Color | Status | Meaning |
 |-------|--------|---------|
-| **Dark Green** | Transitively verified | Function and all transitive dependencies are sorry-free |
-| **Light Green** | Locally-scoped verified | Function body is sorry-free; transitive dependencies are not checked |
+| **Dark Green** | Transitively verified | Function is verified and no transitive dependency is explicitly unverified or failed |
+| **Light Green** | Locally-scoped verified | Function is verified but at least one transitive dependency is explicitly unverified or failed |
 | **Dark Blue** | Specified, specs validated | Has specifications and those specs have been proven correct |
 | **Light Blue** | Specified, specs not validated | Has specifications written but they haven't been fully proven |
 | **Light Cyan** | Translated | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |

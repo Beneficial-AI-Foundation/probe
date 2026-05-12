@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `probe propagate-verification-status` subcommand: walks the dependency graph to compute `transitive-verification-status` ("transitive" or "local") for each verified atom, distinguishing transitively verified (Dark Green) from locally-scoped verified (Light Green)
 - `probe summary` subcommand: partitions verified atoms into entrypoints, verified functions, and verified lemmas (schema `probe/summary`)
 - KB link-checker script (`scripts/check-kb-links.sh`) that validates all cross-references between `kb/` markdown files, including heading anchors
 - CI job (`kb-links`) that runs the link checker on every push/PR

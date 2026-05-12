@@ -1,0 +1,138 @@
+{
+  "schema": "probe-verus/atoms",
+  "schema-version": "2.0",
+  "tool": {
+    "name": "probe-verus",
+    "version": "5.0.0",
+    "command": "extract"
+  },
+  "source": {
+    "repo": "https://github.com/example/test-crate",
+    "commit": "abcdef1234567890abcdef1234567890abcdef12",
+    "language": "rust",
+    "package": "test-crate",
+    "package-version": "1.0.0"
+  },
+  "timestamp": "2026-05-12T10:00:00Z",
+  "data": {
+    "probe:test/1.0/entry()": {
+      "display-name": "entry",
+      "dependencies": ["probe:test/1.0/helper()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 1, "lines-end": 10 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/helper()": {
+      "display-name": "helper",
+      "dependencies": ["probe:test/1.0/leaf()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 12, "lines-end": 20 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/leaf()": {
+      "display-name": "leaf",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 22, "lines-end": 30 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/caller()": {
+      "display-name": "caller",
+      "dependencies": ["probe:test/1.0/broken()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 32, "lines-end": 40 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/broken()": {
+      "display-name": "broken",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 42, "lines-end": 50 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "unverified"
+    },
+    "probe:test/1.0/uses_trusted()": {
+      "display-name": "uses_trusted",
+      "dependencies": ["probe:test/1.0/axiom()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 52, "lines-end": 60 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/axiom()": {
+      "display-name": "axiom",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 62, "lines-end": 65 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "trusted"
+    },
+    "probe:test/1.0/uses_external()": {
+      "display-name": "uses_external",
+      "dependencies": ["probe:std/alloc()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 67, "lines-end": 75 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/calls_untracked()": {
+      "display-name": "calls_untracked",
+      "dependencies": ["probe:test/1.0/plain_rust()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 76, "lines-end": 76 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/plain_rust()": {
+      "display-name": "plain_rust",
+      "dependencies": [],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 77, "lines-end": 77 },
+      "kind": "exec",
+      "language": "rust"
+    },
+    "probe:test/1.0/cycle_a()": {
+      "display-name": "cycle_a",
+      "dependencies": ["probe:test/1.0/cycle_b()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 77, "lines-end": 85 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    },
+    "probe:test/1.0/cycle_b()": {
+      "display-name": "cycle_b",
+      "dependencies": ["probe:test/1.0/cycle_a()", "probe:test/1.0/broken()"],
+      "code-module": "lib",
+      "code-path": "src/lib.rs",
+      "code-text": { "lines-start": 87, "lines-end": 95 },
+      "kind": "exec",
+      "language": "rust",
+      "verification-status": "verified"
+    }
+  }
+}
