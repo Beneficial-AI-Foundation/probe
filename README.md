@@ -90,6 +90,12 @@ curl -sL https://raw.githubusercontent.com/Beneficial-AI-Foundation/probe/main/s
 - **Core atom fields**: `display-name`, `dependencies`, `code-module`, `code-path`, `code-text`, `kind`, `language`
 - **Extensions**: `additionalProperties: true` on atoms allows language-specific fields to pass through
 
+## Acknowledgements
+
+The probe ecosystem's development methodology — knowledge bases, auditor skills, and
+Ralph Loops (implement → audit → fix → repeat) — follows the spec-driven agentic
+development approach proposed in [kb-sync-demo](https://github.com/yurug/kb-sync-demo).
+
 ## Related projects
 
 - [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) -- Rust call graph atoms from SCIP index
