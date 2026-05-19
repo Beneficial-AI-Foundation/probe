@@ -43,6 +43,28 @@ enum Commands {
         translations: Option<PathBuf>,
     },
 
+    /// Propagate verification status through the dependency graph.
+    ///
+    /// Reads a Schema 2.0 atom file, walks the dependency graph, and
+    /// computes whether each verified atom is transitively verified
+    /// (all transitive dependencies are also verified/trusted) or only
+    /// locally-scoped verified (the atom itself is verified but some
+    /// transitive dependency is not).
+    ///
+    /// Adds `transitive-verification-status` ("transitive" or "local")
+    /// to each verified atom. The output preserves the input envelope
+    /// structure exactly.
+    // @kb: kb/engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination
+    PropagateVerificationStatus {
+        /// Input atom file (Schema 2.0).
+        #[arg(required = true)]
+        input: PathBuf,
+
+        /// Output file path.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+
     /// Summarize verified atoms: entrypoints, functions, and lemmas.
     ///
     /// Reads a Schema 2.0 atom file and partitions all atoms with
@@ -77,6 +99,12 @@ fn main() {
             translations,
         } => {
             probe::commands::merge::cmd_merge(inputs, output, translations);
+        }
+        Commands::PropagateVerificationStatus { input, output } => {
+            probe::commands::propagate::cmd_propagate_verification_status(
+                &input,
+                output.as_deref(),
+            );
         }
         Commands::Summary { input, output } => {
             probe::commands::summary::cmd_summary(&input, output.as_deref());

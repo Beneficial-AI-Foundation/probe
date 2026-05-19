@@ -204,6 +204,24 @@ Tools must NOT rename their `trusted-reason` values to match another tool — th
 
 **Implemented in**: `probe/scripts/summarize_extract.py` (`TRUST_LABELS` mapping and `TOOL_CONFIG` per-tool configuration).
 
+## P23. Transitive verification scope is computed by reverse-BFS contamination
+
+The `probe propagate-verification-status` command computes `transitive-verification-status` for each verified atom by walking the dependency graph:
+
+- **`"transitive"`**: the atom is verified AND every transitively reachable dependency is also verified or trusted.
+- **`"local"`**: the atom is verified but at least one transitively reachable dependency is not verified and not trusted.
+
+The algorithm uses **reverse-BFS contamination**: build a reverse dependency index, seed contamination from atoms with explicit `"unverified"` or `"failed"` status, and propagate backwards through callers. This correctly handles cycles (all cycle members receive the same scope) without requiring SCC computation.
+
+Key rules:
+- **Only explicit `"unverified"` / `"failed"` contaminates** — atoms with missing `verification-status` (untracked/Grey, e.g. plain Rust functions or Verus spec functions) are transparent and do not affect transitive scope.
+- **`trusted` does not block transitive** — trusted atoms are intentional axioms, not incomplete work.
+- **Missing deps are treated as trusted** — dependencies not present in the atom map (e.g., external stdlib functions) do not block transitive status. A warning is logged for each.
+- **Non-verified atoms are untouched** — only atoms with `verification-status: "verified"` receive a `transitive-verification-status` field.
+- **Deterministic** — uses `BTreeMap`/`BTreeSet` throughout (P14).
+
+**Implemented in**: `probe/src/commands/propagate.rs`
+
 ## Known bugs and edge cases
 
 These are documented defects that should be fixed, not acceptable behavior:

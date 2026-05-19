@@ -1,55 +1,71 @@
 ---
 auditor: ambiguity-auditor
-date: 2026-04-07
-pass: trusted-reason (probe-lean KB + cross-file consistency)
-status: 0 critical, 3 warnings, 8 info
+date: 2026-05-12
+scope: propagate-verification-status / P23 / transitive-verification-status KB consistency
+status: 2 critical, 6 warnings, 4 info
 ---
-
-## Scope
-
-Audit focused on **`trusted-reason`** and **`verification-status: "trusted"`** after KB updates to [schema.md](../engineering/schema.md), [probe-lean.md](../tools/probe-lean.md), and [glossary.md](../engineering/glossary.md). Requested files were read in full; [probe-verus.md](../tools/probe-verus.md) was additionally scanned because it is the paired Verus tool doc and [schema.md](../engineering/schema.md) documents `trusted-reason` for both tools.
 
 ## Critical
 
-None.
+### C1 — `docs/verification-statuses.md` contradicts [P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination) on what “transitive” means
+
+In the **Verification scope** bullets (lines 41–44), Dark Green is described in proof terms (“sorry-free”) and Light Green correctly mentions dependencies that are **explicitly unverified or failed**. [P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination) defines **`"transitive"`** via contamination from **only** explicit `"unverified"` / `"failed"` (missing `verification-status` is transparent; missing deps treated as trusted). A verified atom can therefore receive `transitive-verification-status: "transitive"` while depending on atoms with **no** verification status (e.g. plain Rust). Those dependencies are not “sorry-free” in the Verus/Lean sense—they are outside the status model. Readers using the doc’s “sorry-free” wording will misinterpret probe output and UI colors relative to the normative algorithm.
+
+### C2 — Internal inconsistency in `docs/verification-statuses.md` color table vs scope bullets
+
+The **Verification scope** subsection (lines 41–45) defines **Locally-scoped verified** using **explicit** unverified/failed dependencies. The **Color Mapping** table row for **Light Green** (line 49) instead says “transitive dependencies are **not checked**,” which does not match P23 (dependencies without status do **not** force Light Green) and does not match the doc’s own preceding bullet (lines 44–45). Same table: **Dark Green** (line 48) says “all transitive dependencies are sorry-free,” which again conflicts with P23’s transparent missing-status rule.
 
 ## Warnings
 
-| ID | Topic | Notes |
-|----|--------|--------|
-| **W1** | [probe-verus.md](../tools/probe-verus.md) vs [schema.md](../engineering/schema.md) | **Stale / contradictory.** Output fields list gives `verification-status` as only `"verified"`, `"failed"`, `"unverified"` and does not mention `"trusted"` or `trusted-reason`. [schema.md](../engineering/schema.md) and [glossary.md](../engineering/glossary.md) state probe-verus emits `trusted-reason` when status is `"trusted"` (values `"admit"`, `"external-body"`, `"assume-specification"`). Readers using the tool page alone will mis-implement consumers or think the schema table is wrong. |
-| **W2** | [P16](../engineering/properties.md#p16-verification-status-mapping) incomplete for probe-verus | **Normative gap.** P16 documents Verus run output mapping (`success` / `failure` / `sorries` / `warning`) but never states when atoms are `"trusted"` or how that relates to `trusted-reason`. Trust-base behavior for Verus is only implied elsewhere ([glossary](../engineering/glossary.md#trusted-verification-status), [schema optional fields](../engineering/schema.md#core-fields-required-for-all-languages)). P16 should either add a Verus `"trusted"` row/table or explicitly defer to glossary/schema for trust-base + `trusted-reason`. |
-| **W3** | [glossary.md](../engineering/glossary.md#trusted-verification-status) “trusted” lede | **Vague / easy to misread.** The opening sentence describes only Lean (`axiom`, `*External.lean`) before the list that covers Verus. A quick read suggests `"trusted"` is Lean-only; the full entry is cross-tool. Consider leading with “Cross-tool value” or splitting into probe-lean vs probe-verus sentences up front. |
+### W1 — Broken `@kb` fragment for P23 in `src/commands/propagate.rs`
+
+The annotation uses `#p23-transitive-verification-scope`, but the GitHub-compatible slug for the heading **“P23. Transitive verification scope is computed by reverse-BFS contamination”** is `p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination` (see `./scripts/check-kb-links.sh` slug rules). Traceability from code to the precise KB section is therefore wrong if anyone resolves the fragment manually or extends the checker to Rust `@kb` lines.
+
+### W2 — No `@kb` on the propagate subcommand in `src/main.rs`
+
+`PropagateVerificationStatus` documents behavior that is specified by [P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination) and the [`transitive-verification-status` row](../engineering/schema.md#common-optional-fields) in `schema.md`, but only merge/summary-adjacent `@kb` refs appear at the top of `main.rs`. Adding `@kb` on the propagate variant would align with project traceability expectations.
+
+### W3 — `docs/verification-statuses.md` never ties colors to `transitive-verification-status` or the CLI
+
+The document discusses Dark Green / Light Green and transitive vs local scope but does not mention `probe propagate-verification-status`, the JSON field `transitive-verification-status`, or [P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination). Consumers have no KB anchor from this doc to the normative behavior.
+
+### W4 — README propagate comment is incomplete
+
+The comment under “Compute transitive verification status” only illustrates `"transitive"`; it does not state that verified atoms may get `"local"` when contamination reaches them ([README.md](../../README.md) usage block).
+
+### W5 — `kb/engineering/schema.md` version history omits the new field
+
+The optional field and `probe` as producer are documented in the atom table, but the **Version history** subsection still stops at probe-rust 2.1 entries. A minor schema note for `transitive-verification-status` / propagate would reduce ambiguity about when the field appeared.
+
+### W6 — JSON Schema may not describe `transitive-verification-status`
+
+[`schemas/atom-envelope.schema.json`](../../schemas/atom-envelope.schema.json) has no mention of `transitive` (grep). README positions the schema as the machine-readable contract; omitting this probe-added field can confuse validators and downstream tools.
 
 ## Info
 
-1. **P16 vs probe-lean detail:** [probe-lean.md](../tools/probe-lean.md) documents `trusted-reason` per row and **axiom vs external precedence**; [P16](../engineering/properties.md#p16-verification-status-mapping) gives Lean `verification-status` only. Precedence is tool-doc-specific, which is acceptable, but P16 does not cross-link `trusted-reason` or [glossary](../engineering/glossary.md#trusted-verification-status) for the Lean trust base.
+### I1 — Glossary gaps for propagate vocabulary
 
-2. **Schema version history:** [schema.md § Version history](../engineering/schema.md#version-history) still only records probe-rust 2.1 optional fields. Introduction of `trusted-reason` (and normative pairing with `"trusted"`) for probe-verus / probe-lean is not reflected there — optional for traceability, useful for consumers asking “when did this field appear?”.
+[P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination) introduces **reverse-BFS contamination**, **`transitive-verification-status`**, and scope values **`transitive`** / **`local`**. [glossary.md](../engineering/glossary.md) defines [trusted (verification-status)](../engineering/glossary.md#trusted-verification-status) but has no entries for transitive scope or the new field; optional gloss entries would align terminology with UI docs (“Dark Green” / “Light Green”).
 
-3. **product/spec.md:** [§ Core capabilities — Verification status](../product/spec.md#core-capabilities) mentions Lean axioms / `*External.lean` as trusted but does not mention **`trusted-reason`** as the machine-readable classifier or Verus trust-base categories. Low priority for product-level doc.
+### I2 — [P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination) does not cross-link `schema.md`
 
-4. **Glossary cross-links:** Under [trusted (verification-status)](../engineering/glossary.md#trusted-verification-status), the see-also points at P16 and probe-lean; adding [probe-verus.md](../tools/probe-verus.md) (once fixed) would balance cross-navigation.
+The property cites only `probe/src/commands/propagate.rs`. A link to the `transitive-verification-status` row in [schema.md](../engineering/schema.md#common-optional-fields) would complete KB-internal cross-references.
 
-5. **index.md metadata:** [index.md](../index.md) `last-updated: 2026-04-03` lags pages touched for `trusted-reason` (`2026-04-07`). Cosmetic only.
+### I3 — `docs/verification-statuses.md` uses `null` for verification status
 
-6. **viewify and `trusted-reason`:** [probe-lean.md](../tools/probe-lean.md) documents `trusted-reason` on extract output but does not state whether **`viewify` preserves** the field on molecules. If molecules are a strict subset/projection, stating pass-through or omission would remove ambiguity for UI authors.
+The table lists `null` as a status value; the interchange spec treats absence of `verification-status` as optional. Low ambiguity if readers treat these as equivalent, but the doc does not say that explicitly.
 
-7. **Prior P14 warning (unchanged):** [P14](../engineering/properties.md#p14-deterministic-output) headline still reads as universal deterministic output while probe-rust caveat remains below; unrelated to `trusted-reason` but still a clarity hazard (same as prior ambiguity-auditor finding W1).
+### I4 — KB front-matter dates unchanged
 
-8. **Code-name pattern `*External.lean`:** Used consistently; [glossary](../engineering/glossary.md#trusted-verification-status) ties it to Aeneas convention. No contradiction found with [probe-lean.md](../tools/probe-lean.md) table (`code-path` ends with `External.lean`).
+`kb/index.md`, `glossary.md`, `properties.md`, and `schema.md` still show **last-updated** metadata from April 2026; no staleness issue for correctness, but dates do not reflect the propagate feature edit trail.
 
-## Consistency checks (clean)
+## Summary table
 
-- [schema.md](../engineering/schema.md) optional-field description of `trusted-reason` matches [glossary.md](../engineering/glossary.md) enumerations for both tools.
-- [probe-lean.md](../tools/probe-lean.md) verification table and Lean-specific fields table align with [schema.md](../engineering/schema.md) and with [trust base](../engineering/glossary.md#trust-base) wording.
-- [trust base](../engineering/glossary.md#trust-base) correctly references both tools and `trusted-reason`.
-- No conflict found between “`trusted-reason` present only when `verification-status` is `"trusted"`” across schema, glossary, and probe-lean tool doc.
-
-## Files read (this pass)
-
-`kb/index.md`, `kb/engineering/properties.md`, `kb/engineering/schema.md`, `kb/engineering/glossary.md`, `kb/tools/probe-lean.md`, `kb/product/spec.md`
-
-## Additional KB file scanned
-
-`kb/tools/probe-verus.md` (for `trusted-reason` / `"trusted"` alignment with schema)
+| Area | Result |
+|------|--------|
+| Glossary vs P23 / docs terms | Trust base / verification-status covered; **transitive scope / field / algorithm name** not in glossary (info). |
+| P23 vs other properties | Aligns with P14 (determinism), P16 (status vocabulary); no merge-rule conflict identified. |
+| `schema.md` field vs P23 | Semantics match; version history gap (warning). |
+| `docs/verification-statuses.md` vs KB | **Contradictions** on transitive/local meaning (critical). |
+| README propagate section | Partial; missing `"local"` mention (warning). |
+| `@kb` annotations | Present on `propagate.rs` (fragment wrong); missing on `main.rs` propagate variant; P14 also cited on `propagate.rs`. |
