@@ -176,7 +176,9 @@ use the names and semantics defined here. All are omitted when not applicable.
 | Field | Type | Producers | Description |
 |-------|------|-----------|-------------|
 | `primary-spec` | string | probe-verus, probe-lean | The primary specification for this atom. In probe-verus: concatenated requires+ensures text (empty string = analyzed but no spec). In probe-lean: code-name of the primary specification theorem. |
-| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, or `"unverified"`. Absent when verification was skipped. |
+| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, `"unverified"`, or `"trusted"` for trust-base atoms (axioms, `#[verifier::external]`). Absent when verification was skipped. |
+| `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
+| `transitive-verification-status` | string | probe | `"transitive"` (all transitive deps verified/trusted) or `"local"` (verified but some transitive dep is not). Computed by `probe propagate-verification-status`. Only present on verified atoms. |
 | `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | `false` if the function is in scope for analysis; `true` otherwise. Semantics vary by tool. |
 | `specs` | array of strings | probe-lean | Code-names of theorem atoms that reference this atom as a dependency (reverse spec edges). Absent when empty. |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data (see below). |

@@ -22,8 +22,17 @@ Key distinction: **Implementations** can have specifications attached to them. *
 | `verified` | Compiles successfully, all proofs discharged |
 | `unverified` | Has sorries, admits, or warnings |
 | `failed` | Has compile errors |
-| `trusted` | Axiomatically assumed (e.g., `axiom`, `#[verifier::external]`) |
+| `trusted` | Axiomatically assumed (e.g., `axiom`, `#[verifier::external_body]`) |
 | `null` | Not subject to verification (test functions, constants) |
+
+### Transitive Verification Status (applies to verified atoms only)
+
+Computed by `probe propagate-verification-status` via reverse-BFS contamination over the dependency graph ([P23](../kb/engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination)). Only present on atoms whose `verification-status` is `"verified"`. See also the [`transitive-verification-status` field](../kb/engineering/schema.md) in the schema spec.
+
+| Status | Meaning |
+|--------|---------|
+| `transitive` | No transitive dependency is explicitly `"unverified"` or `"failed"` (dependencies with missing status or absent from the atom map are transparent) |
+| `local` | At least one transitive dependency is explicitly `"unverified"` or `"failed"` |
 
 ### Specification Status (applies to implementations only)
 
@@ -38,10 +47,10 @@ Specifications are always `unspecified` by definition—they cannot have specs a
 
 Colors provide visual feedback based on verification progress. The scheme follows a progression from untracked to fully verified, with a separate branch for trusted/axiomatic items.
 
-**Verification scope:** Green comes in two strengths depending on how far we look for sorries:
+**Verification scope:** Green comes in two strengths depending on whether explicit contamination (`"unverified"` or `"failed"`) exists in the transitive dependency closure:
 
-- **Transitively verified**: The function body is sorry-free AND all its transitive dependencies are also sorry-free. Trusted (axiomatic) dependencies count as verified for this purpose — they are intentional assumptions, not incomplete work.
-- **Locally-scoped verified**: The function body itself is sorry-free, but at least one transitive dependency is explicitly unverified or failed.
+- **Transitively verified** (`transitive-verification-status: "transitive"`): The function is verified and no transitive dependency is explicitly `"unverified"` or `"failed"`. Dependencies with missing `verification-status` (untracked Rust functions, spec functions) and dependencies absent from the atom map are transparent — they do not block transitive scope. Trusted (axiomatic) dependencies are also transparent.
+- **Locally-scoped verified** (`transitive-verification-status: "local"`): The function is verified, but at least one transitive dependency is explicitly `"unverified"` or `"failed"`.
 
 | Color | Status | Meaning |
 |-------|--------|---------|
@@ -51,7 +60,7 @@ Colors provide visual feedback based on verification progress. The scheme follow
 | **Light Blue** | Specified, specs not validated | Has specifications written but they haven't been fully proven |
 | **Light Cyan** | Translated | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |
 | **White** | Tracked, not yet specified | Tracked for verification but not yet specified (in Aeneas: not yet translated; in Verus/Lean: no spec written) |
-| **Purple** | Trusted | Intentionally assumed correct—either axiomatic (Lean `axiom`) or excluded from verification (Verus `#[verifier::external]`) |
+| **Purple** | Trusted | Intentionally assumed correct—either axiomatic (Lean `axiom`) or excluded from verification (Verus `#[verifier::external_body]`) |
 | **Grey** | Untracked/disabled | Not subject to verification (`null`), disabled, or excluded |
 
 ### Color Priority Rules
@@ -97,18 +106,18 @@ In Verus, spec validation and proof happen atomically in a single verifier pass 
 
 | Condition | Color |
 |-----------|-------|
-| Proofs complete, all transitive deps sorry-free | Dark Green |
-| Proofs complete, transitive deps not checked | Light Green |
+| Proofs complete, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
+| Proofs complete, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
 | Subject to verification, but no pre/post conditions yet | White |
-| `#[verifier::external]` (intentionally excluded) | Purple |
+| `#[verifier::external_body]` (intentionally excluded) | Purple |
 | `#[test]` function | Grey |
 
 **Specifications (`proof fn`, spec-defs):**
 
 | Condition | Color |
 |-----------|-------|
-| Proofs complete, all transitive deps sorry-free | Dark Green |
-| Proofs complete, transitive deps not checked | Light Green |
+| Proofs complete, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
+| Proofs complete, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
 | Trusted assumption (intentionally axiomatic) | Purple |
 
 ### Lean Only
@@ -117,8 +126,8 @@ In Verus, spec validation and proof happen atomically in a single verifier pass 
 
 | Condition | Color |
 |-----------|-------|
-| Has specs, all proven, all transitive deps sorry-free | Dark Green |
-| Has specs, all proven, transitive deps not checked | Light Green |
+| Has specs, all proven, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
+| Has specs, all proven, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
 | Has specs, specs validated (proven) | Dark Blue |
 | Has specs, specs not yet validated | Light Blue |
 | Subject to verification, but no specs | White |
@@ -128,8 +137,8 @@ In Verus, spec validation and proof happen atomically in a single verifier pass 
 
 | Condition | Color |
 |-----------|-------|
-| Compiles successfully, all transitive deps sorry-free | Dark Green |
-| Compiles successfully, transitive deps not checked | Light Green |
+| Compiles successfully, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
+| Compiles successfully, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
 | `axiom` declaration (intentionally axiomatic) | Purple |
 
 ### Rust with Lean and Aeneas
@@ -151,8 +160,8 @@ Aeneas translates Rust functions to Lean definitions, which can then be specifie
 
 | Condition | Color |
 |-----------|-------|
-| Primary spec proven, all transitive deps sorry-free | Dark Green |
-| Primary spec proven, transitive deps not checked | Light Green |
+| Primary spec proven, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
+| Primary spec proven, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
 | Primary spec written and validated | Dark Blue |
 | Primary spec written but not validated | Light Blue |
 | Has translation, no spec | Light Cyan |

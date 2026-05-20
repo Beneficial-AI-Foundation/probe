@@ -104,7 +104,9 @@ for full details):
 | Field | Type | Tools | Description |
 |-------|------|-------|-------------|
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification (text in Verus, code-name in Lean) |
-| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, or `"unverified"` |
+| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, `"unverified"`, or `"trusted"` |
+| `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"` (e.g., `"axiom"`, `"external-body"`) |
+| `transitive-verification-status` | string | probe | `"transitive"` or `"local"`. Computed by `probe propagate-verification-status`. Only on verified atoms. |
 | `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | Whether the function is out of scope |
 | `specs` | array | probe-lean | Code-names of theorems that spec this atom |
 
