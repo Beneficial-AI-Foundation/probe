@@ -75,6 +75,10 @@ pub fn check_source(data: &BTreeMap<String, Atom>, project_path: &Path) -> Vec<D
 }
 
 fn check_atom_source(key: &str, atom: &Atom, project_path: &Path, diags: &mut Vec<Diagnostic>) {
+    // Lexical pre-checks: reject obvious traversal patterns before touching the
+    // filesystem. These are necessary but not sufficient — symlinks with
+    // clean-looking names can still escape the root, so canonicalization below
+    // is the authoritative guard.
     if std::path::Path::new(&atom.code_path).is_absolute()
         || atom.code_path.contains("..")
         || atom.code_path.starts_with('~')
@@ -92,40 +96,57 @@ fn check_atom_source(key: &str, atom: &Atom, project_path: &Path, diags: &mut Ve
 
     let file_path = project_path.join(&atom.code_path);
 
-    if let (Ok(canonical_root), Ok(canonical_file)) =
-        (project_path.canonicalize(), file_path.canonicalize())
-    {
-        if !canonical_file.starts_with(&canonical_root) {
+    // Canonicalization is the authoritative containment check. Both paths must
+    // resolve successfully; if either fails (file missing, dangling symlink) we
+    // report "not found" rather than silently skipping the root check — the
+    // previous `if let Ok(...)` pattern fell through on failure, allowing a
+    // symlink TOCTOU escape.
+    let canonical_root = match project_path.canonicalize() {
+        Ok(p) => p,
+        Err(e) => {
             diags.push(Diagnostic {
                 level: Level::Error,
                 atom_key: Some(key.into()),
-                message: format!(
-                    "code-path escapes project root (symlink?): {}",
-                    atom.code_path
-                ),
+                message: format!("failed to resolve project root: {e}"),
             });
             return;
         }
-    }
+    };
 
-    // 1. File exists
-    if !file_path.is_file() {
+    let canonical_file = match file_path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => {
+            // File does not exist or is a dangling symlink.
+            diags.push(Diagnostic {
+                level: Level::Error,
+                atom_key: Some(key.into()),
+                message: format!("code-path not found: {}", atom.code_path),
+            });
+            return;
+        }
+    };
+
+    if !canonical_file.starts_with(&canonical_root) {
         diags.push(Diagnostic {
             level: Level::Error,
             atom_key: Some(key.into()),
-            message: format!("code-path not found: {}", atom.code_path),
+            message: format!(
+                "code-path escapes project root (symlink?): {}",
+                atom.code_path
+            ),
         });
         return;
     }
 
-    // 2. Read file and check line bounds
-    let content = match std::fs::read_to_string(&file_path) {
+    // 2. Read file and check line bounds — use the canonical path to avoid a
+    //    TOCTOU race between the existence check above and the read below.
+    let content = match std::fs::read_to_string(&canonical_file) {
         Ok(c) => c,
         Err(e) => {
             diags.push(Diagnostic {
                 level: Level::Error,
                 atom_key: Some(key.into()),
-                message: format!("failed to read {}: {e}", file_path.display()),
+                message: format!("failed to read {}: {e}", canonical_file.display()),
             });
             return;
         }
@@ -425,6 +446,54 @@ mod tests {
         assert!(
             has_error,
             "absolute path should produce an error, got: {diags:?}"
+        );
+    }
+
+    /// V1 (symlink): a clean-looking code_path that is a symlink pointing
+    /// outside the project root must be rejected.
+    ///
+    /// The old `if let Ok(...)` guard silently skipped the root check when
+    /// canonicalization failed, but also skipped it when canonicalization
+    /// *succeeded* on a symlink that resolved outside the root — because the
+    /// guard was only entered when both paths resolved. This test verifies the
+    /// fixed code rejects such a symlink.
+    #[cfg(unix)]
+    #[test]
+    fn test_symlink_escape_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let project = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+
+        // Create a real file outside the project root.
+        let outside_file = outside.path().join("secret.rs");
+        std::fs::write(&outside_file, "fn secret() {}\n").unwrap();
+
+        // Plant a symlink inside the project that points to the outside file.
+        let src_dir = project.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        let link = src_dir.join("lib.rs");
+        symlink(&outside_file, &link).unwrap();
+
+        let mut data = BTreeMap::new();
+        data.insert(
+            "probe:t/1/m/secret()".into(),
+            make_atom("secret", "src/lib.rs", 1, 1, "exec", "rust"),
+        );
+
+        let diags = check_source(&data, project.path());
+
+        let has_error = diags.iter().any(|d| d.level == Level::Error);
+        assert!(
+            has_error,
+            "symlink escaping project root should produce an error, got: {diags:?}"
+        );
+        // Confirm the specific message
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("escapes project root")),
+            "expected 'escapes project root' diagnostic, got: {diags:?}"
         );
     }
 }

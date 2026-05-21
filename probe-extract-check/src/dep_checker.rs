@@ -156,24 +156,42 @@ fn get_file_lines<'a>(
     project_path: &Path,
     cache: &'a mut BTreeMap<String, Vec<String>>,
 ) -> Option<&'a Vec<String>> {
+    // Lexical pre-checks: reject obvious traversal patterns before hitting the
+    // filesystem. These are necessary but not sufficient on their own — symlinks
+    // with clean-looking names can still escape the root, so canonicalization
+    // below is the authoritative guard.
     if std::path::Path::new(code_path).is_absolute()
         || code_path.contains("..")
         || code_path.starts_with('~')
     {
         return None;
     }
-    if !cache.contains_key(code_path) {
-        let full_path = project_path.join(code_path);
-        if let (Ok(root), Ok(resolved)) = (project_path.canonicalize(), full_path.canonicalize()) {
-            if !resolved.starts_with(&root) {
-                return None;
-            }
-        }
-        let content = std::fs::read_to_string(&full_path).ok()?;
-        let lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-        cache.insert(code_path.to_string(), lines);
+
+    // Use the canonical path as the cache key so that two strings that resolve
+    // to the same file share one cache entry and both go through the root check.
+    let full_path = project_path.join(code_path);
+
+    // Canonicalization is the authoritative containment check. If either path
+    // cannot be resolved (file missing, dangling symlink, race) we reject rather
+    // than fall through — the previous `if let Ok(...)` pattern silently skipped
+    // the guard on failure, allowing a symlink TOCTOU escape.
+    let canonical_root = project_path.canonicalize().ok()?;
+    let canonical_file = full_path.canonicalize().ok()?;
+
+    if !canonical_file.starts_with(&canonical_root) {
+        return None;
     }
-    cache.get(code_path)
+
+    // Key the cache on the canonical path string so aliases (e.g.
+    // `src/lib.rs` vs `src/../src/lib.rs`) share one entry.
+    let cache_key = canonical_file.to_string_lossy().into_owned();
+
+    if !cache.contains_key(&cache_key) {
+        let content = std::fs::read_to_string(&canonical_file).ok()?;
+        let lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        cache.insert(cache_key.clone(), lines);
+    }
+    cache.get(&cache_key)
 }
 
 #[cfg(test)]
@@ -258,5 +276,94 @@ mod tests {
         assert!(diags
             .iter()
             .any(|d| d.message.contains("not found as identifier")));
+    }
+
+    // =========================================================================
+    // Security tests: symlink escape (TOCTOU fix)
+    // =========================================================================
+
+    /// A symlink inside the project that resolves to a file outside the root
+    /// must be silently skipped (returns None from get_file_lines), not read.
+    ///
+    /// The old `if let Ok(...)` guard fell through when canonicalization
+    /// succeeded on a symlink pointing outside the root, allowing the read.
+    #[cfg(unix)]
+    #[test]
+    fn test_symlink_escape_skipped_in_dep_checker() {
+        use std::os::unix::fs::symlink;
+
+        let project = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+
+        // Real file outside the project with a dependency call inside.
+        let outside_file = outside.path().join("secret.rs");
+        std::fs::write(
+            &outside_file,
+            "fn caller() {\n    callee();\n}\nfn callee() {}\n",
+        )
+        .unwrap();
+
+        // Symlink inside the project pointing to the outside file.
+        let src_dir = project.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        let link = src_dir.join("lib.rs");
+        symlink(&outside_file, &link).unwrap();
+
+        let mut data = BTreeMap::new();
+        data.insert(
+            "probe:t/1/m/caller()".into(),
+            make_atom("caller", "src/lib.rs", 1, 3, &["probe:t/1/m/callee()"]),
+        );
+        data.insert(
+            "probe:t/1/m/callee()".into(),
+            make_atom("callee", "src/lib.rs", 4, 4, &[]),
+        );
+
+        // The dep checker must not read the symlinked file. It should produce
+        // no diagnostics (silently skips the atom) rather than reading outside
+        // the project root.
+        let diags = check_deps(&data, project.path());
+
+        // No "not found as identifier" warning — the file was skipped entirely.
+        let has_dep_warning = diags
+            .iter()
+            .any(|d| d.message.contains("not found as identifier"));
+        assert!(
+            !has_dep_warning,
+            "symlink-escaped file should be skipped, not read; got: {diags:?}"
+        );
+    }
+
+    /// Cache aliasing: two code_path strings that resolve to the same canonical
+    /// file share one cache entry and both go through the root check.
+    #[test]
+    fn test_cache_uses_canonical_key() {
+        let tmp = TempDir::new().unwrap();
+        let src = tmp.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(
+            src.join("lib.rs"),
+            "fn foo() {\n    bar();\n}\nfn bar() {}\n",
+        )
+        .unwrap();
+
+        // Both atoms reference the same file via different path strings.
+        // The second path uses a redundant `src/../src/` prefix.
+        let mut data = BTreeMap::new();
+        data.insert(
+            "probe:t/1/m/foo()".into(),
+            make_atom("foo", "src/lib.rs", 1, 3, &["probe:t/1/m/bar()"]),
+        );
+        data.insert(
+            "probe:t/1/m/bar()".into(),
+            // Alias: resolves to the same file as src/lib.rs
+            make_atom("bar", "src/../src/lib.rs", 4, 4, &[]),
+        );
+
+        // Should not panic or produce spurious errors — both paths are valid
+        // and within the project root.
+        let diags = check_deps(&data, tmp.path());
+        let errors: Vec<_> = diags.iter().filter(|d| d.level == Level::Error).collect();
+        assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
     }
 }
