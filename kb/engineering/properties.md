@@ -126,11 +126,13 @@ The `dependencies` field MUST always equal the union of its categorized subsets.
 
 ## P16. Verification status mapping
 
+The `verification-status` field has five possible values: `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, `"trusted"` (or absent for untracked atoms).
+
 For probe-verus, Verus verification output maps to `verification-status` as:
 
 | Verus status | `verification-status` |
 |---|---|
-| `success` | `"verified"` |
+| `success` | `"verified"` (upgraded to `"transitively-verified"` after enrichment if all transitive deps are clean) |
 | `failure` | `"failed"` |
 | `sorries` | `"unverified"` |
 | `warning` | `"unverified"` |
@@ -145,6 +147,8 @@ For probe-lean, verification status is determined by sorry detection and trust-b
 | Build failure | `"failed"` |
 
 **Precedence**: `"trusted"` overrides sorry-based status — an axiom or `*External.lean` declaration is always `"trusted"` regardless of build output.
+
+**Enrichment** (P23): After initial status assignment, the enrichment step (reverse-BFS contamination) upgrades `"verified"` → `"transitively-verified"` for atoms whose entire transitive closure is verified or trusted. This is run automatically as the last step of `probe-verus extract` and `probe-aeneas extract` (or manually via `probe enrich`).
 
 ## P17. Schema category consistency
 
@@ -204,12 +208,12 @@ Tools must NOT rename their `trusted-reason` values to match another tool — th
 
 **Implemented in**: `probe/scripts/summarize_extract.py` (`TRUST_LABELS` mapping and `TOOL_CONFIG` per-tool configuration).
 
-## P23. Transitive verification scope is computed by reverse-BFS contamination
+## P23. Transitive verification is computed by reverse-BFS contamination
 
-The `probe propagate-verification-status` command computes `transitive-verification-status` for each verified atom by walking the dependency graph:
+The `probe enrich` command (and the `enrich_verification_status` library function) upgrades `verification-status` from `"verified"` to `"transitively-verified"` on atoms whose entire transitive dependency closure is verified or trusted:
 
-- **`"transitive"`**: the atom is verified AND every transitively reachable dependency is also verified or trusted.
-- **`"local"`**: the atom is verified but at least one transitively reachable dependency is not verified and not trusted.
+- **`"transitively-verified"`**: the atom is verified AND every transitively reachable dependency is also verified or trusted.
+- **`"verified"`** (after enrichment): the atom is verified but at least one transitively reachable dependency is not verified and not trusted (locally verified only).
 
 The algorithm uses **reverse-BFS contamination**: build a reverse dependency index, seed contamination from atoms with explicit `"unverified"` or `"failed"` status, and propagate backwards through callers. This correctly handles cycles (all cycle members receive the same scope) without requiring SCC computation.
 
@@ -217,8 +221,11 @@ Key rules:
 - **Only explicit `"unverified"` / `"failed"` contaminates** — atoms with missing `verification-status` (untracked/Grey, e.g. plain Rust functions or Verus spec functions) are transparent and do not affect transitive scope.
 - **`trusted` does not block transitive** — trusted atoms are intentional axioms, not incomplete work.
 - **Missing deps are treated as trusted** — dependencies not present in the atom map (e.g., external stdlib functions) do not block transitive status. A warning is logged for each.
-- **Non-verified atoms are untouched** — only atoms with `verification-status: "verified"` receive a `transitive-verification-status` field.
+- **Non-verified atoms are untouched** — only atoms with `verification-status: "verified"` are candidates for upgrade.
 - **Deterministic** — uses `BTreeMap`/`BTreeSet` throughout (P14).
+- **Idempotent** — running enrichment on already-enriched output produces the same result.
+
+**Integrated into extractors**: probe-verus and probe-aeneas call `enrich_verification_status` as the final step of their `extract` command (skippable via `--skip-enrich`). The `probe enrich` CLI command remains available for re-processing or standalone use.
 
 **Implemented in**: `probe/src/commands/propagate.rs`
 

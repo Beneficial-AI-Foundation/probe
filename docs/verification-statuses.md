@@ -19,20 +19,14 @@ Key distinction: **Implementations** can have specifications attached to them. *
 
 | Status | Meaning |
 |--------|---------|
-| `verified` | Compiles successfully, all proofs discharged |
+| `transitively-verified` | Verified and all transitive dependencies are also verified or trusted ([P23](../kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination)) |
+| `verified` | Compiles successfully, all proofs discharged (but at least one transitive dep may be unverified/failed) |
 | `unverified` | Has sorries, admits, or warnings |
 | `failed` | Has compile errors |
 | `trusted` | Axiomatically assumed (e.g., `axiom`, `#[verifier::external_body]`) |
 | `null` | Not subject to verification (test functions, constants) |
 
-### Transitive Verification Status (applies to verified atoms only)
-
-Computed by `probe propagate-verification-status` via reverse-BFS contamination over the dependency graph ([P23](../kb/engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination)). Only present on atoms whose `verification-status` is `"verified"`. See also the [`transitive-verification-status` field](../kb/engineering/schema.md) in the schema spec.
-
-| Status | Meaning |
-|--------|---------|
-| `transitive` | No transitive dependency is explicitly `"unverified"` or `"failed"` (dependencies with missing status or absent from the atom map are transparent) |
-| `local` | At least one transitive dependency is explicitly `"unverified"` or `"failed"` |
+The distinction between `"transitively-verified"` and `"verified"` is computed by `probe enrich` (reverse-BFS contamination over the dependency graph). probe-verus and probe-aeneas run this enrichment automatically as the last step of `extract`.
 
 ### Specification Status (applies to implementations only)
 
@@ -49,13 +43,13 @@ Colors provide visual feedback based on verification progress. The scheme follow
 
 **Verification scope:** Green comes in two strengths depending on whether explicit contamination (`"unverified"` or `"failed"`) exists in the transitive dependency closure:
 
-- **Transitively verified** (`transitive-verification-status: "transitive"`): The function is verified and no transitive dependency is explicitly `"unverified"` or `"failed"`. Dependencies with missing `verification-status` (untracked Rust functions, spec functions) and dependencies absent from the atom map are transparent — they do not block transitive scope. Trusted (axiomatic) dependencies are also transparent.
-- **Locally-scoped verified** (`transitive-verification-status: "local"`): The function is verified, but at least one transitive dependency is explicitly `"unverified"` or `"failed"`.
+- **Transitively verified** (`verification-status: "transitively-verified"`): The function is verified and no transitive dependency is explicitly `"unverified"` or `"failed"`. Dependencies with missing `verification-status` (untracked Rust functions, spec functions) and dependencies absent from the atom map are transparent — they do not block transitive scope. Trusted (axiomatic) dependencies are also transparent.
+- **Locally verified** (`verification-status: "verified"`): The function is verified, but at least one transitive dependency is explicitly `"unverified"` or `"failed"`.
 
 | Color | Status | Meaning |
 |-------|--------|---------|
-| **Dark Green** | Transitively verified | Function is verified and no transitive dependency is explicitly unverified or failed |
-| **Light Green** | Locally-scoped verified | Function is verified but at least one transitive dependency is explicitly unverified or failed |
+| **Dark Green** | `transitively-verified` | Function is verified and no transitive dependency is explicitly unverified or failed |
+| **Light Green** | `verified` | Function is verified but at least one transitive dependency is explicitly unverified or failed |
 | **Dark Blue** | Specified, specs validated | Has specifications and those specs have been proven correct |
 | **Light Blue** | Specified, specs not validated | Has specifications written but they haven't been fully proven |
 | **Light Cyan** | Translated | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |

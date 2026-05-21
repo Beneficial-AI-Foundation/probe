@@ -1,4 +1,4 @@
-//! Integration tests for the `probe propagate-verification-status` command.
+//! Integration tests for the `probe enrich` command.
 
 use probe::types::Atom;
 use std::collections::BTreeMap;
@@ -7,18 +7,13 @@ use tempfile::TempDir;
 
 const FIXTURE: &str = "tests/fixtures/propagate_test/atoms.json";
 
-fn run_propagate(input: &str, output_path: &std::path::Path) {
+fn run_enrich(input: &str, output_path: &std::path::Path) {
     let binary = env!("CARGO_BIN_EXE_probe");
     let status = Command::new(binary)
-        .args([
-            "propagate-verification-status",
-            input,
-            "-o",
-            output_path.to_str().unwrap(),
-        ])
+        .args(["enrich", input, "-o", output_path.to_str().unwrap()])
         .status()
         .expect("Failed to run probe");
-    assert!(status.success(), "propagate command failed for {input}");
+    assert!(status.success(), "enrich command failed for {input}");
 }
 
 fn load_atoms(path: &std::path::Path) -> BTreeMap<String, Atom> {
@@ -28,52 +23,52 @@ fn load_atoms(path: &std::path::Path) -> BTreeMap<String, Atom> {
     serde_json::from_value(data.clone()).expect("failed to deserialize atoms")
 }
 
-fn get_scope(atom: &Atom) -> Option<&str> {
+fn get_vs(atom: &Atom) -> Option<&str> {
     atom.extensions
-        .get("transitive-verification-status")
+        .get("verification-status")
         .and_then(|v| v.as_str())
 }
 
 #[test]
-fn test_transitive_chain_gets_transitive() {
+fn test_transitive_chain_gets_transitively_verified() {
     let tmp = TempDir::new().unwrap();
     let out = tmp.path().join("output.json");
-    run_propagate(FIXTURE, &out);
+    run_enrich(FIXTURE, &out);
 
     let atoms = load_atoms(&out);
 
-    // entry -> helper -> leaf: all verified, no bad deps
+    // entry -> helper -> leaf: all verified, no bad deps → transitively-verified
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/entry()").unwrap()),
-        Some("transitive")
+        get_vs(atoms.get("probe:test/1.0/entry()").unwrap()),
+        Some("transitively-verified")
     );
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/helper()").unwrap()),
-        Some("transitive")
+        get_vs(atoms.get("probe:test/1.0/helper()").unwrap()),
+        Some("transitively-verified")
     );
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/leaf()").unwrap()),
-        Some("transitive")
+        get_vs(atoms.get("probe:test/1.0/leaf()").unwrap()),
+        Some("transitively-verified")
     );
 }
 
 #[test]
-fn test_caller_of_unverified_is_local() {
+fn test_caller_of_unverified_stays_verified() {
     let tmp = TempDir::new().unwrap();
     let out = tmp.path().join("output.json");
-    run_propagate(FIXTURE, &out);
+    run_enrich(FIXTURE, &out);
 
     let atoms = load_atoms(&out);
 
-    // caller -> broken (unverified)
+    // caller -> broken (unverified) → stays "verified" (locally verified only)
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/caller()").unwrap()),
-        Some("local")
+        get_vs(atoms.get("probe:test/1.0/caller()").unwrap()),
+        Some("verified")
     );
-    // broken itself is unverified — no scope set
+    // broken itself stays unverified
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/broken()").unwrap()),
-        None
+        get_vs(atoms.get("probe:test/1.0/broken()").unwrap()),
+        Some("unverified")
     );
 }
 
@@ -81,14 +76,14 @@ fn test_caller_of_unverified_is_local() {
 fn test_trusted_dep_does_not_block() {
     let tmp = TempDir::new().unwrap();
     let out = tmp.path().join("output.json");
-    run_propagate(FIXTURE, &out);
+    run_enrich(FIXTURE, &out);
 
     let atoms = load_atoms(&out);
 
-    // uses_trusted -> axiom (trusted)
+    // uses_trusted -> axiom (trusted) → transitively-verified
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/uses_trusted()").unwrap()),
-        Some("transitive")
+        get_vs(atoms.get("probe:test/1.0/uses_trusted()").unwrap()),
+        Some("transitively-verified")
     );
 }
 
@@ -96,33 +91,33 @@ fn test_trusted_dep_does_not_block() {
 fn test_missing_dep_does_not_block() {
     let tmp = TempDir::new().unwrap();
     let out = tmp.path().join("output.json");
-    run_propagate(FIXTURE, &out);
+    run_enrich(FIXTURE, &out);
 
     let atoms = load_atoms(&out);
 
     // uses_external -> probe:std/alloc() (not in map, treated as trusted)
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/uses_external()").unwrap()),
-        Some("transitive")
+        get_vs(atoms.get("probe:test/1.0/uses_external()").unwrap()),
+        Some("transitively-verified")
     );
 }
 
 #[test]
-fn test_cycle_with_unverified_dep_all_local() {
+fn test_cycle_with_unverified_dep_stays_verified() {
     let tmp = TempDir::new().unwrap();
     let out = tmp.path().join("output.json");
-    run_propagate(FIXTURE, &out);
+    run_enrich(FIXTURE, &out);
 
     let atoms = load_atoms(&out);
 
     // cycle_a -> cycle_b -> cycle_a (cycle), cycle_b -> broken (unverified)
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/cycle_a()").unwrap()),
-        Some("local")
+        get_vs(atoms.get("probe:test/1.0/cycle_a()").unwrap()),
+        Some("verified")
     );
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/cycle_b()").unwrap()),
-        Some("local")
+        get_vs(atoms.get("probe:test/1.0/cycle_b()").unwrap()),
+        Some("verified")
     );
 }
 
@@ -130,18 +125,18 @@ fn test_cycle_with_unverified_dep_all_local() {
 fn test_missing_status_does_not_contaminate() {
     let tmp = TempDir::new().unwrap();
     let out = tmp.path().join("output.json");
-    run_propagate(FIXTURE, &out);
+    run_enrich(FIXTURE, &out);
 
     let atoms = load_atoms(&out);
 
     // calls_untracked -> plain_rust (no verification-status at all)
     // plain_rust is untracked/Grey — should NOT contaminate
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/calls_untracked()").unwrap()),
-        Some("transitive")
+        get_vs(atoms.get("probe:test/1.0/calls_untracked()").unwrap()),
+        Some("transitively-verified")
     );
     assert_eq!(
-        get_scope(atoms.get("probe:test/1.0/plain_rust()").unwrap()),
+        get_vs(atoms.get("probe:test/1.0/plain_rust()").unwrap()),
         None
     );
 }
@@ -150,12 +145,11 @@ fn test_missing_status_does_not_contaminate() {
 fn test_envelope_structure_preserved() {
     let tmp = TempDir::new().unwrap();
     let out = tmp.path().join("output.json");
-    run_propagate(FIXTURE, &out);
+    run_enrich(FIXTURE, &out);
 
     let content = std::fs::read_to_string(&out).expect("Failed to read output");
     let raw: serde_json::Value = serde_json::from_str(&content).expect("Failed to parse output");
 
-    // Schema and source are preserved from the input
     assert_eq!(
         raw.get("schema").unwrap().as_str().unwrap(),
         "probe-verus/atoms"

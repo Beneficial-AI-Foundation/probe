@@ -10,7 +10,7 @@ status: 3 critical, 8 warnings, 5 info
 ### [C1] Color Mapping scope bullets contradict P23 on transitive meaning
 
 - **Location**: `docs/verification-statuses.md`, lines 50–53 (Verification scope bullets under Color Mapping)
-- **Issue**: **Transitively verified** is defined as “sorry-free AND all its transitive dependencies are also sorry-free.” [P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination) defines `"transitive"` via reverse-BFS contamination seeded only from explicit `"unverified"` / `"failed"`. Atoms with **missing** `verification-status` (untracked/Grey, e.g. plain Rust or Verus spec functions) are **transparent** and do not block `"transitive"`. Dependencies absent from the atom map are treated as trusted (with a warning). A verified atom can therefore receive `transitive-verification-status: "transitive"` while depending on code that is not “sorry-free” in the Verus/Lean sense. The bullets were not updated in the recent docs pass and still conflict with the new **Transitive Verification Status** subsection (lines 28–35).
+- **Issue**: **Transitively verified** is defined as “sorry-free AND all its transitive dependencies are also sorry-free.” [P23](../engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination) defines `"transitive"` via reverse-BFS contamination seeded only from explicit `"unverified"` / `"failed"`. Atoms with **missing** `verification-status` (untracked/Grey, e.g. plain Rust or Verus spec functions) are **transparent** and do not block `"transitive"`. Dependencies absent from the atom map are treated as trusted (with a warning). A verified atom can therefore receive `transitive-verification-status: "transitive"` while depending on code that is not “sorry-free” in the Verus/Lean sense. The bullets were not updated in the recent docs pass and still conflict with the new **Transitive Verification Status** subsection (lines 28–35).
 - **Recommendation**: Rewrite the scope bullets to match P23: Dark Green = verified with no contamination from explicit `"unverified"` / `"failed"` in the dependency closure; Light Green = verified but contaminated by at least one such dependency. Drop “sorry-free” as the defining criterion for transitive scope.
 
 ### [C2] Framework-specific color tables contradict P23 and the new subsection
@@ -66,7 +66,7 @@ status: 3 critical, 8 warnings, 5 info
 ### [W7] New subsection lacks cross-links to normative KB
 
 - **Location**: `docs/verification-statuses.md`, lines 28–35
-- **Issue**: The **Transitive Verification Status** subsection correctly names `probe propagate-verification-status`, reverse-BFS contamination, and field values — an improvement over the prior audit. It still has no links to [P23](../engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination) or the `transitive-verification-status` row in [schema.md](../engineering/schema.md).
+- **Issue**: The **Transitive Verification Status** subsection correctly names `probe propagate-verification-status`, reverse-BFS contamination, and field values — an improvement over the prior audit. It still has no links to [P23](../engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination) or the `transitive-verification-status` row in [schema.md](../engineering/schema.md).
 - **Recommendation**: Add markdown links so human-facing docs anchor to the normative spec.
 
 ### [W8] Color Mapping table rows still disagree with scope bullets and P23

@@ -43,19 +43,17 @@ enum Commands {
         translations: Option<PathBuf>,
     },
 
-    /// Propagate verification status through the dependency graph.
+    /// Enrich verification status through the dependency graph.
     ///
     /// Reads a Schema 2.0 atom file, walks the dependency graph, and
-    /// computes whether each verified atom is transitively verified
-    /// (all transitive dependencies are also verified/trusted) or only
-    /// locally-scoped verified (the atom itself is verified but some
-    /// transitive dependency is not).
+    /// upgrades `verification-status` from "verified" to
+    /// "transitively-verified" on atoms whose entire transitive dependency
+    /// closure is verified or trusted. Atoms that remain "verified" are only
+    /// locally verified (some transitive dep is not verified/trusted).
     ///
-    /// Adds `transitive-verification-status` ("transitive" or "local")
-    /// to each verified atom. The output preserves the input envelope
-    /// structure exactly.
-    // @kb: kb/engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination
-    PropagateVerificationStatus {
+    /// The output preserves the input envelope structure exactly.
+    // @kb: kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination
+    Enrich {
         /// Input atom file (Schema 2.0).
         #[arg(required = true)]
         input: PathBuf,
@@ -100,11 +98,8 @@ fn main() {
         } => {
             probe::commands::merge::cmd_merge(inputs, output, translations);
         }
-        Commands::PropagateVerificationStatus { input, output } => {
-            probe::commands::propagate::cmd_propagate_verification_status(
-                &input,
-                output.as_deref(),
-            );
+        Commands::Enrich { input, output } => {
+            probe::commands::propagate::cmd_enrich(&input, output.as_deref());
         }
         Commands::Summary { input, output } => {
             probe::commands::summary::cmd_summary(&input, output.as_deref());

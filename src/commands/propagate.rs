@@ -1,5 +1,5 @@
 // @kb: kb/engineering/properties.md#p14-deterministic-output
-// @kb: kb/engineering/properties.md#p23-transitive-verification-scope-is-computed-by-reverse-bfs-contamination
+// @kb: kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination
 
 use crate::types::Atom;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -12,7 +12,7 @@ fn get_verification_status(atom: &Atom) -> Option<&str> {
 }
 
 fn is_verified(atom: &Atom) -> bool {
-    get_verification_status(atom).is_some_and(|s| s == "verified")
+    get_verification_status(atom).is_some_and(|s| s == "verified" || s == "transitively-verified")
 }
 
 /// Only atoms with explicit "unverified" or "failed" status are contamination
@@ -22,19 +22,22 @@ fn is_contamination_source(atom: &Atom) -> bool {
     matches!(get_verification_status(atom), Some("unverified" | "failed"))
 }
 
-/// Propagate verification status through the dependency graph using
+/// Enrich verification status through the dependency graph using
 /// reverse-BFS contamination.
 ///
 /// For each verified atom, determines whether it is **transitively verified**
 /// (all transitive dependencies are verified or trusted) or only
-/// **locally-scoped verified** (the atom itself is verified but at least one
+/// **locally verified** (the atom itself is verified but at least one
 /// transitive dependency is not).
 ///
-/// Sets `extensions["transitive-verification-status"]` to `"transitive"` or
-/// `"local"` on each verified atom. Non-verified atoms are untouched.
+/// Upgrades `verification-status` from `"verified"` to `"transitively-verified"`
+/// on atoms whose entire transitive dependency closure is verified or trusted.
+/// Atoms that remain `"verified"` are only locally verified. Non-verified atoms
+/// are untouched.
 ///
 /// Returns `(transitive_count, local_count, missing_deps)` for reporting.
-pub fn propagate_verification_status(
+// @kb: kb/engineering/schema.md#verification-status-values
+pub fn enrich_verification_status(
     atoms: &mut BTreeMap<String, Atom>,
 ) -> (usize, usize, Vec<String>) {
     // Use owned Strings throughout to avoid borrow-checker conflicts
@@ -104,29 +107,27 @@ pub fn propagate_verification_status(
         }
     }
 
-    // 5. Label results.
+    // 5. Upgrade non-contaminated verified atoms to "transitively-verified".
     let mut transitive_count = 0;
     let mut local_count = 0;
 
     for code_name in &verified_set {
-        let scope = if contaminated.contains(code_name) {
+        if contaminated.contains(code_name) {
             local_count += 1;
-            "local"
         } else {
             transitive_count += 1;
-            "transitive"
-        };
-        atoms.get_mut(code_name).unwrap().extensions.insert(
-            "transitive-verification-status".to_string(),
-            serde_json::Value::String(scope.to_string()),
-        );
+            atoms.get_mut(code_name).unwrap().extensions.insert(
+                "verification-status".to_string(),
+                serde_json::Value::String("transitively-verified".to_string()),
+            );
+        }
     }
 
     (transitive_count, local_count, missing_deps)
 }
 
-/// CLI entry point: load atom file, propagate, write enriched JSON.
-pub fn cmd_propagate_verification_status(input: &Path, output: Option<&Path>) {
+/// CLI entry point: load atom file, enrich verification status, write JSON.
+pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
     let content = std::fs::read_to_string(input).unwrap_or_else(|e| {
         eprintln!("Error reading {}: {e}", input.display());
         std::process::exit(1);
@@ -160,7 +161,7 @@ pub fn cmd_propagate_verification_status(input: &Path, output: Option<&Path>) {
             std::process::exit(1);
         });
 
-    let (transitive, local, _missing) = propagate_verification_status(&mut atoms);
+    let (transitive, local, _missing) = enrich_verification_status(&mut atoms);
     let not_verified = atoms.len() - transitive - local;
 
     eprintln!(
@@ -194,7 +195,7 @@ fn default_output_name(input: &Path) -> String {
     let stem = input
         .file_stem()
         .map_or("atoms", |s| s.to_str().unwrap_or("atoms"));
-    format!("propagated_{stem}.json")
+    format!("enriched_{stem}.json")
 }
 
 #[cfg(test)]
@@ -237,9 +238,9 @@ mod tests {
         atom.dependencies.insert(dep.to_string());
     }
 
-    fn get_scope(atom: &Atom) -> Option<&str> {
+    fn get_vs(atom: &Atom) -> Option<&str> {
         atom.extensions
-            .get("transitive-verification-status")
+            .get("verification-status")
             .and_then(|v| v.as_str())
     }
 
@@ -250,8 +251,11 @@ mod tests {
         set_verified(&mut a);
         atoms.insert("a".to_string(), a);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("transitive"));
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
     }
 
     #[test]
@@ -272,10 +276,19 @@ mod tests {
         set_verified(&mut c);
         atoms.insert("c".to_string(), c);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("transitive"));
-        assert_eq!(get_scope(atoms.get("b").unwrap()), Some("transitive"));
-        assert_eq!(get_scope(atoms.get("c").unwrap()), Some("transitive"));
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
+        assert_eq!(
+            get_vs(atoms.get("b").unwrap()),
+            Some("transitively-verified")
+        );
+        assert_eq!(
+            get_vs(atoms.get("c").unwrap()),
+            Some("transitively-verified")
+        );
     }
 
     #[test]
@@ -291,9 +304,9 @@ mod tests {
         set_status(&mut b, "failed");
         atoms.insert("b".to_string(), b);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("b").unwrap()), None);
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("b").unwrap()), Some("failed"));
     }
 
     #[test]
@@ -309,9 +322,9 @@ mod tests {
         set_status(&mut b, "unverified");
         atoms.insert("b".to_string(), b);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("b").unwrap()), None);
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("b").unwrap()), Some("unverified"));
     }
 
     #[test]
@@ -327,8 +340,11 @@ mod tests {
         set_trusted(&mut b);
         atoms.insert("b".to_string(), b);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("transitive"));
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
     }
 
     #[test]
@@ -340,8 +356,11 @@ mod tests {
         add_dep(&mut a, "nonexistent");
         atoms.insert("a".to_string(), a);
 
-        let (_t, _l, missing) = propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("transitive"));
+        let (_t, _l, missing) = enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
         assert_eq!(missing, vec!["nonexistent"]);
     }
 
@@ -363,10 +382,10 @@ mod tests {
         set_status(&mut c, "unverified");
         atoms.insert("c".to_string(), c);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("b").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("c").unwrap()), None);
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("b").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("c").unwrap()), Some("unverified"));
     }
 
     #[test]
@@ -393,11 +412,11 @@ mod tests {
         set_status(&mut d, "unverified");
         atoms.insert("d".to_string(), d);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("b").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("c").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("d").unwrap()), None);
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("b").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("c").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("d").unwrap()), Some("unverified"));
     }
 
     #[test]
@@ -414,14 +433,19 @@ mod tests {
         add_dep(&mut b, "a");
         atoms.insert("b".to_string(), b);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("transitive"));
-        assert_eq!(get_scope(atoms.get("b").unwrap()), Some("transitive"));
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
+        assert_eq!(
+            get_vs(atoms.get("b").unwrap()),
+            Some("transitively-verified")
+        );
     }
 
     #[test]
     fn test_cycle_with_unverified_dep() {
-        // A -> B -> C -> A, B -> D (unverified)
         let mut atoms = BTreeMap::new();
 
         let mut a = make_atom("a");
@@ -444,11 +468,11 @@ mod tests {
         set_status(&mut d, "unverified");
         atoms.insert("d".to_string(), d);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("b").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("c").unwrap()), Some("local"));
-        assert_eq!(get_scope(atoms.get("d").unwrap()), None);
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("b").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("c").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("d").unwrap()), Some("unverified"));
     }
 
     #[test]
@@ -464,8 +488,11 @@ mod tests {
         let b = make_atom("b");
         atoms.insert("b".to_string(), b);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("transitive"));
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
     }
 
     #[test]
@@ -487,8 +514,8 @@ mod tests {
         let c = make_atom("c");
         atoms.insert("c".to_string(), c);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), Some("local"));
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("verified"));
     }
 
     #[test]
@@ -506,10 +533,10 @@ mod tests {
         let c = make_atom("c");
         atoms.insert("c".to_string(), c);
 
-        propagate_verification_status(&mut atoms);
-        assert_eq!(get_scope(atoms.get("a").unwrap()), None);
-        assert_eq!(get_scope(atoms.get("b").unwrap()), None);
-        assert_eq!(get_scope(atoms.get("c").unwrap()), None);
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("unverified"));
+        assert_eq!(get_vs(atoms.get("b").unwrap()), Some("failed"));
+        assert_eq!(get_vs(atoms.get("c").unwrap()), None);
     }
 
     #[test]
@@ -525,14 +552,36 @@ mod tests {
         set_status(&mut b, "unverified");
         atoms.insert("b".to_string(), b);
 
-        propagate_verification_status(&mut atoms);
-        let first_scope_a = get_scope(atoms.get("a").unwrap()).unwrap().to_string();
+        enrich_verification_status(&mut atoms);
+        let first = get_vs(atoms.get("a").unwrap()).unwrap().to_string();
 
-        propagate_verification_status(&mut atoms);
-        let second_scope_a = get_scope(atoms.get("a").unwrap()).unwrap().to_string();
+        enrich_verification_status(&mut atoms);
+        let second = get_vs(atoms.get("a").unwrap()).unwrap().to_string();
 
-        assert_eq!(first_scope_a, second_scope_a);
-        assert_eq!(first_scope_a, "local");
+        assert_eq!(first, second);
+        assert_eq!(first, "verified");
+    }
+
+    #[test]
+    fn test_idempotency_transitively_verified() {
+        let mut atoms = BTreeMap::new();
+
+        let mut a = make_atom("a");
+        set_verified(&mut a);
+        atoms.insert("a".to_string(), a);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
+
+        // Running again should not change the result (already upgraded)
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
     }
 
     #[test]
@@ -558,8 +607,8 @@ mod tests {
         let mut atoms1 = build();
         let mut atoms2 = build();
 
-        propagate_verification_status(&mut atoms1);
-        propagate_verification_status(&mut atoms2);
+        enrich_verification_status(&mut atoms1);
+        enrich_verification_status(&mut atoms2);
 
         let json1 = serde_json::to_string(&atoms1).unwrap();
         let json2 = serde_json::to_string(&atoms2).unwrap();
@@ -583,7 +632,7 @@ mod tests {
         set_status(&mut c, "unverified");
         atoms.insert("c".to_string(), c);
 
-        let (transitive, local, missing) = propagate_verification_status(&mut atoms);
+        let (transitive, local, missing) = enrich_verification_status(&mut atoms);
         assert_eq!(transitive, 1);
         assert_eq!(local, 1);
         assert!(missing.is_empty());

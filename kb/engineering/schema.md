@@ -144,9 +144,8 @@ Note: `"latex"` appears as a reserved `source.language` value in some envelope e
 | Field | Type | Tools | Description |
 |-------|------|-------|-------------|
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification text (verus) or code-name of primary spec theorem (lean) |
-| `verification-status` | string | probe-verus, probe-lean | `"verified"`, `"failed"`, `"unverified"`, or `"trusted"` for trust-base atoms |
+| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment (P23): `"transitively-verified"` = all transitive deps verified/trusted; `"verified"` = locally verified only. |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
-| `transitive-verification-status` | string | probe | `"transitive"` (all transitive deps verified/trusted) or `"local"` (atom is verified but some transitive dep is not). Computed by `probe propagate-verification-status`. Only present on verified atoms. |
 | `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
 | `specs` | array of strings | probe-lean | Theorem atoms referencing this atom |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data: `{code-name, location, line}` |

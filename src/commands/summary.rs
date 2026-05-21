@@ -35,7 +35,7 @@ fn is_verified(atom: &Atom) -> bool {
     atom.extensions
         .get("verification-status")
         .and_then(|v| v.as_str())
-        .is_some_and(|s| s == "verified")
+        .is_some_and(|s| s == "verified" || s == "transitively-verified")
 }
 
 // @kb: kb/engineering/schema.md#language-assignment-for-verus-atoms

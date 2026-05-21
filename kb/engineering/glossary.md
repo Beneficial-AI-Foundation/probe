@@ -135,6 +135,16 @@ When `verification-status` is `"trusted"`, a `trusted-reason` field is also pres
 - `"external-body"` — `#[verifier::external_body]` attribute (probe-verus)
 - `"assume-specification"` — `assume_specification` declaration (probe-verus)
 
+## transitively-verified (verification-status)
+
+A `verification-status` value indicating that an atom is verified AND every transitively reachable dependency is also verified or trusted. Computed by `probe enrich` (see [P23](properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination)) using reverse-BFS contamination over the dependency graph.
+
+After enrichment, the distinction between `"transitively-verified"` and `"verified"` encodes the transitive scope:
+- `"transitively-verified"` — no transitive dependency is explicitly `"unverified"` or `"failed"` (Dark Green in UX)
+- `"verified"` — at least one transitive dependency is explicitly `"unverified"` or `"failed"` (Light Green in UX)
+
+probe-verus and probe-aeneas run enrichment as the last step of `extract` (skippable via `--skip-enrich`). The `probe enrich` CLI command is also available for standalone use.
+
 ## trust base
 
 The set of declarations in a verified project that are assumed correct without proof. In probe-lean: axioms and hand-written models in `*External.lean` files. In probe-verus: `admit()` axioms, `#[verifier::external_body]` functions, and `assume_specification` targets. Both tools mark these with `verification-status: "trusted"` and a `trusted-reason` for classification. Everything outside the trust base must be proven (or is `"unverified"` / `"failed"`).
