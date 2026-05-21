@@ -297,8 +297,11 @@ mod tests {
 
         // Real file outside the project with a dependency call inside.
         let outside_file = outside.path().join("secret.rs");
-        std::fs::write(&outside_file, "fn caller() {\n    callee();\n}\nfn callee() {}\n")
-            .unwrap();
+        std::fs::write(
+            &outside_file,
+            "fn caller() {\n    callee();\n}\nfn callee() {}\n",
+        )
+        .unwrap();
 
         // Symlink inside the project pointing to the outside file.
         let src_dir = project.path().join("src");
