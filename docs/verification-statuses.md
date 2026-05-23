@@ -46,18 +46,22 @@ Colors provide visual feedback based on verification progress. The scheme follow
 - **Transitively verified** (`verification-status: "transitively-verified"`): The function is verified and no transitive dependency is explicitly `"unverified"` or `"failed"`. Dependencies with missing `verification-status` (untracked Rust functions, spec functions) and dependencies absent from the atom map are transparent — they do not block transitive scope. Trusted (axiomatic) dependencies are also transparent.
 - **Locally verified** (`verification-status: "verified"`): The function is verified, but at least one transitive dependency is explicitly `"unverified"` or `"failed"`.
 
-| Color | Status | Meaning |
-|-------|--------|---------|
-| **Dark Green** | `transitively-verified` | Function is verified and no transitive dependency is explicitly unverified or failed |
-| **Light Green** | `verified` | Function is verified but at least one transitive dependency is explicitly unverified or failed |
-| **Dark Blue** | Specified, specs validated | Has specifications and those specs have been proven correct |
-| **Light Blue** | Specified, specs not validated | Has specifications written but they haven't been fully proven |
-| **Light Cyan** | Translated | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |
-| **White** | Tracked, not yet specified | Tracked for verification but not yet specified (in Aeneas: not yet translated; in Verus/Lean: no spec written) |
-| **Purple** | Trusted | Intentionally assumed correct—either axiomatic (Lean `axiom`) or excluded from verification (Verus `#[verifier::external_body]`) |
-| **Grey** | Untracked/disabled | Not subject to verification (`null`), disabled, or excluded |
+### Implementation colors
 
-### Color Priority Rules
+Colors apply to Rust functions from the project under analysis — that is, atoms with `language: "rust"` and a non-empty `code-path`. Stubs with `code-path: ""` represent functions from external crates and are excluded from color assignment and counting.
+
+| # | Color | Meaning |
+|---|-------|---------|
+| 1 | **Grey** | Not subject to verification, disabled (`is-disabled: true`), or excluded |
+| 2 | **White** | Tracked (`is-disabled: false`) but not yet translated (Aeneas) or no spec written (Verus/Lean) |
+| 3 | **Light Cyan** | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |
+| 4 | **Light Blue** | Has specs but not yet validated (placeholder — see note) |
+| 5 | **Dark Blue** | Has specs and those specs have been validated |
+| 6 | **Light Green** | Verified but at least one transitive dependency is unverified or failed |
+| 7 | **Dark Green** | Verified and no transitive dependency is unverified or failed |
+| — | **Purple** | Intentionally assumed correct — axiomatic or excluded from verification |
+
+### Color priority
 
 The progression from least to most verified:
 
@@ -65,26 +69,29 @@ The progression from least to most verified:
 Grey → White → Light Cyan → Light Blue → Dark Blue → Light Green → Dark Green
 ```
 
-Purple (Trusted) is a special branch—it indicates intentional axiomatic assumptions rather than incomplete work.
+Purple (Trusted) indicates intentional axiomatic assumptions rather than incomplete work.
 
-**For Implementations:**
+> **Spec validation note:** All specs are currently considered validated if they appear in the JSON — to be present, the spec must be on `main`, meaning it passed PR review. Light Blue is kept as a placeholder for future spec-invalidation support; until then, all specified-but-unverified functions are Dark Blue.
 
-1. Untracked/disabled → Grey
-2. Tracked, not yet specified → White
-3. Translated, no specs → Light Cyan
-4. Specified, specs not validated → Light Blue
-5. Specified, specs validated → Dark Blue
-6. Locally-scoped verified → Light Green
-7. Transitively verified → Dark Green
-8. Trusted (axiom or intentional exclusion) → Purple
+### Counting Rust functions per color
 
-**For Specifications:**
+Use [`scripts/count-colors.sh`](../scripts/count-colors.sh) to count Rust project functions per color in a `probe-aeneas/extract` JSON:
 
-1. Locally-scoped verified → Light Green
-2. Transitively verified → Dark Green
-3. Trusted (axiomatic) → Purple
+```bash
+scripts/count-colors.sh input.json
+```
 
-Specifications skip Grey, White, Light Cyan, and Blue tiers because they are not translated or specified—they ARE the specs. If a spec exists, it's already tracked.
+The script scopes to project functions (`code-path != ""`), excluding external crate stubs. Grey includes test functions. All color counts should sum to the total.
+
+### Specification colors
+
+Specifications skip Grey, White, Light Cyan, and Blue tiers — they ARE the specs. Only three colors apply:
+
+| Color | Meaning |
+|-------|---------|
+| **Light Green** | Locally verified |
+| **Dark Green** | Transitively verified |
+| **Purple** | Trusted (axiomatic) |
 
 ## Framework-Specific Behavior
 
@@ -171,3 +178,4 @@ Aeneas translates Rust functions to Lean definitions, which can then be specifie
    - Annotation system in Lean
    - First spec in declaration order
 3. Should Translated use Light Cyan or Light Purple? Light Cyan distinguishes it more clearly from the Blue tiers; Light Purple groups it visually closer to Trusted/Purple.
+4. For Aeneas Rust atoms, `is-relevant == !is-disabled` (both derived from `functions.json`). `is-disabled` is the canonical field; should `is-relevant` be removed from Rust atom enrichment as redundant? See [probe-aeneas#20](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/20).
