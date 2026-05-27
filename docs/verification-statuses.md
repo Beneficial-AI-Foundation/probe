@@ -75,13 +75,13 @@ Purple (Trusted) indicates intentional axiomatic assumptions rather than incompl
 
 ### Counting Rust functions per color
 
-Use [`scripts/count-colors.sh`](../scripts/count-colors.sh) to count Rust project functions per color in a `probe-aeneas/extract` JSON:
+Use [`scripts/count-colors.sh`](../scripts/count-colors.sh) to count Rust project functions per color. Auto-detects `probe-aeneas/extract` and `probe-verus/extract` JSON:
 
 ```bash
 scripts/count-colors.sh input.json
 ```
 
-The script scopes to project functions (`code-path != ""`), excluding external crate stubs. Grey includes test functions. All color counts should sum to the total.
+The script scopes to project functions (`code-path != ""`), excluding external crate stubs. Grey includes test functions. Grey, White, Light Cyan, Dark Blue, and Purple form a partition of the total; Green is an informational overlay within Dark Blue (verified subset of specified functions). Functions that are specified but not yet verified (`"unverified"` or `"failed"`) are counted in Dark Blue but not in Green.
 
 ### Specification colors
 
@@ -167,7 +167,7 @@ Aeneas translates Rust functions to Lean definitions, which can then be specifie
 | Primary spec written but not validated | Light Blue |
 | Has translation, no spec | Light Cyan |
 | Tracked, no translation | White |
-| External stub (intentionally excluded) | Purple |
+| External stub (intentionally excluded; `code-path: ""`, excluded from project counting) | Purple |
 | Untracked/disabled | Grey |
 
 ## Open Questions
