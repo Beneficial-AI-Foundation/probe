@@ -36,6 +36,7 @@ jq -r '
              elif startswith("probe-verus") then "verus"
              else "unknown" end) as $pipeline |
 
+  # Rust project atoms (base set for implementation colors)
   [.data | to_entries[] | select(
     .value.language == "rust" and .value["code-path"] != ""
   )] |
@@ -55,6 +56,12 @@ jq -r '
     )
   }) |
 
+  # Non-Rust trusted project atoms (axioms, proof fns)
+  ([$d | to_entries[] | select(
+    .value.language != "rust" and .value["code-path"] != "" and
+    ((.value["verification-status"] // null) == "trusted")
+  )] | length) as $axioms |
+
   {
     pipeline:    $pipeline,
     grey:        [.[] | select(._disabled == true)] | length,
@@ -68,11 +75,13 @@ jq -r '
                                 ._has_spec == true)] | length,
     dark_green:  [.[] | select(.value["verification-status"] == "transitively-verified" and
                                 ._has_spec == true)] | length,
-    purple:      [.[] | select(._disabled == false and ._trusted == true)] | length,
+    purple_impl: [.[] | select(._disabled == false and ._trusted == true)] | length,
+    axioms:      $axioms,
     total:       length
   } |
+  . + { purple: (.purple_impl + .axioms) } |
 
-  (.grey + .white + .light_cyan + .dark_blue + .purple) as $cover |
+  (.grey + .white + .light_cyan + .dark_blue + .purple_impl) as $cover |
   (.light_green + .dark_green) as $verified |
   "Pipeline: \(.pipeline)",
   "",
@@ -85,11 +94,11 @@ jq -r '
   "5 | Dark Blue   | \(.dark_blue)",
   "6 | Light Green | \(.light_green)",
   "7 | Dark Green  | \(.dark_green)",
-  "- | Purple      | \(.purple)",
+  "- | Purple      | \(.purple)  (\(.purple_impl) impl + \(.axioms) axioms)",
   "--|-------------|------",
   "  | Total       | \(.total)",
   (if $cover != .total then
-    "  WARNING: grey+white+cyan+blue+purple (\($cover)) != total (\(.total))"
+    "  WARNING: grey+white+cyan+blue+purple_impl (\($cover)) != total (\(.total))"
   else empty end),
   (if $verified > .dark_blue then
     "  WARNING: green (\($verified)) > dark_blue (\(.dark_blue))"
