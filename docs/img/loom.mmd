@@ -1,0 +1,17 @@
+flowchart TD
+    subgraph m1 ["method squareRoot"]
+        m1_pre[["requires: True"]]:::darkBlue
+        m1_body(["body"]):::darkGreen
+        m1_post[["ensures: res*res ≤ x"]]:::darkBlue
+    end
+    subgraph m2 ["method abs"]
+        m2_pre[["requires: True"]]:::darkBlue
+        m2_body(["body"]):::darkGreen
+        m2_post[["ensures: res ≥ 0"]]:::darkBlue
+    end
+    m3(["helper"]):::white
+    m1_body --> m2_body
+    m1_body --> m3
+    classDef white fill:#fff,color:#333,stroke:#999
+    classDef darkBlue fill:#1565c0,color:#fff
+    classDef darkGreen fill:#2e7d32,color:#fff

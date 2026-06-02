@@ -1,0 +1,11 @@
+flowchart LR
+    c1(["not tracked"]):::grey --- c2(["unspecified"]):::white --- c3(["translated"]):::lightCyan --- c4(["specified"]):::darkBlue
+    c5[["locally verified"]]:::lightGreen --- c6[["trans. verified"]]:::darkGreen --- c7[/"trusted"/]:::purple
+    linkStyle 0,1,2,3,4 stroke:none
+    classDef grey fill:#999,color:#fff
+    classDef white fill:#fff,color:#333,stroke:#999
+    classDef lightCyan fill:#b3e5fc,color:#0277bd
+    classDef darkBlue fill:#1565c0,color:#fff
+    classDef lightGreen fill:#81c784,color:#1b5e20
+    classDef darkGreen fill:#2e7d32,color:#fff
+    classDef purple fill:#9c27b0,color:#fff

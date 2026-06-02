@@ -29,6 +29,7 @@ How the system is built. Architecture, schema contract, invariants.
 - **[schema.md](engineering/schema.md)** — Schema 2.0 interchange specification: envelope format, atom fields, code-name URIs, merge output
 - **[properties.md](engineering/properties.md)** — Invariants and correctness constraints that all implementations must preserve
 - **[glossary.md](engineering/glossary.md)** — Precise definitions of domain terms used across the ecosystem
+- **[lean-verification-landscape.md](engineering/lean-verification-landscape.md)** — How specs surface in Lean verification projects; discovery strategies for probe-lean
 
 ### [Tools](tools/index.md)
 Per-tool specifics — what each tool does differently from the common patterns.
