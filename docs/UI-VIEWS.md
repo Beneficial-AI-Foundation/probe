@@ -29,7 +29,7 @@ a probe-aeneas extraction), the UI should offer:
 |------|---------------|
 | **Rust view** | Only atoms where `language == "rust"`. Dependency edges are restricted to Rust-to-Rust. |
 | **Lean view** | Only atoms where `language == "lean"`. Dependency edges are restricted to Lean-to-Lean. |
-| **Combined view** | All atoms. Cross-language edges (created by `probe merge --translations`) are visible. |
+| **Combined view** | All atoms. Cross-language edges (created by `probe merge --mappings`) are visible. |
 
 Switching between these modes is a client-side filter on the loaded
 JSON -- no re-fetching is needed. The toggle should be prominent (e.g.
@@ -56,8 +56,8 @@ link to the specification theorem for Lean atoms.
 ### Cross-language links
 
 In combined view, atoms from different languages may be connected by
-translation edges (created via a
-[translations file](translations-spec.md)). These edges deserve
+mapping edges (created via a
+[mappings file](mappings-spec.md)). These edges deserve
 distinct styling (e.g. dashed lines, a different color) to distinguish
 them from intra-language dependency edges.
 
@@ -292,7 +292,7 @@ If the loaded JSON is a merged file containing both Rust and Lean
 atoms (e.g. from probe-aeneas), toggling to Lean view shows the Lean
 counterparts of the same functions -- `batch_invert` becomes
 `Curve25519Dalek.Scalar.batch_invert` (or whatever the Lean name is).
-Cross-language translation edges connect the two.
+Cross-language mapping edges connect the two.
 
 ## Implementation notes
 

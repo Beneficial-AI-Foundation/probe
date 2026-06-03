@@ -1,6 +1,6 @@
 ---
 title: Per-Tool Knowledge
-last-updated: 2026-04-03
+last-updated: 2026-06-03
 status: draft
 ---
 
@@ -26,4 +26,4 @@ Each file covers what is **unique** to that tool — what it does differently fr
 - Fixing Rust extraction issues (SCIP, trait disambiguation) → [probe-rust.md](probe-rust.md)
 - Working on Verus verification, spec taxonomy, or dual-AST parsing → [probe-verus.md](probe-verus.md)
 - Touching Lean environment walking, sorry detection, or lake builds → [probe-lean.md](probe-lean.md)
-- Working on cross-language translation or parallel orchestration → [probe-aeneas.md](probe-aeneas.md)
+- Working on cross-language mapping or parallel orchestration → [probe-aeneas.md](probe-aeneas.md)

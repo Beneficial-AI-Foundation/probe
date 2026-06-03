@@ -150,7 +150,7 @@ Additional reference docs in [`probe/docs/`](https://github.com/Beneficial-AI-Fo
 - [`UI-VIEWS.md`](UI-VIEWS.md) — How a UI should implement language toggles, call graph / file map / crate map views
 - [`TESTING_GUIDE.md`](TESTING_GUIDE.md) — How to test that your visualization correctly represents the probe data
 - [`merge-algorithm.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/merge-algorithm.md) — How `probe merge` combines files
-- [`translations-spec.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/translations-spec.md) — Cross-language translation file format
+- [`mappings-spec.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/mappings-spec.md) — Cross-language mapping file format
 - [`envelope-rationale.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/envelope-rationale.md) — Why the metadata envelope exists
 
 ## Working with the data

@@ -1,5 +1,5 @@
 use crate::types::{
-    load_atom_file, load_envelope, load_translations, Atom, InputProvenance, MergedAtomEnvelope,
+    load_atom_file, load_envelope, load_mappings, Atom, InputProvenance, MergedAtomEnvelope,
     MergedGenericEnvelope, SchemaCategory, Tool,
 };
 use std::collections::{BTreeMap, HashMap};
@@ -19,7 +19,7 @@ pub struct MergeStats {
     pub entries_added: usize,
     pub keys_normalized: usize,
     pub conflicts: usize,
-    pub translations_applied: usize,
+    pub mappings_applied: usize,
 }
 
 // ---------------------------------------------------------------------------
@@ -73,20 +73,20 @@ fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, us
 
 // @kb: kb/engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement
 // @kb: kb/engineering/properties.md#p13-cross-language-edges-require-existence
-/// Merge multiple atom maps into one, optionally applying cross-language translations.
+/// Merge multiple atom maps into one, optionally applying cross-language mappings.
 ///
 /// The first map is the base. For each subsequent map:
 /// - Stubs in the base are replaced by real atoms from the incoming map.
 /// - New atoms (not in base) are added.
 /// - Real-vs-real conflicts keep the base version (first wins).
 ///
-/// If `translations` is provided, after merging, cross-language dependency edges
-/// are added: for each atom whose dependencies include a code-name with a translation,
-/// the translated code-name is added as an additional dependency.
+/// If `mappings` is provided, after merging, cross-language dependency edges
+/// are added: for each atom whose dependencies include a code-name with a mapping,
+/// the mapped code-name(s) are added as additional dependencies (1-to-many supported).
 #[allow(clippy::type_complexity)]
 pub fn merge_atom_maps(
     maps: Vec<BTreeMap<String, Atom>>,
-    translations: Option<&(HashMap<String, String>, HashMap<String, String>)>,
+    mappings: Option<&(HashMap<String, Vec<String>>, HashMap<String, Vec<String>>)>,
 ) -> (BTreeMap<String, Atom>, MergeStats) {
     let mut stats = MergeStats {
         total_entries: 0,
@@ -95,7 +95,7 @@ pub fn merge_atom_maps(
         entries_added: 0,
         keys_normalized: 0,
         conflicts: 0,
-        translations_applied: 0,
+        mappings_applied: 0,
     };
 
     let mut maps_iter = maps.into_iter();
@@ -129,8 +129,8 @@ pub fn merge_atom_maps(
         }
     }
 
-    // Apply translations: add cross-language dependency edges
-    if let Some((from_to, to_from)) = translations {
+    // Apply cross-language mappings: add dependency edges
+    if let Some((from_to, to_from)) = mappings {
         let all_keys: Vec<String> = base.keys().cloned().collect();
         let key_set: std::collections::BTreeSet<String> = all_keys.iter().cloned().collect();
 
@@ -139,14 +139,18 @@ pub fn merge_atom_maps(
 
             if let Some(atom) = base.get(key) {
                 for dep in &atom.dependencies {
-                    if let Some(translated) = from_to.get(dep) {
-                        if key_set.contains(translated) && !atom.dependencies.contains(translated) {
-                            new_deps.push(translated.clone());
+                    if let Some(targets) = from_to.get(dep) {
+                        for target in targets {
+                            if key_set.contains(target) && !atom.dependencies.contains(target) {
+                                new_deps.push(target.clone());
+                            }
                         }
                     }
-                    if let Some(translated) = to_from.get(dep) {
-                        if key_set.contains(translated) && !atom.dependencies.contains(translated) {
-                            new_deps.push(translated.clone());
+                    if let Some(targets) = to_from.get(dep) {
+                        for target in targets {
+                            if key_set.contains(target) && !atom.dependencies.contains(target) {
+                                new_deps.push(target.clone());
+                            }
                         }
                     }
                 }
@@ -154,7 +158,7 @@ pub fn merge_atom_maps(
 
             if !new_deps.is_empty() {
                 if let Some(atom) = base.get_mut(key) {
-                    stats.translations_applied += new_deps.len();
+                    stats.mappings_applied += new_deps.len();
                     for dep in new_deps {
                         atom.dependencies.insert(dep);
                     }
@@ -176,7 +180,7 @@ pub fn merge_atom_maps(
 #[allow(clippy::type_complexity)]
 pub fn merge_atom_files(
     paths: &[&Path],
-    translations: Option<&(HashMap<String, String>, HashMap<String, String>)>,
+    mappings: Option<&(HashMap<String, Vec<String>>, HashMap<String, Vec<String>>)>,
 ) -> Result<(BTreeMap<String, Atom>, Vec<InputProvenance>, MergeStats), String> {
     let mut maps = Vec::with_capacity(paths.len());
     let mut provenance = Vec::new();
@@ -187,7 +191,7 @@ pub fn merge_atom_files(
         provenance.extend(prov);
     }
 
-    let (merged, stats) = merge_atom_maps(maps, translations);
+    let (merged, stats) = merge_atom_maps(maps, mappings);
     Ok((merged, provenance, stats))
 }
 
@@ -230,7 +234,7 @@ pub fn merge_generic_maps(
         entries_added: 0,
         keys_normalized: 0,
         conflicts: 0,
-        translations_applied: 0,
+        mappings_applied: 0,
     };
 
     let mut maps_iter = maps.into_iter();
@@ -263,7 +267,7 @@ pub fn merge_generic_maps(
 // @kb: kb/tools/probe-merge.md — end-to-end merge pipeline
 // @kb: kb/engineering/properties.md#p17-schema-category-consistency
 /// Execute the `merge` command, auto-detecting the schema category.
-pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, translations_path: Option<PathBuf>) {
+pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, mappings_path: Option<PathBuf>) {
     if inputs.len() < 2 {
         eprintln!("Error: merge requires at least 2 input files");
         std::process::exit(1);
@@ -318,16 +322,16 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, translations_path: Optio
     let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let merged_schema = category.merged_schema().to_string();
 
-    let translations = if let Some(ref t_path) = translations_path {
-        println!("  Loading translations from {}...", t_path.display());
-        match load_translations(t_path) {
-            Ok(t) => {
+    let mappings = if let Some(ref m_path) = mappings_path {
+        println!("  Loading mappings from {}...", m_path.display());
+        match load_mappings(m_path) {
+            Ok(m) => {
                 println!(
                     "    {} from→to mappings, {} to→from mappings",
-                    t.0.len(),
-                    t.1.len()
+                    m.0.len(),
+                    m.1.len()
                 );
-                Some(t)
+                Some(m)
             }
             Err(e) => {
                 eprintln!("Error: {e}");
@@ -357,7 +361,7 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, translations_path: Optio
                 }
             };
 
-            let (merged, stats) = merge_atom_maps(maps, translations.as_ref());
+            let (merged, stats) = merge_atom_maps(maps, mappings.as_ref());
 
             let envelope = MergedAtomEnvelope {
                 schema: merged_schema,
@@ -445,8 +449,8 @@ fn print_stats(output: &std::path::Path, stats: &MergeStats) {
     if stats.conflicts > 0 {
         println!("  Conflicts:        {}", stats.conflicts);
     }
-    if stats.translations_applied > 0 {
-        println!("  Cross-lang edges: {}", stats.translations_applied);
+    if stats.mappings_applied > 0 {
+        println!("  Cross-lang edges: {}", stats.mappings_applied);
     }
     println!();
 }
@@ -622,7 +626,7 @@ mod tests {
     }
 
     #[test]
-    fn test_translations_add_cross_language_edges() {
+    fn test_mappings_add_cross_language_edges() {
         let mut rust_atoms = BTreeMap::new();
         let mut rust_main = make_real_atom("main", "src/lib.rs", "rust", "exec");
         rust_main
@@ -640,23 +644,23 @@ mod tests {
             make_real_atom("reduce", "Field.lean", "lean", "exec"),
         );
 
-        let translations = {
-            let mut from_to = HashMap::new();
-            let mut to_from = HashMap::new();
-            from_to.insert(
-                "probe:mycrate/1.0/reduce()".to_string(),
-                "probe:mycrate.field.reduce".to_string(),
-            );
-            to_from.insert(
-                "probe:mycrate.field.reduce".to_string(),
-                "probe:mycrate/1.0/reduce()".to_string(),
-            );
+        let mappings = {
+            let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+            let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
+            from_to
+                .entry("probe:mycrate/1.0/reduce()".to_string())
+                .or_default()
+                .push("probe:mycrate.field.reduce".to_string());
+            to_from
+                .entry("probe:mycrate.field.reduce".to_string())
+                .or_default()
+                .push("probe:mycrate/1.0/reduce()".to_string());
             (from_to, to_from)
         };
 
-        let (merged, stats) = merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&translations));
+        let (merged, stats) = merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&mappings));
 
-        assert_eq!(stats.translations_applied, 1);
+        assert_eq!(stats.mappings_applied, 1);
         let main_atom = &merged["probe:mycrate/1.0/main()"];
         assert!(main_atom
             .dependencies
@@ -665,7 +669,7 @@ mod tests {
             main_atom
                 .dependencies
                 .contains("probe:mycrate.field.reduce"),
-            "main should now depend on Lean reduce via translation"
+            "main should now depend on Lean reduce via mapping"
         );
         assert_eq!(merged.len(), 3);
     }
@@ -1071,13 +1075,13 @@ mod tests {
     // Edge case tests (C8, C9)
     // =========================================================================
 
-    /// C8: Duplicate translation `from` keys silently overwrite earlier mappings.
+    /// C8 fix: Duplicate `from` keys now collect all targets (1-to-many).
     #[test]
-    fn test_duplicate_translation_from_keys_overwrite() {
+    fn test_duplicate_from_keys_preserved() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("translations.json");
+        let path = dir.path().join("mappings.json");
         let content = serde_json::json!({
-            "schema": "probe/translations",
+            "schema": "probe/mappings",
             "schema-version": "2.0",
             "mappings": [
                 {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"},
@@ -1086,21 +1090,264 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&content).unwrap()).unwrap();
 
-        let (from_to, _to_from) = load_translations(&path).unwrap();
+        let (from_to, _to_from) = load_mappings(&path).unwrap();
 
-        // BUG C8: The second mapping overwrites the first.
-        // from_to["probe:a/1.0/f()"] == "probe:a.lean.g" (last wins)
-        // The first mapping to "probe:a.lean.f" is silently lost.
-        let mapped = from_to.get("probe:a/1.0/f()").unwrap();
-        eprintln!(
-            "C8: duplicate from key mapped to {:?} (other mapping silently lost)",
-            mapped
-        );
-        // There's only 1 entry for the duplicate key — the second one.
+        assert_eq!(from_to.len(), 1, "one unique 'from' key");
+        let targets = from_to.get("probe:a/1.0/f()").unwrap();
+        assert_eq!(targets.len(), 2, "both targets should be preserved");
+        assert!(targets.contains(&"probe:a.lean.f".to_string()));
+        assert!(targets.contains(&"probe:a.lean.g".to_string()));
+    }
+
+    #[test]
+    fn test_duplicate_from_keys_to_from_also_preserved() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mappings.json");
+        let content = serde_json::json!({
+            "schema": "probe/mappings",
+            "schema-version": "2.0",
+            "mappings": [
+                {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"},
+                {"from": "probe:a/1.0/f()", "to": "probe:a.lean.g", "confidence": "high"}
+            ]
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&content).unwrap()).unwrap();
+
+        let (_from_to, to_from) = load_mappings(&path).unwrap();
+
+        assert_eq!(to_from.len(), 2, "two unique 'to' keys");
         assert_eq!(
-            from_to.len(),
-            1,
-            "duplicate 'from' key should result in a single entry"
+            to_from["probe:a.lean.f"],
+            vec!["probe:a/1.0/f()"],
+            "lean.f maps back to rust f()"
+        );
+        assert_eq!(
+            to_from["probe:a.lean.g"],
+            vec!["probe:a/1.0/f()"],
+            "lean.g maps back to rust f()"
+        );
+    }
+
+    #[test]
+    fn test_load_mappings_rejects_legacy_translations_schema() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("legacy.json");
+        let content = serde_json::json!({
+            "schema": "probe/translations",
+            "schema-version": "2.0",
+            "mappings": [
+                {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"}
+            ]
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&content).unwrap()).unwrap();
+
+        let result = load_mappings(&path);
+        assert!(result.is_err(), "legacy schema should be rejected");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("probe/mappings"),
+            "error should mention expected schema: {err}"
+        );
+    }
+
+    /// P13 guard: mapping target not in merged keys → edge NOT added.
+    #[test]
+    fn test_mapping_target_absent_no_edge_added() {
+        let mut rust_atoms = BTreeMap::new();
+        let mut caller = make_real_atom("caller", "src/lib.rs", "rust", "exec");
+        caller
+            .dependencies
+            .insert("probe:a/1.0/encrypt()".to_string());
+        rust_atoms.insert("probe:a/1.0/caller()".to_string(), caller);
+        rust_atoms.insert(
+            "probe:a/1.0/encrypt()".to_string(),
+            make_real_atom("encrypt", "src/crypto.rs", "rust", "exec"),
+        );
+
+        let mappings = {
+            let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+            let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
+            from_to
+                .entry("probe:a/1.0/encrypt()".to_string())
+                .or_default()
+                .push("probe:Ghost.encrypt".to_string());
+            to_from
+                .entry("probe:Ghost.encrypt".to_string())
+                .or_default()
+                .push("probe:a/1.0/encrypt()".to_string());
+            (from_to, to_from)
+        };
+
+        let (merged, stats) = merge_atom_maps(vec![rust_atoms], Some(&mappings));
+
+        assert_eq!(
+            stats.mappings_applied, 0,
+            "no edges added when target absent from merged keys"
+        );
+        let caller_atom = &merged["probe:a/1.0/caller()"];
+        assert!(
+            !caller_atom.dependencies.contains("probe:Ghost.encrypt"),
+            "ghost target should not appear in deps"
+        );
+    }
+
+    /// P13 guard: mapping target already in deps → no duplicate, stats not incremented.
+    #[test]
+    fn test_mapping_dep_already_present_no_duplicate() {
+        let mut rust_atoms = BTreeMap::new();
+        let mut caller = make_real_atom("caller", "src/lib.rs", "rust", "exec");
+        caller
+            .dependencies
+            .insert("probe:a/1.0/encrypt()".to_string());
+        caller
+            .dependencies
+            .insert("probe:LeanPkg.encrypt".to_string());
+        rust_atoms.insert("probe:a/1.0/caller()".to_string(), caller);
+        rust_atoms.insert(
+            "probe:a/1.0/encrypt()".to_string(),
+            make_real_atom("encrypt", "src/crypto.rs", "rust", "exec"),
+        );
+
+        let mut lean_atoms = BTreeMap::new();
+        lean_atoms.insert(
+            "probe:LeanPkg.encrypt".to_string(),
+            make_real_atom("encrypt", "Pkg.lean", "lean", "def"),
+        );
+
+        let mappings = {
+            let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+            let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
+            from_to
+                .entry("probe:a/1.0/encrypt()".to_string())
+                .or_default()
+                .push("probe:LeanPkg.encrypt".to_string());
+            to_from
+                .entry("probe:LeanPkg.encrypt".to_string())
+                .or_default()
+                .push("probe:a/1.0/encrypt()".to_string());
+            (from_to, to_from)
+        };
+
+        let (merged, stats) = merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&mappings));
+
+        assert_eq!(
+            stats.mappings_applied, 0,
+            "already-present dep should not be counted"
+        );
+        let dep_count = merged["probe:a/1.0/caller()"]
+            .dependencies
+            .iter()
+            .filter(|d| *d == "probe:LeanPkg.encrypt")
+            .count();
+        assert_eq!(dep_count, 1, "no duplicate dependency");
+    }
+
+    /// P13: to→from direction — Lean atom depending on Lean mapped name gains Rust target.
+    #[test]
+    fn test_mapping_to_from_direction() {
+        let mut lean_atoms = BTreeMap::new();
+        let mut lean_caller = make_real_atom("main_spec", "Main.lean", "lean", "def");
+        lean_caller
+            .dependencies
+            .insert("probe:LeanPkg.encrypt".to_string());
+        lean_atoms.insert("probe:LeanPkg.main_spec".to_string(), lean_caller);
+        lean_atoms.insert(
+            "probe:LeanPkg.encrypt".to_string(),
+            make_real_atom("encrypt", "Pkg.lean", "lean", "def"),
+        );
+
+        let mut rust_atoms = BTreeMap::new();
+        rust_atoms.insert(
+            "probe:a/1.0/encrypt()".to_string(),
+            make_real_atom("encrypt", "src/crypto.rs", "rust", "exec"),
+        );
+
+        let mappings = {
+            let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+            let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
+            from_to
+                .entry("probe:a/1.0/encrypt()".to_string())
+                .or_default()
+                .push("probe:LeanPkg.encrypt".to_string());
+            to_from
+                .entry("probe:LeanPkg.encrypt".to_string())
+                .or_default()
+                .push("probe:a/1.0/encrypt()".to_string());
+            (from_to, to_from)
+        };
+
+        let (merged, stats) = merge_atom_maps(vec![lean_atoms, rust_atoms], Some(&mappings));
+
+        assert!(
+            stats.mappings_applied >= 1,
+            "to→from direction should add edge"
+        );
+        let lean_caller_atom = &merged["probe:LeanPkg.main_spec"];
+        assert!(
+            lean_caller_atom
+                .dependencies
+                .contains("probe:a/1.0/encrypt()"),
+            "lean caller should gain rust dependency via to→from mapping"
+        );
+    }
+
+    /// 1-to-many: a single `from` key with two `to` targets produces two cross-language edges.
+    #[test]
+    fn test_one_to_many_mapping_produces_multiple_edges() {
+        let mut rust_atoms = BTreeMap::new();
+        let mut rust_main = make_real_atom("main", "src/lib.rs", "rust", "exec");
+        rust_main
+            .dependencies
+            .insert("probe:mycrate/1.0/encrypt()".to_string());
+        rust_atoms.insert("probe:mycrate/1.0/main()".to_string(), rust_main);
+        rust_atoms.insert(
+            "probe:mycrate/1.0/encrypt()".to_string(),
+            make_real_atom("encrypt", "src/crypto.rs", "rust", "exec"),
+        );
+
+        let mut lean_atoms = BTreeMap::new();
+        lean_atoms.insert(
+            "probe:AEADScheme.encrypt".to_string(),
+            make_real_atom("encrypt", "AEAD.lean", "lean", "def"),
+        );
+        lean_atoms.insert(
+            "probe:DetSEAlg.encrypt".to_string(),
+            make_real_atom("encrypt", "DetSE.lean", "lean", "def"),
+        );
+
+        let mappings = {
+            let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+            let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
+            from_to
+                .entry("probe:mycrate/1.0/encrypt()".to_string())
+                .or_default()
+                .push("probe:AEADScheme.encrypt".to_string());
+            from_to
+                .entry("probe:mycrate/1.0/encrypt()".to_string())
+                .or_default()
+                .push("probe:DetSEAlg.encrypt".to_string());
+            to_from
+                .entry("probe:AEADScheme.encrypt".to_string())
+                .or_default()
+                .push("probe:mycrate/1.0/encrypt()".to_string());
+            to_from
+                .entry("probe:DetSEAlg.encrypt".to_string())
+                .or_default()
+                .push("probe:mycrate/1.0/encrypt()".to_string());
+            (from_to, to_from)
+        };
+
+        let (merged, stats) = merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&mappings));
+
+        assert_eq!(stats.mappings_applied, 2, "two cross-language edges added");
+        let main_atom = &merged["probe:mycrate/1.0/main()"];
+        assert!(
+            main_atom.dependencies.contains("probe:AEADScheme.encrypt"),
+            "main should depend on AEAD encrypt via mapping"
+        );
+        assert!(
+            main_atom.dependencies.contains("probe:DetSEAlg.encrypt"),
+            "main should depend on DetSE encrypt via mapping"
         );
     }
 }

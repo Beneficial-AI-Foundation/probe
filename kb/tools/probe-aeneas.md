@@ -1,19 +1,19 @@
 ---
 title: "Tool: probe-aeneas"
-last-updated: 2026-04-02
+last-updated: 2026-06-03
 status: draft
 ---
 
 # probe-aeneas
 
 **Directory**: `baif/probe-aeneas/`
-**Role**: Cross-language bridge for Aeneas-transpiled projects. Generates Rust↔Lean [translation mappings](../engineering/glossary.md#translation-mapping) and delegates merging to `probe merge`.
+**Role**: Cross-language bridge for Aeneas-transpiled projects. Generates Rust↔Lean [cross-language mappings](../engineering/glossary.md#cross-language-mapping) and delegates merging to `probe merge`.
 **Subcommands**: `extract`, `translate`, `listfuns`
 
 ## What this tool is (and isn't)
 
 probe-aeneas is a [functor factory](../engineering/glossary.md#functor), not a merge engine. It:
-- **Generates** the translation mapping between Rust and Lean code-names
+- **Generates** the cross-language mapping between Rust and Lean code-names
 - **Orchestrates** running probe-rust and probe-lean
 - **Enriches** merged atoms with Aeneas-specific metadata
 - **Delegates** the actual merge to `probe::merge::merge_atom_maps()`
@@ -33,8 +33,8 @@ inputs → parallel extraction → load functions.json → translate → merge �
 3. **Validate inputs** — exactly one Rust source + one Lean source + functions.json
 4. **Resolve inputs** — if project paths given, run extractors; if JSON given, use directly
 5. **Parallel extraction** — when both project paths given, run probe-rust and probe-lean in parallel via scoped threads
-6. **Generate translations** — three-strategy matching against functions.json (see below)
-7. **Merge** — call `merge_atom_maps()` from probe crate with translations
+6. **Generate mappings** — three-strategy translation matching against functions.json (see below)
+7. **Merge** — call `merge_atom_maps()` from probe crate with mappings
 8. **Enrich** — add Aeneas-specific metadata to merged atoms
 9. **Wrap** — Schema 2.0 envelope with `probe-aeneas/extract` schema
 
@@ -56,9 +56,9 @@ probe-aeneas extract --rust atoms_rust.json --lean-project ./dalek-lean --functi
 
 The positional `PROJECT` argument parses `aeneas-config.yml` to derive `crate.dir` (Rust crate path) and uses the project root as the Lean project. If `functions.json` exists at the project root, it is reused. This aligns with the `probe-<tool> extract <project_path>` convention used by all other probes.
 
-## Three-strategy translation matching
+## Three-strategy mapping generation
 
-Implemented in `src/translate.rs`. Strict priority order — see [P12](../engineering/properties.md#p12-translation-strategy-priority).
+Implemented in `src/translate.rs`. Strict priority order — see [P12](../engineering/properties.md#p12-mapping-strategy-priority).
 
 ### Strategy 1: Rust-qualified-name (highest priority)
 
@@ -89,7 +89,7 @@ For unmatched Rust atoms with valid line ranges:
 
 ### 1-to-1 constraint
 
-See [P11](../engineering/properties.md#p11-translation-mapping-is-1-to-1). Enforced by `matched_rust` and `matched_lean` HashSets. Once an atom is claimed by any strategy, no later strategy can claim it again.
+See [P11](../engineering/properties.md#p11-mapping-generation-is-1-to-1-probe-aeneas). Enforced by `matched_rust` and `matched_lean` HashSets. Once an atom is claimed by any strategy, no later strategy can claim it again.
 
 ## Enrichment
 
@@ -130,7 +130,7 @@ Full pipeline: extract + translate + merge + enrich.
 The positional `PROJECT` arg conflicts with `--rust`, `--rust-project`, `--lean`, and `--lean-project`.
 
 ### `translate`
-Generate translation mappings only (no merge/enrich). Requires pre-generated atoms.
+Generate cross-language mappings only (no merge/enrich). Requires pre-generated atoms.
 
 ### `listfuns`
 Run `lake exe listfuns` to generate functions.json from an Aeneas-transpiled Lean project.
@@ -140,7 +140,7 @@ Run `lake exe listfuns` to generate functions.json from an Aeneas-transpiled Lea
 | File | Purpose |
 |------|---------|
 | `src/extract.rs` | Pipeline orchestration, parallel extraction |
-| `src/translate.rs` | Three-strategy translation generation, name normalization |
+| `src/translate.rs` | Three-strategy mapping generation, name normalization |
 | `src/extract_runner.rs` | Auto-download and run probe-rust/probe-lean |
 | `src/listfuns.rs` | Wrapper for `lake exe listfuns` |
 | `src/gen_functions.rs` | Parse Aeneas-generated Lean files for name mappings |
@@ -177,6 +177,6 @@ Parsed from `"L<start>-L<end>"` format.
 
 probe-aeneas imports `probe` as a git dependency (`git = "https://github.com/Beneficial-AI-Foundation/probe"`). Uses:
 - `probe::commands::merge::merge_atom_files` — merge algorithm (file-level convenience over `merge_atom_maps`)
-- `probe::types::Atom`, `TranslationMapping`, `MergedAtomEnvelope`, `InputProvenance`, `Tool`
+- `probe::types::Atom`, `Mapping`, `MergedAtomEnvelope`, `InputProvenance`, `Tool`
 
 This is the only probe tool with a Rust crate dependency on the central hub.

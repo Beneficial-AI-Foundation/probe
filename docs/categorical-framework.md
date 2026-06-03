@@ -5,7 +5,7 @@ This document describes the categorical structure underlying the probe tools arc
 - **DOTS** (Double Operadic Theory of Systems) by Libkind & Myers ([arXiv 2505.18329](https://arxiv.org/abs/2505.18329))
 - **SSProve** (State-Separating Proofs) by Spitters et al. ([ePrint 2021/397](https://eprint.iacr.org/2021/397))
 
-Both frameworks describe composable units with typed interfaces governed by algebraic laws. The probe tools instantiate this pattern: `probe merge` is the universal composition operator, each probe tool is a doctrine, and translation mappings are functors between language categories.
+Both frameworks describe composable units with typed interfaces governed by algebraic laws. The probe tools instantiate this pattern: `probe merge` is the universal composition operator, each probe tool is a doctrine, and cross-language mappings are functors between language categories.
 
 ## Core Correspondence
 
@@ -15,13 +15,13 @@ Both frameworks describe composable units with typed interfaces governed by alge
 |---|---|
 | **Interface** | Atom schema — the typed signature (code-name, kind, language, dependencies) |
 | **Interaction (loose morphism)** | A probe extract output — a dependency graph over atoms with a typed boundary |
-| **Tight morphism (interface map)** | Translation mapping — relates code-names across languages (e.g. Rust ↔ Lean) |
+| **Tight morphism (interface map)** | Cross-language mapping — relates code-names across languages (e.g. Rust ↔ Lean) |
 | **Composition** | `probe merge` — the single operator that composes any atom maps |
-| **Composition with functor** | `probe merge --translations` — composition mediated by a cross-language functor |
-| **Parallel placement** | Merging disjoint atom maps (no overlapping keys, no translations needed) |
+| **Composition with functor** | `probe merge --mappings` — composition mediated by a cross-language functor |
+| **Parallel placement** | Merging disjoint atom maps (no overlapping keys, no mappings needed) |
 | **Doctrine** | Each probe tool (probe-rust, probe-verus, probe-lean) — defines what atoms look like in its language |
 
-In DOTS, there is one composition operator. When interfaces don't match natively, a tight morphism (interface map) mediates. `--translations` is exactly this — a tight morphism between the Rust and Lean interface categories.
+In DOTS, there is one composition operator. When interfaces don't match natively, a tight morphism (interface map) mediates. `--mappings` is exactly this — a tight morphism between the Rust and Lean interface categories.
 
 ### Mapping to SSProve
 
@@ -32,7 +32,7 @@ In DOTS, there is one composition operator. When interfaces don't match natively
 | **Import interface** | The dependencies those atoms reference (potentially unresolved stubs) |
 | **Sequential linking (`link`)** | Stub replacement in `probe merge` — an incoming real atom resolves a stub in the base |
 | **Parallel composition (`par`)** | Adding new atoms from incoming maps that don't overlap with the base |
-| **Translation / simulation** | `--translations` — maps code-names across language boundaries so linking can resolve cross-language dependencies |
+| **Translation / simulation** | `--mappings` — maps code-names across language boundaries so linking can resolve cross-language dependencies |
 | **State separation** | Each atom's internal code (`code-text`, `code-path`) is opaque to the merge — only the interface (code-name, dependencies, kind) participates in composition |
 | **Identity package** | An empty atom map — merging with it changes nothing |
 
@@ -48,7 +48,7 @@ In SSProve, "interactions" are "packages" — composable units with import/expor
 
 3. **Commutativity of parallel placement**: when A and B have disjoint keys and no stubs to resolve, `merge(A, B) = merge(B, A)` (modulo provenance ordering).
 
-4. **Translation functoriality**: if T is a translation, applying T then merging equals merging then applying T. Translations are applied after the base merge (in `merge_atom_maps`), which makes this hold naturally.
+4. **Mapping functoriality**: if M is a mapping, applying M then merging equals merging then applying M. Mappings are applied after the base merge (in `merge_atom_maps`), which makes this hold naturally.
 
 ## Architecture
 
@@ -56,14 +56,14 @@ In SSProve, "interactions" are "packages" — composable units with import/expor
 
 `probe merge` is the single composition operator for all probe outputs. It handles:
 
-- **Homogeneous merging** (rust+rust, lean+lean): no translations needed, composition via stub replacement and key-based union.
-- **Heterogeneous merging** (rust+lean): supply `--translations` to mediate cross-language dependencies.
+- **Homogeneous merging** (rust+rust, lean+lean): no mappings needed, composition via stub replacement and key-based union.
+- **Heterogeneous merging** (rust+lean): supply `--mappings` to mediate cross-language dependencies.
 
 The `SchemaCategory` enum (atoms, specs, proofs) determines which composition law applies:
 - **Atoms**: stub-replacement (first-wins for real-vs-real conflicts)
 - **Specs/Proofs**: last-wins semantics
 
-The `SchemaCategory` + `--translations` pair is the **doctrine signature**: it tells `probe merge` which composition law to apply and which functor to use for cross-language mediation.
+The `SchemaCategory` + `--mappings` pair is the **doctrine signature**: it tells `probe merge` which composition law to apply and which functor to use for cross-language mediation.
 
 ### Each Probe Tool — A Doctrine
 
@@ -80,13 +80,13 @@ A doctrine specifies:
 
 ### `probe-aeneas` — A Functor Factory
 
-probe-aeneas is not a composition operator. It is a **functor factory** — it produces the tight morphism (translation mapping) that `probe merge` needs to compose across language boundaries.
+probe-aeneas is not a composition operator. It is a **functor factory** — it produces the tight morphism (cross-language mapping) that `probe merge` needs to compose across language boundaries.
 
 - **`probe-aeneas translate`**: construct the functor via three-strategy matching:
   1. `rust-qualified-name` match (Charon-derived)
   2. `file+display-name` match
   3. `file+line-overlap` match
-- **`probe-aeneas extract <project_path>`**: orchestrate the full pipeline — resolve Rust/Lean paths from `aeneas-config.yml`, run probe-rust and probe-lean, generate translations, merge with cross-language edges.
+- **`probe-aeneas extract <project_path>`**: orchestrate the full pipeline — resolve Rust/Lean paths from `aeneas-config.yml`, run probe-rust and probe-lean, generate mappings, merge with cross-language edges.
 
 The domain knowledge about how Aeneas transpilation relates Rust names to Lean names lives in probe-aeneas. The generic composition law lives in probe merge. They don't mix.
 
@@ -99,18 +99,18 @@ This categorical structure provides:
 Adding a new probe (e.g. `probe-haskell`) requires only:
 - Implement the extractor (the doctrine): produce atoms in the standard envelope format.
 - `probe merge` handles same-language composition automatically.
-- For cross-language support: build a translation generator that produces `translations.json`, then `probe merge --translations` handles the rest.
+- For cross-language support: build a mapping generator that produces `mappings.json`, then `probe merge --mappings` handles the rest.
 
 ### 2. Closed Composition
 
-Adding a new cross-language bridge (e.g. Rust↔Haskell) requires only a new translation generator — no changes to `probe merge`. The composition operator is closed over the space of all probe outputs.
+Adding a new cross-language bridge (e.g. Rust↔Haskell) requires only a new mapping generator — no changes to `probe merge`. The composition operator is closed over the space of all probe outputs.
 
 ### 3. Testable Compositionality
 
 The algebraic laws (associativity, identity, functoriality) are concrete properties expressible as tests. The existing recursive merge test is essentially testing associativity. Additional law-based tests could verify:
 - Identity: `merge([atoms, empty]) == atoms`
 - Commutativity: `merge([A, B]) == merge([B, A])` for disjoint keys
-- Functoriality: translations commute with merge order
+- Functoriality: mappings commute with merge order
 
 ### 4. Provenance as Composition Trace
 

@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-04-07
+last-updated: 2026-06-03
 status: draft
 ---
 
@@ -77,16 +77,18 @@ Every merged output records the provenance of its inputs in the `inputs` array. 
 
 Tool-specific extension fields (any JSON key/value not part of the core atom schema) MUST be preserved through merge operations. The `extensions` BTreeMap in the Rust `Atom` struct captures these via `#[serde(flatten)]`.
 
-## P11. Translation mapping is 1-to-1
+## P11. Mapping generation is 1-to-1 (probe-aeneas)
 
-When generating cross-language translations (probe-aeneas):
+When generating cross-language mappings (probe-aeneas):
 - Each Rust atom maps to at most one Lean atom
 - Each Lean atom is claimed by at most one Rust atom
 - Once matched, neither side can be matched again
 
 Enforced by `matched_rust` and `matched_lean` HashSets in `probe-aeneas/src/translate.rs`.
 
-## P12. Translation strategy priority
+Note: `probe merge` accepts 1-to-many mappings (a single `from` key can map to multiple `to` targets). The 1-to-1 constraint is specific to probe-aeneas's generation logic.
+
+## P12. Mapping strategy priority
 
 The three matching strategies run in strict priority order:
 1. **Rust-qualified-name** (confidence: `exact` or `exact-disambiguated`) — Charon-derived names
@@ -97,10 +99,11 @@ Higher-priority strategies run first and claim atoms. Lower-priority strategies 
 
 ## P13. Cross-language edges require existence
 
-When applying translations during merge:
-- A translated dependency is added only if the target code-name exists in the merged key set
-- A translated dependency is not added if it's already present in the atom's dependencies
+When applying mappings during merge:
+- A mapped dependency is added only if the target code-name exists in the merged key set
+- A mapped dependency is not added if it's already present in the atom's dependencies
 - Both mapping directions (from→to and to→from) are checked
+- When a single source maps to multiple targets (1-to-many), each target is checked independently
 
 ## P14. Deterministic output
 
@@ -231,8 +234,8 @@ Key rules:
 
 ## Known bugs and edge cases
 
-These are documented defects that should be fixed, not acceptable behavior:
+### Resolved
 
-- **C6**: When two Rust atoms share the same normalized RQN in probe-aeneas translation, `rqn_to_rust.insert()` overwrites (last-wins in HashMap.insert), silently dropping the first. Should collect into a Vec.
-- **C7**: Lean atoms without source location (lines 0,0) get misleading `translation-text` in probe-aeneas enrichment. Should check and skip.
-- **C8**: Duplicate translation `from` keys silently overwrite in `load_translations()`. Last-wins in HashMap.insert.
+- **C6** *(fixed)*: `strategy_rust_qualified_name` in probe-aeneas now uses `HashMap<String, Vec<String>>` for RQN→Rust-atom lookup with disambiguation when multiple candidates share a normalized RQN.
+- **C7** *(fixed)*: `enrich_with_aeneas_metadata` in probe-aeneas skips `translation-text` when `start == 0 || end == 0`.
+- **C8** *(fixed)*: `load_mappings()` uses `HashMap<String, Vec<String>>` with `or_default().push()` — duplicate `from` keys collect all targets (1-to-many). Covered by `test_duplicate_from_keys_preserved` and `test_one_to_many_mapping_produces_multiple_edges`.

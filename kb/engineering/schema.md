@@ -1,6 +1,6 @@
 ---
 title: Schema 2.0 Interchange Specification
-last-updated: 2026-04-07
+last-updated: 2026-06-03
 status: draft
 ---
 
@@ -87,7 +87,7 @@ Note: Legacy schema values `probe-lean/atoms`, `probe-lean/enriched-atoms`, `pro
 - `probe/summary`
 
 **Special**:
-- `probe/translations` — cross-language translation mappings
+- `probe/mappings` — cross-language mappings
 
 ### Schema categories
 
@@ -233,25 +233,26 @@ See [properties.md](properties.md) for the invariants merge must satisfy.
 | any | any (same key) | **Replace**: incoming wins |
 | (absent) | any | **Add** |
 
-### Translations
+### Cross-language mappings
 
-When `--translations <file>` is provided to `probe merge`:
-- For each atom's dependencies, if a dependency has a translation mapping, the translated code-name is added as an additional dependency
+When `--mappings <file>` is provided to `probe merge`:
+- For each atom's dependencies, if a dependency has a mapping, the mapped code-name(s) are added as additional dependencies
 - Both directions are checked (from→to and to→from)
-- Target must exist in the merged key set
-- Target must not already be a dependency
+- A single source may map to multiple targets (1-to-many)
+- Each target must exist in the merged key set
+- Each target must not already be a dependency
 
 ### Normalization
 
 Before merging, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact).
 
-## Translations file format
+## Mappings file format
 
-Schema: `probe/translations`. Contains bidirectional mappings between code-names across languages.
+Schema: `probe/mappings`. Contains bidirectional mappings between code-names across languages.
 
 ```json
 {
-  "schema": "probe/translations",
+  "schema": "probe/mappings",
   "schema-version": "2.0",
   "tool": { "name": "probe-aeneas", "version": "...", "command": "translate" },
   "timestamp": "...",
@@ -266,6 +267,8 @@ Schema: `probe/translations`. Contains bidirectional mappings between code-names
 ```
 
 Confidence levels: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`.
+
+See also: [mappings-spec.md](../../docs/mappings-spec.md) for the full format specification and [ADR-003](../decisions/003-mappings-design.md) for design rationale.
 
 ## Versioning
 

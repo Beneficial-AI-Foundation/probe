@@ -1,76 +1,99 @@
 ---
 auditor: test-quality-auditor
-date: 2026-05-20
-scope: P23 (transitive verification status), trusted status preservation
-status: 0 critical, 2 warnings, 6 info
+date: 2026-06-03
+scope: P11–P13 (mappings rename, 1-to-many / C8 fix), probe merge, probe-aeneas, scip-callgraph
+status: 0 critical, 5 warnings, 6 info
 ---
 
 ## Summary
 
-Recent changes are **docs-only** (`docs/verification-statuses.md` Transitive Verification Status subsection; `docs/SCHEMA.md` additions for `trusted`, `trusted-reason`, and `transitive-verification-status`). No new code landed in this diff, but the audit confirms that **P23** is well covered by a dual-layer test suite (16 unit tests in `src/commands/propagate.rs`, 7 integration tests in `tests/propagate.rs`) backed by a rich fixture. **`verification-status: "trusted"`** is exercised in both layers as a non-blocking dependency. **`trusted-reason`** has **no probe test that names the field** — merge relies on the generic P10 extension-preservation test only. Doc additions do not require new tests by themselves, but the gap between documented schema fields and named regression tests is worth closing.
+Recent changes rename **translation → mapping**, fix **C8** (duplicate `from` keys now collect into `Vec` instead of last-wins), and extend **P13** merge logic for 1-to-many targets. **P11** (probe-aeneas 1-to-1 generation) and **P12** (strategy priority) remain well covered in `probe-aeneas/src/translate.rs` and were not weakened by the hub changes. **P13** core happy paths are covered by three unit tests in `merge.rs`, including a new 1-to-many edge test and a flipped C8 loader test — but **P13 guard branches** (missing target, duplicate dep skip, explicit to→from path) have **no dedicated tests**, **`load_mappings()` schema rejection** of legacy `"probe/translations"` is untested, and **`tests/merge.rs` has no CLI integration test** for `--mappings`. scip-callgraph UI tests were updated for `showMappingLinks` / `'mapping'` link type.
 
 ## Recent changes vs test coverage
 
-| Commit | Change | Tests added? | Assessment |
-|--------|--------|--------------|------------|
-| `991fa9f` | `feat: add probe propagate-verification-status command (P23)` | Yes — unit + integration + fixture | Covered |
-| `8c6081e` | `feat: add trusted verification-status and trusted-reason field (P21, P22)` | No probe merge/propagate tests for `trusted-reason` | Partial — P23 tests use `trusted` status only |
-| (current) | Docs: transitive scope, `trusted`, `trusted-reason`, `transitive-verification-status` | N/A (docs only) | Existing P23 tests align with documented behavior |
+| Area | Change | Tests added/updated? | Assessment |
+|------|--------|----------------------|------------|
+| `probe/src/types.rs` | `load_mappings()` → `HashMap<String, Vec<String>>`; schema `"probe/mappings"` | `test_duplicate_from_keys_preserved` (loader only) | Partial — C8 fixed at parse layer; no schema-rejection test |
+| `probe/src/commands/merge.rs` | 1-to-many in `merge_atom_maps`; mapping rename | `test_mappings_add_cross_language_edges` (renamed), `test_duplicate_from_keys_preserved`, `test_one_to_many_mapping_produces_multiple_edges` | Partial — happy path + stats; guards untested |
+| `probe-aeneas/src/extract.rs` | `MappingMaps` Vec-based; `setup_translation` helper | Existing enrich tests updated (still 1-to-1) | OK — P11 scope unchanged |
+| `scip-callgraph/web/src/*.test.ts` | `showMappingLinks`, `'mapping'` link type | Updated snapshots/filters | UI layer only; no 1-to-many graph fixture |
+| `tests/merge.rs` | — | None | Gap — no `--mappings` end-to-end |
 
 ## Coverage summary
 
-| Property / field | Tests | Coverage | Notes |
-|------------------|-------|----------|-------|
-| **P23** — reverse-BFS contamination | `src/commands/propagate.rs` (16 unit), `tests/propagate.rs` (7 integration) | **Full** | Chain, diamond, cycles, idempotency, counts, determinism |
-| P23 — `"transitive"` vs `"local"` labeling | `test_leaf_no_deps`, `test_all_deps_verified`, integration `test_transitive_chain_gets_transitive`, `test_caller_of_unverified_is_local` | Full | |
-| P23 — only `"unverified"` / `"failed"` contaminate | `test_one_dep_unverified`, `test_one_dep_failed_contaminates`, `test_explicit_unverified_contaminates_but_missing_does_not` | Full | `"failed"` covered in unit tests; not duplicated in integration fixture |
-| P23 — missing `verification-status` transparent | `test_missing_status_does_not_contaminate`, integration `test_missing_status_does_not_contaminate` | Full | Fixture `plain_rust()` has no status |
-| P23 — `"trusted"` does not block | `test_dep_trusted_does_not_block`, integration `test_trusted_dep_does_not_block` | Full | Fixture `axiom()` is `trusted` |
-| P23 — missing deps treated as trusted | `test_dep_missing_from_map`, integration `test_missing_dep_does_not_block` | Full | Warning text not asserted |
-| P23 — non-verified atoms untouched | `test_non_verified_atoms_untouched`, integration spot-checks on `broken()`, `plain_rust()` | Full | |
-| P23 — cycles without SCC | `test_cycle_all_verified`, `test_cycle_with_unverified_dep`, integration `test_cycle_with_unverified_dep_all_local` | Full | |
-| P14 — deterministic output | `test_deterministic_output` | Partial | Atom-map JSON only; not full pretty-printed CLI envelope |
-| **`transitive-verification-status` field** | All P23 tests above | Full | Field is the direct assertion target |
-| **`verification-status: "trusted"`** (propagate) | `test_dep_trusted_does_not_block`, integration `test_trusted_dep_does_not_block` | Full | Used as dependency semantics, not as labeled atom |
-| **`verification-status: "trusted"`** (merge) | — | **None explicit** | No merge fixture or test asserts `trusted` survives merge |
-| **`trusted-reason`** (merge / P10) | `merge.rs::test_extensions_preserved` (generic extension key) | **Partial** | Generic passthrough only; no test with `trusted-reason` |
-| **`trusted-reason`** (P22 normalization) | — | **None** | `scripts/summarize_extract.py` implements `TRUST_LABELS`; no automated tests in repo |
-| P10 — extensions preserved through merge | `merge.rs::test_extensions_preserved`, `tests/merge.rs` stub-replacement fixtures | Partial | Covers `dependencies-with-locations`, not verification fields |
+| Property | Tests | Coverage | Notes |
+|----------|-------|----------|-------|
+| **P11** — mapping generation 1-to-1 (probe-aeneas) | `probe-aeneas/src/translate.rs`: `test_one_to_one_primary_wins`, `test_does_not_double_claim_lean`, `test_no_duplicate_mappings` | **Full** | Hub merge correctly accepts 1-to-many; generation invariant tested in aeneas only |
+| **P12** — strategy priority (RQN → file+name → file+lines) | `test_strategy_rust_qualified_name`, `test_strategy_file_display_name`, `test_strategy_file_line_overlap`, `test_no_duplicate_mappings` | **Partial** | Each strategy tested in isolation; strategy-1-over-2/3 via `test_no_duplicate_mappings`; no explicit strategy-2-over-3 fixture |
+| **P13** — cross-language edges require existence (core) | `merge.rs::test_mappings_add_cross_language_edges`, `test_one_to_many_mapping_produces_multiple_edges` | **Partial** | Both tests exercise `merge_atom_maps` with existing targets; 1-to-many adds two edges and asserts `mappings_applied == 2` |
+| P13 — 1-to-many per-target independence | `test_one_to_many_mapping_produces_multiple_edges` | **Partial** | Both targets exist; no case where one target missing and one present |
+| P13 — target absent from merged keys → edge NOT added | — | **None** | `key_set.contains(target)` guard has zero regression tests |
+| P13 — dep already present → edge NOT added | — | **None** | `!atom.dependencies.contains(target)` guard untested |
+| P13 — both directions (from→to and to→from) | `test_mappings_add_cross_language_edges`, `test_one_to_many_mapping_produces_multiple_edges` | **Partial** | Both maps populated in fixtures; assertions only on from→to caller path (Rust dep → Lean targets) |
+| **C8** — duplicate `from` keys preserved | `test_duplicate_from_keys_preserved` | **Partial** | Asserts `from_to` Vec has 2 targets; `_to_from` discarded; no merge assertion from file load |
+| C8 — end-to-end via `load_mappings` + merge | — | **None** | `test_one_to_many` builds maps in-memory, bypassing loader |
+| `load_mappings()` — rejects `"probe/translations"` | — | **None** | Schema gate in `types.rs:327` untested |
+| `load_mappings()` — builds bidirectional `to_from` | `test_duplicate_from_keys_preserved` | **None** | `to_from` map never asserted |
+| CLI `probe merge --mappings` | — | **None** | `tests/merge.rs` covers merge without mappings flag |
+| scip-callgraph mapping links | `query.test.ts`, `query.integration.test.ts`, `filters.test.ts` | **Partial** | Filter toggle and link type; integration assumes fixture has mapping links |
 
-## P23 sub-property detail
+## Specific audit questions
 
-Implementation in `src/commands/propagate.rs` matches P23: reverse dependency index, contamination seeded from explicit `"unverified"` / `"failed"`, reverse-BFS through verified callers, labeling only `verification-status: "verified"` atoms, `BTreeMap`/`BTreeSet` for determinism.
+### Does `test_duplicate_from_keys_preserved` properly assert 1-to-many behavior?
 
-**Unit tests** (`src/commands/propagate.rs::tests`): leaf, full chain, failed/unverified contamination, trusted non-blocking, missing dep, transitive chain with deep unverified, diamond, cycle-all-verified, cycle-with-unverified, missing status, mixed explicit-unverified + missing-status, non-verified untouched, idempotency, deterministic serialization, return counts.
+**At the loader layer, yes.** It writes a JSON file with two entries sharing the same `from` key and asserts `from_to["probe:a/1.0/f()"]` contains both targets. This directly regression-tests the C8 fix.
 
-**Integration tests** (`tests/propagate.rs`): end-to-end via `CARGO_BIN_EXE_probe`, fixture `tests/fixtures/propagate_test/atoms.json` encodes verified chain, caller→unverified, trusted axiom, external missing key, untracked callee, cycle touching unverified, envelope preservation (`test_envelope_structure_preserved`).
+**Gaps:** (1) `_to_from` is ignored — bidirectional map accumulation is not verified. (2) The test stops at `load_mappings()` and does not call `merge_atom_maps`, so the file-load → merge pipeline is not covered in one test.
+
+### Does `test_one_to_many_mapping_produces_multiple_edges` cover the edge application path?
+
+**Yes.** It calls `merge_atom_maps` with in-memory 1-to-many maps, two Lean targets present in the merged key set, and a Rust caller depending on the mapped Rust function. It asserts `stats.mappings_applied == 2` and both Lean code-names appear in the caller's `dependencies`. This exercises the `from_to` iteration loop in `merge_atom_maps` (lines 142–147).
+
+### Is there a test for `load_mappings()` rejecting old `"probe/translations"` schema?
+
+**No.** No test in `types.rs`, `merge.rs`, or `tests/` passes a file with `"schema": "probe/translations"` and expects an error.
+
+### Are there tests for bidirectional 1-to-many (both from→to and to→from)?
+
+**No dedicated test.** Existing fixtures set both `from_to` and `to_from`, but callers always depend on the Rust side, so only the `from_to.get(dep)` branch is meaningfully exercised. A scenario where a Lean atom depends on a Lean mapped name and should gain Rust target(s) via `to_from` is missing. A scenario where one `to` maps back to multiple `from` entries in `to_from` is also untested.
+
+### Is there a test for the guard: target doesn't exist in merged keys → edge NOT added?
+
+**No.** No test supplies a mapping target absent from the merged atom map and asserts `mappings_applied == 0` (or that the caller's deps are unchanged). Same gap for the partial 1-to-many case (one target exists, one ghost target).
 
 ## Critical
 
-None. P23 and `transitive-verification-status` have substantive unit and integration coverage; no whole rule is untested.
+None. P11, P12, and P13 each have tests exercising their primary behavior. Gaps are guard branches and integration paths, not wholly untested properties.
 
 ## Warnings
 
-1. **`trusted-reason` not named in any test** — Documented in `docs/SCHEMA.md` and `kb/engineering/schema.md` as a probe-verus/probe-lean field. Probe merge structurally preserves extensions (`test_extensions_preserved`), but there is no regression test that merges atoms carrying `verification-status: "trusted"` **and** `trusted-reason: "axiom"` (or any probe-verus value) and asserts both fields survive stub replacement or multi-file merge. A stub→real replacement scenario would lock P6 + P10 for trust-base atoms.
+1. **P13 guard: missing target untested** — `merge_atom_maps` skips edges when `!key_set.contains(target)` (P13). No test adds a mapping to a non-existent code-name and verifies the edge is omitted and stats unchanged. This is the highest-risk untested branch in the changed code.
 
-2. **`verification-status: "trusted"` not tested through merge** — Propagate tests cover trusted as a dependency that does not contaminate. No merge integration test verifies that a real atom with `trusted` status (from probe-verus/lean output) is retained unchanged in merged output. Low runtime risk given serde flatten + P10, but docs now prominently document the value with no merge-level regression anchor.
+2. **P13 guard: already-present dep untested** — When the mapped target is already in `atom.dependencies`, the edge must not be re-added and `mappings_applied` must not increment. No regression test exists.
+
+3. **`load_mappings()` schema rejection untested** — Files with `"schema": "probe/translations"` should fail with the `"probe/mappings"` error message. Without a test, a silent serde success + wrong schema string could regress undetected.
+
+4. **No CLI integration test for `--mappings`** — All mapping coverage is unit-level in `merge.rs`. `tests/merge.rs` never passes `--mappings` to the binary, so flag wiring, file I/O, and stderr stats printing are unverified end-to-end.
+
+5. **P13 to→from direction not explicitly exercised** — Both mapping tests assert Rust-caller → Lean-target edges only. The `to_from.get(dep)` branch (lines 149–154) lacks a fixture where the dependency key is on the "to" side of the mapping.
 
 ## Info
 
-1. **Property-based testing** — Random DAGs with random contamination seeds (`proptest`/`quickcheck`) would complement the hand-written P23 suite, especially with cycle injection.
+1. **`test_duplicate_from_keys_preserved` should assert `to_from`** — Two duplicate-from entries should produce `to_from[lean.f] = [rust.f]` and `to_from[lean.g] = [rust.f]`. Trivial addition would close bidirectional loader coverage.
 
-2. **Integration: `"failed"` contamination** — Unit test `test_one_dep_failed_contaminates` covers this; the propagate integration fixture has `broken()` as `"unverified"` only. Adding a `"failed"` atom to the fixture would mirror unit coverage at CLI level.
+2. **C8 end-to-end test opportunity** — A single test loading a duplicate-from JSON file and merging with atom fixtures would connect loader + merge in one regression anchor (currently split across two tests with different setup styles).
 
-3. **Integration: stderr warnings** — Missing-dep warnings are printed (`eprintln!`) but integration tests do not assert subprocess stderr contains the documented substring.
+3. **P12 strategy-2-over-3 priority** — No fixture where file+display-name and file+line-overlap both match different Lean atoms for the same Rust atom; lower-priority fallback ordering between strategies 2 and 3 is implicit only.
 
-4. **CLI edge branches** — Default output path, schema-version rejection for non-`2.x`, and missing `data` field are not covered by `tests/propagate.rs`.
+4. **`build_translations_json` schema untested** — probe-aeneas emits `"schema": "probe/mappings"` but no unit test asserts the envelope shape (only generation logic is tested).
 
-5. **Schema validation** — `tests/schema_validation.rs` validates generic extensions (`dependencies-with-locations`) but has no case with `verification-status: "trusted"`, `trusted-reason`, or `transitive-verification-status`. JSON Schema uses passthrough for optional atom fields, so this is low risk but would document the new fields in validation fixtures.
+5. **Property-based testing** — Random mapping graphs with subset of targets present/absent would stress P13 guards and 1-to-many independence more thoroughly than hand-written fixtures.
 
-6. **P22 consumer script** — `scripts/summarize_extract.py` maps tool-specific `trusted-reason` values via `TRUST_LABELS`; no pytest or golden-output test exists in this repo. Normalization logic is untested here (may live in probe-verus/probe-lean repos).
+6. **scip-callgraph 1-to-many** — UI tests verify filter toggle and link type enum rename; no fixture asserts a single Rust node with multiple mapping edges (consumer of hub 1-to-many output).
 
 ## Integration vs unit
 
-- **End-to-end CLI for P23**: Yes — `tests/propagate.rs` runs the real binary, writes output, reloads envelope.
-- **End-to-end CLI for trusted/trusted-reason preservation**: No — `tests/merge.rs` fixtures do not include trust-base fields.
-- **Fixture quality (propagate)**: `tests/fixtures/propagate_test/atoms.json` covers the main P23 scenarios; `axiom()` has `trusted` status but omits `trusted-reason` (optional per schema).
+- **Unit (probe hub)**: Three mapping tests in `merge.rs`; C8 loader test uses tempfile + `load_mappings`.
+- **Integration (probe hub)**: `tests/merge.rs` — 12 tests, none use `--mappings`.
+- **Unit (probe-aeneas)**: P11/P12 in `translate.rs` (20+ tests); enrich path in `extract.rs` uses updated Vec helper but 1-to-1 only.
+- **Integration (scip-callgraph)**: Snapshot-based mapping link count in `query.integration.test.ts`; filter unit tests in `query.test.ts` / `filters.test.ts`.

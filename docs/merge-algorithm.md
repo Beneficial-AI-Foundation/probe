@@ -155,11 +155,11 @@ When merging atoms from different languages:
   purely by code-name string equality.
 
 - **Cross-language stub resolution** (e.g., resolving a Lean stub that corresponds to a
-  Rust atom via Aeneas transpilation) requires a translation mapping file. If a
-  `--translations <file>` argument is provided, the merge tool loads the mapping and
+  Rust atom via Aeneas transpilation) requires a cross-language mapping file. If a
+  `--mappings <file>` argument is provided, the merge tool loads the mapping and
   uses it to add cross-language dependency edges between atoms that represent the same
-  logical function. The translations file format is specified in
-  [translations-spec.md](translations-spec.md).
+  logical function. The mappings file format is specified in
+  [mappings-spec.md](mappings-spec.md).
 
 ## Relationship to probe-verus merge-atoms
 
@@ -172,6 +172,6 @@ This algorithm generalizes probe-verus's `merge-atoms` command. The key differen
 | Data categories | Atoms only | Atoms, specs, and proofs |
 | Languages | Rust only | Any language |
 | Provenance | None | `inputs` array in output envelope |
-| Cross-language | N/A | Same-language by default; translations planned |
+| Cross-language | N/A | Same-language by default; cross-language mappings supported |
 
 The atom merge rules (stub resolution, conflict handling, normalization) are identical.

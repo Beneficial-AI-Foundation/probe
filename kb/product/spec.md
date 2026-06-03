@@ -1,6 +1,6 @@
 ---
 title: Product Specification
-last-updated: 2026-04-07
+last-updated: 2026-06-03
 status: draft
 ---
 
@@ -42,7 +42,7 @@ The probe ecosystem extracts structured data from multi-language verification pr
 **4. Cross-language merging** — Combine data from different languages into a single graph with cross-language dependency edges.
 
 - probe merge: universal composition operator (any language pair)
-- probe-aeneas: generates Rust↔Lean translation mappings for Aeneas-transpiled projects
+- probe-aeneas: generates Rust↔Lean cross-language mappings for Aeneas-transpiled projects
 
 **5. Entrypoint analysis** — Identify which verified functions are API entrypoints (not depended upon by other atoms) vs internal dependencies.
 

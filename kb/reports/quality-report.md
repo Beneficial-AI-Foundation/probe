@@ -1,55 +1,96 @@
 ---
 auditor: code-quality-auditor
-date: 2026-05-20
-scope: docs/verification-statuses.md, docs/SCHEMA.md (doc updates for P23 and trusted status)
-status: 1 critical, 1 warning, 4 info
+date: 2026-06-03
+scope: translation→mapping rename, C8 1-to-many HashMap fix (probe, probe-aeneas, scip-callgraph)
+status: 0 critical, 4 warnings, 6 info
 ---
 
 ## Critical
 
-### C1 — `docs/verification-statuses.md` Color Mapping still contradicts P23 and the new Transitive Verification Status subsection
+*(none)*
 
-The newly added **Transitive Verification Status** table (lines 28–35) correctly documents P23 semantics: `"transitive"` when all reachable deps are verified or trusted, `"local"` when at least one dep is **explicitly** `"unverified"` or `"failed"`, computed by `probe propagate-verification-status` via reverse-BFS contamination, only on verified atoms. This matches `kb/engineering/schema.md` (lines 147–149), **P23**, and `src/commands/propagate.rs`.
-
-However, the **Color Mapping → Verification scope** bullets immediately below (lines 50–53) still define **Transitively verified** as “sorry-free AND all its transitive dependencies are also sorry-free.” Per P23, atoms with **missing** `verification-status` (untracked/Grey) are transparent and do **not** block `"transitive"`; missing deps in the atom map are treated as trusted. A verified atom can therefore be `"transitive"` while depending on plain Rust functions with no status — those deps are not “sorry-free” in the Verus/Lean sense. This contradicts both P23 and the doc’s own new subsection.
-
-The Color Mapping **table rows** for Dark Green / Light Green (lines 57–58) were updated to the correct “explicitly unverified or failed” wording, but the scope bullets were not, leaving an internal contradiction in the same section.
+Implementation satisfies all audited properties (P3, P6, P7, P10, P11–P13, P14, P17, P19). C8 is fixed in code.
 
 ## Warnings
 
-### W1 — Framework-specific color tables still use pre-P23 phrasing
+### [W1] Known-bugs section in `properties.md` is stale — C6, C7, C8 fixed in code but still listed as open
 
-The **Framework-Specific Behavior** tables (Verus lines 107–121, Lean 127–142, Aeneas 161–170) still map Light Green to “transitive deps **not checked**” and Dark Green to “all transitive deps **sorry-free**.” That phrasing implies dependency-status inspection rather than P23’s contamination model (only explicit `"unverified"` / `"failed"` force `"local"`; missing status and missing deps do not). These tables were not updated in this pass and remain inconsistent with the new Transitive Verification Status subsection and with `kb/engineering/properties.md#p23`.
+- **Location**: `kb/engineering/properties.md` lines 239–241
+- **Issue**: The Known bugs section still describes C8 as `load_translations()` last-wins overwrite, C6 as `rqn_to_rust.insert()` overwrite, and C7 as misleading `translation-text`. All three are fixed in the current codebase:
+  - **C8**: `load_mappings()` in `src/types.rs` uses `HashMap<String, Vec<String>>` with `or_default().push()`; covered by `test_duplicate_from_keys_preserved` and `test_one_to_many_mapping_produces_multiple_edges` in `merge.rs`.
+  - **C6**: `strategy_rust_qualified_name` in `probe-aeneas/src/translate.rs` uses `rqn_to_rust: HashMap<String, Vec<String>>` with disambiguation when len > 1.
+  - **C7**: `enrich_with_aeneas_metadata` in `probe-aeneas/src/extract.rs` skips `translation-text` when `start == 0 || end == 0`.
+- **Recommendation**: Move C6/C7/C8 to a "Fixed" subsection (with fix references) or remove them from Known bugs so auditors and implementers do not chase resolved defects.
+
+### [W2] Broken links to removed `translations-spec.md` in probe docs
+
+- **Location**: `README.md` line 20, `docs/merge-algorithm.md` lines 159–162, `docs/UI-VIEWS.md` lines 32/60, `docs/CONSUMER_GUIDE.md` line 153
+- **Issue**: These files link to `docs/translations-spec.md`, which no longer exists. The spec was renamed to `docs/mappings-spec.md` (confirmed present). `docs/SCHEMA.md` and `src/main.rs` already reference the new name; these four files do not.
+- **Recommendation**: Update links and CLI references (`--translations` → `--mappings`) in all four files.
+
+### [W3] Breaking CLI rename not recorded in CHANGELOG
+
+- **Location**: `CHANGELOG.md` `[Unreleased]` section (empty)
+- **Issue**: `--translations` → `--mappings`, schema `probe/translations` → `probe/mappings`, and public type renames (`TranslationMapping` → `Mapping`, etc.) are breaking changes for CLI consumers and probe-aeneas git dep users. No entry under `[Unreleased]`.
+- **Recommendation**: Add `Changed`/`Removed` entries before release; bump semver appropriately (major for CLI flag and schema string).
+
+### [W4] probe-aeneas normative docs still use old type and schema names
+
+- **Location**: `probe-aeneas/docs/architecture.md` lines 40, 130, 145; `probe-aeneas/docs/SCHEMA.md` lines 418, 457, 467, 628
+- **Issue**: Docs reference `TranslationMapping` and "translation entries" where code now uses `probe::types::Mapping` and schema `probe/mappings`.
+- **Recommendation**: Rename type references to `Mapping` and update section headings to match `mappings-spec.md` / `kb/engineering/schema.md#mappings-file-format`.
 
 ## Info
 
-### I1 — Changed sections align with KB and implementation (pass)
+### [I1] Property verification — implementation passes
 
-**`docs/SCHEMA.md` Common Optional Fields** (lines 178–181): The three updated/added rows match `kb/engineering/schema.md` (lines 147–149) verbatim in field names, types, producers, allowed values, and semantics. `verification-status` now lists `"trusted"`; `trusted-reason` values match **P22** (`"admit"`, `"external-body"`, `"assume-specification"` for probe-verus; `"axiom"`, `"external"` for probe-lean); `transitive-verification-status` correctly names `"transitive"` / `"local"`, producer `probe`, and command `probe propagate-verification-status`.
+| Property | Result | Evidence |
+|----------|--------|----------|
+| P3 (stub detection) | Pass | `Atom::is_stub()` checks empty `code-path` and lines 0,0 (`types.rs:108–112`) |
+| P6 (first-wins) | Pass | `merge_atom_maps` keeps base on real-vs-real; stub replacement; tests |
+| P7 (last-wins) | Pass | `merge_generic_maps` overwrites on conflict; tests |
+| P10 (extensions) | Pass | `#[serde(flatten)]` on `Atom.extensions`; `test_extensions_preserved` |
+| P11 (1-to-1 generation) | Pass | `matched_rust` / `matched_lean` HashSets in `generate_translations` |
+| P12 (strategy priority) | Pass | Strategies 1→2→3 called in order in `translate.rs:144–171` |
+| P13 (cross-lang edges) | Pass | Both `from_to` and `to_from` iterated; existence + dedup checks (`merge.rs:141–155`) |
+| P14 (deterministic output) | Pass | `BTreeMap`/`BTreeSet` for merged atoms and dependencies |
+| P17 (category consistency) | Pass | `cmd_merge` rejects mixed categories (`merge.rs:297–306`) |
+| P19 (no cross-repo path deps) | Pass | `probe/Cargo.toml` has no `../` path deps; probe-aeneas uses `git = "..."` for probe |
 
-**Staleness check (changed sections only)**: Command name matches Clap subcommand `PropagateVerificationStatus` → `propagate-verification-status` in `src/main.rs`. Field names match `extensions` keys in `src/commands/propagate.rs`. No version or schema-name references appear in the changed table rows; no staleness found there.
+### [I2] C8 fix verified — duplicate `from` keys collect all targets
 
-**Implementation match**: Documented behavior in both changed files matches `propagate_verification_status()` — reverse-BFS over verified atoms, contamination seeded only from `"unverified"` / `"failed"`, `"trusted"` and missing status transparent, missing map entries treated as trusted with warnings, `"transitive-verification-status"` set only on `"verified"` atoms.
+- **Location**: `src/types.rs:335–347`, `src/commands/merge.rs:1078–1160`
+- **Issue**: *(resolved)* Previously `HashMap<String, String>` caused last-wins on duplicate `from` keys. Now `or_default().push()` preserves all targets; merge iterates the Vec and adds each existing target as a dependency. Tests `test_duplicate_from_keys_preserved` and `test_one_to_many_mapping_produces_multiple_edges` cover load and merge paths.
 
-### I2 — Glossary gaps for transitive scope vocabulary
+### [I3] `probe/src/` free of stale "translation" identifiers
 
-`kb/engineering/glossary.md` defines [trusted (verification-status)](../engineering/glossary.md#trusted-verification-status) and trust-base concepts but has no entries for `transitive-verification-status`, `"transitive"` / `"local"` scope values, or “reverse-BFS contamination.” The new docs use `"transitive"` / `"local"` consistently with P23 and the schema table; glossary coverage would help cross-doc terminology alignment.
+- **Location**: `rg 'translation' src/` in probe
+- **Issue**: No matches. Rename to `Mapping`, `MappingsFile`, `load_mappings`, `mappings_applied`, `--mappings` is complete in hub source.
 
-### I3 — New subsection lacks KB cross-links
+### [I4] Schema string migration complete in active code paths
 
-The Transitive Verification Status subsection names the CLI command and field but does not link to `kb/engineering/properties.md#p23` or the `transitive-verification-status` row in `kb/engineering/schema.md`. Low severity because content is correct; links would anchor human-facing docs to the normative spec.
+- **Location**: `rg 'probe/translations'` across probe, probe-aeneas, scip-callgraph
+- **Issue**: No matches in source or active docs. One historical hit in `probe-aeneas/CHANGELOG.md` line 264 (release note for an older version) — acceptable as changelog history.
 
-### I4 — JSON Schema file still omits new optional fields
+### [I5] Glossary-consistent naming split is intentional
 
-`docs/SCHEMA.md` (line 465) references `schemas/atom-envelope.schema.json` as the machine-readable contract. That schema has no definitions for `transitive-verification-status` or `trusted-reason` (grep). The updated Common Optional Fields table is correct; the JSON Schema lag is pre-existing documentation drift unrelated to this edit’s table content.
+- **Location**: glossary `cross-language mapping` vs atom extensions `translation-name`/`translation-path`/`translation-text`
+- **Issue**: Generic linking concept renamed to "mapping" in merge/KB; Aeneas-specific atom metadata and probe-aeneas internal names (`generate_translations`, `run_extract_with_translations`) retain "translation" for the Rust→Lean transpilation domain. scip-callgraph bridges this: reads `translation-name` from atoms, exposes `mapping_id` / `LinkType 'mapping'` in the UI. Consistent with glossary.
+
+### [I6] Minor KB index phrasing drift
+
+- **Location**: `kb/index.md` line 37
+- **Issue**: Still says "translation application" for probe-merge; should say "mapping application" to match `probe-merge.md` and glossary.
 
 ## Summary
 
 | Check | Result |
 |-------|--------|
-| `docs/SCHEMA.md` changed rows vs `kb/engineering/schema.md` | **Pass** — no contradictions |
-| `docs/verification-statuses.md` new subsection vs P23 / `propagate.rs` | **Pass** — correct values, field names, command, algorithm name |
-| `trusted` / `trusted-reason` vs P22 and glossary | **Pass** |
-| Command / field staleness in changed sections | **Pass** |
-| Internal doc consistency (`verification-statuses.md`) | **Fail** — Color Mapping scope bullets and framework tables still contradict P23 (C1, W1) |
-| Glossary terminology | **Info** — transitive scope terms not yet in glossary |
+| P3, P6, P7, P10, P11–P13, P14, P17, P19 | **Pass** |
+| C8 (duplicate `from` keys) | **Fixed** — Vec-based maps + tests |
+| C6 (RQN collision) | **Fixed** in probe-aeneas (KB not updated) |
+| C7 (translation-text 0,0) | **Fixed** in probe-aeneas enrich (KB not updated) |
+| Architecture boundaries (probe vs probe-aeneas) | **Pass** — generation in aeneas, application in merge |
+| `probe/src/` rename completeness | **Pass** |
+| `probe/translations` schema staleness | **Pass** in code; historical CHANGELOG only |
+| Documentation staleness | **Partial** — 4 probe docs with broken links; probe-aeneas SCHEMA/architecture; properties.md known bugs; empty CHANGELOG |

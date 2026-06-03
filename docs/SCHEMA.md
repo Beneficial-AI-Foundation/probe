@@ -316,9 +316,9 @@ Spec/proof merge rules (last-wins):
 The full merge algorithm, including normalization, envelope handling, and cross-language
 considerations, is specified in [merge-algorithm.md](merge-algorithm.md).
 
-Cross-language merging requires a translations file that maps code-names between
-languages. The translations file format is specified in
-[translations-spec.md](translations-spec.md).
+Cross-language merging requires a mappings file that maps code-names between
+languages. The mappings file format is specified in
+[mappings-spec.md](mappings-spec.md).
 
 ## Complete Example
 

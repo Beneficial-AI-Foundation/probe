@@ -17,7 +17,7 @@ This repository contains:
 - [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
 - [docs/merge-algorithm.md](docs/merge-algorithm.md) -- Merge algorithm specification
-- [docs/translations-spec.md](docs/translations-spec.md) -- Cross-language translation file format
+- [docs/mappings-spec.md](docs/mappings-spec.md) -- Cross-language mapping file format
 - [docs/categorical-framework.md](docs/categorical-framework.md) -- Categorical/algebraic structure of probe merge
 - [docs/extract-check-design.md](docs/extract-check-design.md) -- Design of the extract-check validation tool
 - [probe-extract-check/TESTING.md](probe-extract-check/TESTING.md) -- Test guide for probe-extract-check

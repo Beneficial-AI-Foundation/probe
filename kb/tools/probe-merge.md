@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe (merge operator)"
-last-updated: 2026-03-19
+last-updated: 2026-06-03
 status: draft
 ---
 
@@ -20,9 +20,9 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 
 | File | Purpose |
 |------|---------|
-| `src/types.rs` | `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, `load_envelope()`, `load_translations()` |
+| `src/types.rs` | `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, `load_envelope()`, `load_mappings()` |
 | `src/commands/merge.rs` | `merge_atom_maps()`, `merge_generic_maps()`, `normalize_atoms()`, `cmd_merge()` |
-| `src/main.rs` | CLI: `probe merge <file1> <file2> [--output] [--translations]` |
+| `src/main.rs` | CLI: `probe merge <file1> <file2> [--output] [--mappings]` |
 
 ## Merge algorithm detail
 
@@ -43,11 +43,12 @@ Strip trailing `.` from all code-name keys and dependency references. This handl
 - **Atoms**: `merge_atom_maps()` — first-wins with [stub](../engineering/glossary.md#stub) replacement. See [P6](../engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement).
 - **Specs/Proofs**: `merge_generic_maps()` — last-wins. See [P7](../engineering/properties.md#p7-specsproofs-merge-is-last-wins).
 
-### Phase 4: Apply translations (optional)
+### Phase 4: Apply cross-language mappings (optional)
 
-When `--translations <file>` is provided, for each atom's dependencies:
-- Look up each dependency in both directions of the translation map
-- If a translated code-name exists in the merged key set and isn't already a dependency, add it
+When `--mappings <file>` is provided, for each atom's dependencies:
+- Look up each dependency in both directions of the mapping (from→to and to→from)
+- Each source may map to multiple targets (1-to-many)
+- If a mapped code-name exists in the merged key set and isn't already a dependency, add it
 - See [P13](../engineering/properties.md#p13-cross-language-edges-require-existence)
 
 ### Phase 5: Write output
@@ -66,7 +67,7 @@ After merging, the tool prints:
 | New entries added | yes | yes |
 | Keys normalized | yes | yes |
 | Conflicts | yes (real-vs-real, base kept) | yes (overrides, incoming kept) |
-| Translations applied | yes (if `--translations`) | — |
+| Mappings applied | yes (if `--mappings`) | — |
 
 ## Categorical framework
 
@@ -92,6 +93,6 @@ Used in probe-rust and probe-verus test suites.
 | Categories | Atoms only | Atoms, specs, proofs |
 | Languages | Rust only | Any |
 | Provenance | None | `inputs` array |
-| Cross-language | N/A | Via `--translations` |
+| Cross-language | N/A | Via `--mappings` |
 
 Merge rules (stub resolution, conflict handling, normalization) are identical.

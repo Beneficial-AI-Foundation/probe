@@ -1,6 +1,6 @@
 ---
 title: Architecture
-last-updated: 2026-04-03
+last-updated: 2026-06-03
 status: draft
 ---
 
@@ -17,7 +17,7 @@ probe/           Central hub — schema types, merge operator, extract-check val
 probe-rust/      Rust call graph extraction via rust-analyzer + SCIP
 probe-verus/     Verus/Rust analysis: call graphs + specs + verification status
 probe-lean/      Lean 4 dependency graphs + sorry detection (written in Lean)
-probe-aeneas/    Cross-language bridge: generates Rust↔Lean translation mappings
+probe-aeneas/    Cross-language bridge: generates Rust↔Lean mappings
 ```
 
 ### probe (central hub)
@@ -25,7 +25,7 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean translation mappin
 **Role**: Defines the canonical [Schema 2.0](schema.md) types and the universal `merge` operator.
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
-- `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--translations`
+- `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--mappings`
 - `src/commands/summary.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies
 - `probe-extract-check/` — Validator that checks extract JSON against actual source code
 
@@ -89,17 +89,17 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean translation mappin
 
 ### probe-aeneas
 
-**Role**: Bridge between Rust and Lean for Aeneas-transpiled projects. Generates cross-language translation mappings, then delegates merging to `probe merge`.
+**Role**: Bridge between Rust and Lean for Aeneas-transpiled projects. Generates cross-language mappings via translation matching, then delegates merging to `probe merge`.
 
 **Pipeline** (`extract` command, typically `probe-aeneas extract <project_path>`):
 1. If positional project path given, parse `aeneas-config.yml` to resolve Rust crate (`crate.dir`) and Lean project (project root); otherwise use explicit `--rust-project` / `--lean-project` flags
 2. Auto-run probe-rust and probe-lean in parallel (scoped threads)
 3. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
-4. Generate translations via three-strategy matching (see [properties.md](properties.md#p12-translation-strategy-priority))
-5. Call `probe::merge::merge_atom_maps` with translations
+4. Generate mappings via three-strategy translation matching (see [properties.md](properties.md#p12-mapping-strategy-priority))
+5. Call `probe::merge::merge_atom_maps` with mappings
 6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `is-disabled`, `is-relevant`, `is-public`)
 
-**Key insight**: probe-aeneas is a *[functor](glossary.md#functor) factory*. It produces the [translation mapping](glossary.md#translation-mapping); `probe merge` applies it. Domain knowledge about [Aeneas](glossary.md#aeneas) lives here; generic composition lives in probe. (The algebraic structure is detailed in `probe/docs/categorical-framework.md`, a non-normative design document.)
+**Key insight**: probe-aeneas is a *[functor](glossary.md#functor) factory*. It produces the [cross-language mapping](glossary.md#cross-language-mapping); `probe merge` applies it. Domain knowledge about [Aeneas](glossary.md#aeneas) lives here; generic composition lives in probe. (The algebraic structure is detailed in `probe/docs/categorical-framework.md`, a non-normative design document.)
 
 **Subcommands**: `extract`, `translate`, `listfuns`
 
@@ -117,7 +117,7 @@ Target Projects (Rust, Lean, Verus)
     ├── probe-aeneas extract ────→ aeneas_atoms.json   (merge + translate Rust↔Lean)
     │       │
     │       ├─ runs probe-rust and probe-lean in parallel
-    │       ├─ generates translations from functions.json
+    │       ├─ generates mappings from functions.json
     │       └─ calls probe merge internally
     │
     └── probe merge ─────────────→ merged_atoms.json   (generic cross-tool merge)
@@ -148,7 +148,7 @@ target-project/.verilib/
     lean_<package>_<version>.json      # probe-lean output
   views/
     molecule_all.json                  # Filtered projections
-  translations/
+  mappings/
     verus_<pkg>__lean_<pkg>.json       # Cross-language mappings
   config.json                          # User/project configuration
 ```

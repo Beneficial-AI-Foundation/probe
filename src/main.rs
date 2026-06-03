@@ -34,13 +34,13 @@ enum Commands {
         #[arg(short, long, default_value = "merged.json")]
         output: PathBuf,
 
-        /// Translations file for cross-language atom matching.
+        /// Mappings file for cross-language atom matching.
         ///
         /// Maps code-names between languages (e.g., Rust ↔ Lean) so that
         /// the merge can add cross-language dependency edges. See
-        /// docs/translations-spec.md for the file format.
+        /// docs/mappings-spec.md for the file format.
         #[arg(short, long)]
-        translations: Option<PathBuf>,
+        mappings: Option<PathBuf>,
     },
 
     /// Enrich verification status through the dependency graph.
@@ -94,9 +94,9 @@ fn main() {
         Commands::Merge {
             inputs,
             output,
-            translations,
+            mappings,
         } => {
-            probe::commands::merge::cmd_merge(inputs, output, translations);
+            probe::commands::merge::cmd_merge(inputs, output, mappings);
         }
         Commands::Enrich { input, output } => {
             probe::commands::propagate::cmd_enrich(&input, output.as_deref());

@@ -286,14 +286,14 @@ pub type GenericLoadResult = (
 );
 
 // ---------------------------------------------------------------------------
-// Translations
+// Cross-language mappings
 // ---------------------------------------------------------------------------
 
-// @kb: kb/engineering/schema.md#translations-file-format
-// @kb: kb/engineering/properties.md#p11-translation-mapping-is-1-to-1
-/// A single mapping entry in a translations file.
+// @kb: kb/engineering/schema.md#mappings-file-format
+// @kb: kb/engineering/properties.md#p11-mapping-generation-is-1-to-1-probe-aeneas
+/// A single entry in a cross-language mappings file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TranslationMapping {
+pub struct Mapping {
     pub from: String,
     pub to: String,
     pub confidence: String,
@@ -301,52 +301,49 @@ pub struct TranslationMapping {
     pub method: Option<String>,
 }
 
-/// A translations file mapping code-names between languages.
+/// A cross-language mappings file linking code-names between languages.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TranslationsFile {
+pub struct MappingsFile {
     pub schema: String,
     #[serde(rename = "schema-version")]
     pub schema_version: String,
-    pub mappings: Vec<TranslationMapping>,
+    pub mappings: Vec<Mapping>,
 }
 
-/// Load a translations file and build bidirectional lookup maps.
+/// Load a mappings file and build bidirectional lookup maps.
 ///
-/// Returns two maps: `from → to` and `to → from`.
+/// Returns two maps: `from → [to₁, to₂, …]` and `to → [from₁, from₂, …]`.
+/// A single `from` key may map to multiple `to` targets (1-to-many).
 #[allow(clippy::type_complexity)]
-pub fn load_translations(
+pub fn load_mappings(
     path: &std::path::Path,
-) -> Result<(HashMap<String, String>, HashMap<String, String>), String> {
+) -> Result<(HashMap<String, Vec<String>>, HashMap<String, Vec<String>>), String> {
     let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read translations {}: {e}", path.display()))?;
+        .map_err(|e| format!("Failed to read mappings {}: {e}", path.display()))?;
 
-    let file: TranslationsFile = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse translations {}: {e}", path.display()))?;
+    let file: MappingsFile = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse mappings {}: {e}", path.display()))?;
 
-    if file.schema != "probe/translations" {
+    if file.schema != "probe/mappings" {
         return Err(format!(
-            "{}: expected schema \"probe/translations\", got \"{}\"",
+            "{}: expected schema \"probe/mappings\", got \"{}\"",
             path.display(),
             file.schema
         ));
     }
 
-    let mut from_to = HashMap::new();
-    let mut to_from = HashMap::new();
+    let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+    let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
 
     for mapping in &file.mappings {
-        if let Some(prev) = from_to.insert(mapping.from.clone(), mapping.to.clone()) {
-            eprintln!(
-                "Warning: duplicate translation 'from' key {:?}: {:?} -> {:?} (was {:?})",
-                mapping.from, mapping.from, mapping.to, prev
-            );
-        }
-        if let Some(prev) = to_from.insert(mapping.to.clone(), mapping.from.clone()) {
-            eprintln!(
-                "Warning: duplicate translation 'to' key {:?}: {:?} -> {:?} (was {:?})",
-                mapping.to, mapping.to, mapping.from, prev
-            );
-        }
+        from_to
+            .entry(mapping.from.clone())
+            .or_default()
+            .push(mapping.to.clone());
+        to_from
+            .entry(mapping.to.clone())
+            .or_default()
+            .push(mapping.from.clone());
     }
 
     Ok((from_to, to_from))

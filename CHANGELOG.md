@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING**: CLI flag `--translations` renamed to `--mappings` for `probe merge`
+- **BREAKING**: Schema string `probe/translations` renamed to `probe/mappings`
+- **BREAKING**: Public types renamed: `TranslationMapping` → `Mapping`, `TranslationsFile` → `MappingsFile`, `load_translations()` → `load_mappings()`
+- `probe merge` now supports 1-to-many mappings: a single `from` key can map to multiple `to` targets
+- Terminology: generic cross-language linking concept renamed from "translation" to "mapping" across KB, docs, and code; "translation" retained for Aeneas-specific transpilation context
+
+### Fixed
+- C8: Duplicate `from` keys in mapping files no longer silently overwrite (last-wins); all targets are now collected and applied
+- Known bugs C6 (RQN collision in probe-aeneas) and C7 (misleading translation-text for 0,0 lines) marked as resolved in properties.md
+
 ## [0.2.0] - 2026-05-21
 
 ### Added

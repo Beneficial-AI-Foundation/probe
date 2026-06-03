@@ -1,12 +1,12 @@
-# Probe Translations Specification
+# Probe Mappings Specification
 
 Version: draft
-Date: 2026-03-12
+Date: 2026-06-03
 Parent document: [SCHEMA.md](SCHEMA.md)
 
-This document specifies the translations file format used by `probe merge` to match
-code-names across languages. Translations enable cross-language merging where the same
-logical function has different code-names in different probe outputs (e.g., a Rust
+This document specifies the cross-language mappings file format used by `probe merge`
+to match code-names across languages. Mappings enable cross-language merging where the
+same logical function has different code-names in different probe outputs (e.g., a Rust
 function atomized by probe-verus and its Lean counterpart extracted by probe-lean).
 
 ## Motivation
@@ -17,21 +17,24 @@ code-names:
 - **Rust (probe-verus)**: `probe:curve25519-dalek/4.1.3/field/u64/serial/backend/FieldElement51<[u64;/5]>#reduce()`
 - **Lean (probe-lean)**: `probe:curve25519_dalek.backend.serial.u64.field.FieldElement51.reduce`
 
-These cannot be matched by string equality. A translations file provides the explicit
+These cannot be matched by string equality. A mappings file provides the explicit
 mapping between code-names so that `probe merge` can link them.
+
+A single `from` key may map to multiple `to` targets (1-to-many), enabling scenarios
+where one implementation corresponds to several formal constructs.
 
 ## File Format
 
-A translations file is a Schema 2.0 JSON document with the following envelope:
+A mappings file is a Schema 2.0 JSON document with the following envelope:
 
 ```json
 {
-  "schema": "probe/translations",
+  "schema": "probe/mappings",
   "schema-version": "2.0",
   "tool": {
-    "name": "generate-translations",
-    "version": "0.1.0",
-    "command": "generate"
+    "name": "probe-aeneas",
+    "version": "0.10.0",
+    "command": "translate"
   },
   "timestamp": "2026-03-12T14:00:00Z",
   "sources": {
@@ -61,7 +64,7 @@ A translations file is a Schema 2.0 JSON document with the following envelope:
 
 #### `schema` (string, required)
 
-Must be `"probe/translations"`.
+Must be `"probe/mappings"`.
 
 #### `schema-version` (string, required)
 
@@ -69,7 +72,7 @@ Must be `"2.0"`.
 
 #### `tool` (object, required)
 
-Metadata about the tool that generated the translations file. Same structure as
+Metadata about the tool that generated the mappings file. Same structure as
 other probe envelopes.
 
 #### `timestamp` (string, required)
@@ -78,18 +81,19 @@ ISO 8601 timestamp.
 
 #### `sources` (object, required)
 
-Describes what the translations connect:
+Describes what the mappings connect:
 
-- `from` (object, required): The source side of translations.
+- `from` (object, required): The source side of mappings.
   - `schema` (string): Schema of the source atoms file.
   - `package` (string): Package name of the source.
   - `package-version` (string): Version of the source package.
-- `to` (object, required): The target side of translations.
+- `to` (object, required): The target side of mappings.
   - Same fields as `from`.
 
 #### `mappings` (array of objects, required)
 
-Each entry maps one code-name to another.
+Each entry maps one code-name to another. Multiple entries with the same `from`
+key are allowed (1-to-many).
 
 ### Mapping Entry Fields
 
@@ -109,55 +113,57 @@ How the mapping was established:
 | Value | Meaning |
 |-------|---------|
 | `exact` | Matched via rust-qualified-name or equivalent deterministic key |
+| `exact-disambiguated` | Matched via rust-qualified-name with file/line disambiguation |
 | `file-and-name` | Matched via same source file + display-name overlap |
 | `file-and-lines` | Matched via same source file + overlapping line ranges |
 | `heuristic` | Matched via fuzzy heuristics (lower confidence) |
+| `manual` | Manually authored mapping |
 
 #### `method` (string, optional)
 
 A finer description of the matching method used. Examples:
-`"rust-qualified-name"`, `"file+display-name"`, `"file+line-overlap"`.
+`"rust-qualified-name"`, `"file+display-name"`, `"file+line-overlap"`, `"manual"`.
 
 ## Semantics
 
-Translations are **bidirectional**: if `from → to` exists, the merge tool treats
+Mappings are **bidirectional**: if `from → to` exists, the merge tool treats
 the two code-names as representing the same logical entity.
 
-When `probe merge --translations <file>` processes an atom merge:
+When `probe merge --mappings <file>` processes an atom merge:
 
-1. Load the translations file and build a bidirectional lookup table.
-2. During merge, when an atom from file A has a dependency on code-name X, and
-   X has a translation to Y in file B, the merge tool can:
-   - Replace stub X with the real atom Y (cross-language stub resolution).
-   - Add Y as an additional dependency edge (cross-language linking).
-3. The merged output retains both atoms (Rust and Lean) as separate entries
-   with their original code-names, but dependency edges now cross the language
-   boundary.
+1. Load the mappings file and build bidirectional lookup tables (`from→[to₁,to₂,…]`
+   and `to→[from₁,from₂,…]`).
+2. During merge, when an atom has a dependency on code-name X, and X has mappings
+   to Y₁, Y₂, … the merge tool adds each Yᵢ as an additional dependency edge
+   (provided Yᵢ exists in the merged key set and isn't already a dependency).
+3. The merged output retains all atoms as separate entries with their original
+   code-names, but dependency edges now cross the language boundary.
 
 ## Folder Convention
 
-Translations files live in `.verilib/translations/` with the naming convention:
+Mappings files live in `.verilib/mappings/` with the naming convention:
 
 ```
 <from_tool>_<from_package>__<to_tool>_<to_package>.json
 ```
 
-Example: `rust_curve25519-dalek__lean_Curve25519Dalek.json`
+Example: `lean_SecureMessaging__rust_libsignal-protocol.json`
 
 ## Generation
 
-Translations can be generated by any tool that has access to both probe outputs
+Mappings can be generated by any tool that has access to both probe outputs
 and a mapping source. Common approaches:
 
-1. **`rust-qualified-name` matching**: If probe-rust atoms include the
+1. **probe-aeneas `translate`**: Automated three-strategy matching for
+   Aeneas-transpiled projects (generates 1-to-1 mappings).
+
+2. **Manual authoring**: For cross-language linking where no transpilation
+   relationship exists (e.g., mapping Rust implementations to Lean formal
+   specifications of the same protocol).
+
+3. **`rust-qualified-name` matching**: If probe-rust atoms include the
    `rust-qualified-name` extension field, join with `functions.json` (which maps
    `rust_name` to `lean_name`) and then to probe-lean code-names.
 
-2. **File + line matching**: Match atoms that share the same `code-path` (Rust
+4. **File + line matching**: Match atoms that share the same `code-path` (Rust
    source file) and have overlapping or nearby line ranges.
-
-3. **Aeneas sidecar**: If Aeneas produces a structured `lean-to-rust.json`
-   mapping, use it directly.
-
-The `generate-translations` script in the curve25519-dalek-lean-verify repository
-provides a reference implementation.
