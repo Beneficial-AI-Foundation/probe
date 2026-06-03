@@ -35,6 +35,7 @@ How the system is built. Architecture, schema contract, invariants.
 Per-tool specifics — what each tool does differently from the common patterns.
 
 - **[probe-merge.md](tools/probe-merge.md)** — Merge algorithm, schema category detection, mapping application
+- **[probe-project.md](tools/probe-project.md)** — Graph projection from mapping seeds with BFS expansion
 - **[probe-summary.md](tools/probe-summary.md)** — Entrypoint/verified-dependency partitioning of atom files
 - **[probe-rust.md](tools/probe-rust.md)** — Rust extraction: SCIP pipeline, trait disambiguation, syn spans
 - **[probe-verus.md](tools/probe-verus.md)** — Verus extraction: dual AST parsing, spec taxonomy, verification status

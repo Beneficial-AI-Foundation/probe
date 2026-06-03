@@ -8,7 +8,7 @@ status: draft
 
 **Directory**: `baif/probe/`
 **Role**: Central hub — defines [Schema 2.0](../engineering/schema.md) types and the universal merge operator.
-**Subcommands**: `merge`
+**Subcommands**: `merge`, `project`, `enrich`, `summary`
 
 ## What this tool does
 

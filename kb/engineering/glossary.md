@@ -151,6 +151,18 @@ probe-verus and probe-aeneas run enrichment as the last step of `extract` (skipp
 
 The set of declarations in a verified project that are assumed correct without proof. In probe-lean: axioms and hand-written models in `*External.lean` files. In probe-verus: `admit()` axioms, `#[verifier::external_body]` functions, and `assume_specification` targets. Both tools mark these with `verification-status: "trusted"` and a `trusted-reason` for classification. Everything outside the trust base must be proven (or is `"unverified"` / `"failed"`).
 
+## projection
+
+A focused subgraph extracted from an [atom](#atom) file by `probe project`. The [seed set](#seed-set) is derived from a [cross-language mapping](#cross-language-mapping) file, then expanded via BFS (forward for callees, backward for callers) with configurable depth. Dependencies pointing outside the projected subgraph are trimmed. See [probe-project.md](../tools/probe-project.md).
+
+## seed set
+
+The initial set of [code-names](#code-name) from which a [projection](#projection) expands. Composed of all `from` and `to` endpoints in a [cross-language mapping](#cross-language-mapping) file, filtered to keys present in the input [atom](#atom) data. Seeds that don't exist in the data are silently skipped.
+
+## focus-set
+
+A JSON file produced by `probe project --emit-focus`, containing an array of [code-names](#code-name) (`focus_nodes`) representing the [projected](#projection) subgraph. Compatible with scip-callgraph's `?focus=` URL parameter for highlighting or filtering nodes in the viewer. See [probe-project.md](../tools/probe-project.md#focus-set-emission).
+
 ## probe-extract-check
 
 A validator tool (inside `probe/probe-extract-check/`) that checks extract JSON output against actual source code. Verifies that code-paths exist, line ranges are valid, and atom metadata is consistent with source.

@@ -43,6 +43,39 @@ enum Commands {
         mappings: Option<PathBuf>,
     },
 
+    /// Project a subgraph from a merged atom file using mapping seeds.
+    ///
+    /// Reads a Schema 2.0 atom file and a mappings file, uses all mapping
+    /// endpoints (from + to) as seeds, then expands via BFS: forward
+    /// (callees) and backward (callers) with separate depth controls.
+    /// Outputs a trimmed atom file containing only the projected subgraph.
+    // @kb: kb/tools/probe-project.md
+    Project {
+        /// Input atom file (merged or single-tool).
+        #[arg(required = true)]
+        input: PathBuf,
+
+        /// Mappings file — seeds are all `from` and `to` code-names.
+        #[arg(short, long, required = true)]
+        mappings: PathBuf,
+
+        /// Forward BFS depth: follow callees from seeds (default = 2).
+        #[arg(long, default_value = "2")]
+        forward_depth: usize,
+
+        /// Reverse BFS depth: follow callers of seeds (default = 0).
+        #[arg(long, default_value = "0")]
+        reverse_depth: usize,
+
+        /// Output file path.
+        #[arg(short, long, default_value = "projected.json")]
+        output: PathBuf,
+
+        /// Also emit a focus-set JSON for scip-callgraph ?focus= param.
+        #[arg(long)]
+        emit_focus: bool,
+    },
+
     /// Enrich verification status through the dependency graph.
     ///
     /// Reads a Schema 2.0 atom file, walks the dependency graph, and
@@ -97,6 +130,23 @@ fn main() {
             mappings,
         } => {
             probe::commands::merge::cmd_merge(inputs, output, mappings);
+        }
+        Commands::Project {
+            input,
+            mappings,
+            forward_depth,
+            reverse_depth,
+            output,
+            emit_focus,
+        } => {
+            probe::commands::project::cmd_project(
+                input,
+                mappings,
+                forward_depth,
+                reverse_depth,
+                output,
+                emit_focus,
+            );
         }
         Commands::Enrich { input, output } => {
             probe::commands::propagate::cmd_enrich(&input, output.as_deref());

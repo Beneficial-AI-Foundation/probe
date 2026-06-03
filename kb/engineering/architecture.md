@@ -26,10 +26,11 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean mappings
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
 - `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--mappings`
+- `src/commands/project.rs` — Graph projection: BFS expansion from mapping seeds with separate forward/reverse depth
 - `src/commands/summary.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies
 - `probe-extract-check/` — Validator that checks extract JSON against actual source code
 
-**Subcommands**: `merge`, `summary`
+**Subcommands**: `merge`, `project`, `enrich`, `summary`
 
 **Dependencies**: None (leaf crate).
 
@@ -121,6 +122,8 @@ Target Projects (Rust, Lean, Verus)
     │       └─ calls probe merge internally
     │
     └── probe merge ─────────────→ merged_atoms.json   (generic cross-tool merge)
+            │
+            └── probe project ───→ projected_atoms.json (subgraph via mapping seeds)
 
 All JSON → scip-callgraph (web UI consumer)
 ```

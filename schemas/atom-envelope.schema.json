@@ -31,7 +31,7 @@
 
     "mergedAtomsEnvelope": {
       "type": "object",
-      "description": "Envelope for a merged atom file produced by probe merge-atoms.",
+      "description": "Envelope for merged or projected atom files (probe merge, probe project).",
       "properties": {
         "schema": {
           "type": "string",
@@ -41,7 +41,7 @@
         "tool": { "$ref": "#/$defs/tool" },
         "inputs": {
           "type": "array",
-          "description": "Provenance: one entry per input file that was merged.",
+          "description": "Provenance: one entry per input source (≥2 for merge, ≥1 for project).",
           "items": {
             "type": "object",
             "properties": {
@@ -51,7 +51,22 @@
             "required": ["schema", "source"],
             "additionalProperties": false
           },
-          "minItems": 2
+          "minItems": 1
+        },
+        "projection": {
+          "type": "object",
+          "description": "Present when produced by probe project. Contains projection parameters and statistics.",
+          "properties": {
+            "mappings-file": { "type": "string" },
+            "seeds": { "type": "integer", "minimum": 0 },
+            "forward-depth": { "type": "integer", "minimum": 0 },
+            "reverse-depth": { "type": "integer", "minimum": 0 },
+            "atoms-in": { "type": "integer", "minimum": 0 },
+            "atoms-out": { "type": "integer", "minimum": 0 },
+            "deps-trimmed": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["mappings-file", "seeds", "forward-depth", "reverse-depth", "atoms-in", "atoms-out", "deps-trimmed"],
+          "additionalProperties": false
         },
         "timestamp": { "$ref": "#/$defs/timestamp" },
         "data": { "$ref": "#/$defs/atomDictionary" }

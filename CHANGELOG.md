@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `probe project` subcommand: extract a focused subgraph from an atom file using cross-language mapping seeds with BFS expansion (separate `--forward-depth` and `--reverse-depth` controls)
+- `--emit-focus` flag on `probe project` to produce a companion focus-set JSON compatible with scip-callgraph `?focus=` parameter
+- KB tool spec: `kb/tools/probe-project.md`
+
 ### Changed
 - **BREAKING**: CLI flag `--translations` renamed to `--mappings` for `probe merge`
 - **BREAKING**: Schema string `probe/translations` renamed to `probe/mappings`

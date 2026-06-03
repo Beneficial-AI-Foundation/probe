@@ -270,6 +270,26 @@ Confidence levels: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-li
 
 See also: [mappings-spec.md](../../docs/mappings-spec.md) for the full format specification and [ADR-003](../decisions/003-mappings-design.md) for design rationale.
 
+## Projection metadata
+
+When `probe project` produces output, it reuses the `probe/merged-atoms` schema but adds a `projection` metadata block at the envelope level:
+
+```json
+{
+  "projection": {
+    "mappings-file": "mappings.json",
+    "seeds": 10,
+    "forward-depth": 3,
+    "reverse-depth": 0,
+    "atoms-in": 1261,
+    "atoms-out": 67,
+    "deps-trimmed": 42
+  }
+}
+```
+
+This field is accommodated by `additionalProperties: true` on the merged envelope and is ignored by consumers that don't know about it. See [probe-project.md](../tools/probe-project.md) for full details.
+
 ## Versioning
 
 - **Major** (e.g. 2.0 → 3.0): Changes to required fields, field semantics, or field removals
