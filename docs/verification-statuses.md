@@ -54,7 +54,7 @@ Colors apply to Rust functions from the project under analysis — that is, atom
 |---|-------|---------|
 | 1 | **Grey** | Not subject to verification, disabled (`is-disabled: true`), or excluded |
 | 2 | **White** | Tracked (`is-disabled: false`) but not yet translated (Aeneas) or no spec written (Verus/Lean) |
-| 3 | **Light Cyan** | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |
+| 3 | **Yellow** | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |
 | 4 | **Light Blue** | Has specs but not yet validated (placeholder — see note) |
 | 5 | **Dark Blue** | Has specs and those specs have been validated |
 | 6 | **Light Green** | Verified but at least one transitive dependency is unverified or failed |
@@ -66,7 +66,7 @@ Colors apply to Rust functions from the project under analysis — that is, atom
 The progression from least to most verified:
 
 ```
-Grey → White → Light Cyan → Light Blue → Dark Blue → Light Green → Dark Green
+Grey → White → Yellow → Light Blue → Dark Blue → Light Green → Dark Green
 ```
 
 Purple (Trusted) indicates intentional axiomatic assumptions rather than incomplete work.
@@ -81,11 +81,11 @@ Use [`scripts/count-colors.sh`](../scripts/count-colors.sh) to count Rust projec
 scripts/count-colors.sh input.json
 ```
 
-The script scopes to project functions (`code-path != ""`), excluding external crate stubs. Grey includes test functions. Grey, White, Light Cyan, Dark Blue, and Purple form a partition of the total; Green is an informational overlay within Dark Blue (verified subset of specified functions). Functions that are specified but not yet verified (`"unverified"` or `"failed"`) are counted in Dark Blue but not in Green.
+The script scopes to project functions (`code-path != ""`), excluding external crate stubs. Grey includes test functions. Grey, White, Yellow, Dark Blue, and Purple form a partition of the total; Green is an informational overlay within Dark Blue (verified subset of specified functions). Functions that are specified but not yet verified (`"unverified"` or `"failed"`) are counted in Dark Blue but not in Green.
 
 ### Specification colors
 
-Specifications skip Grey, White, Light Cyan, and Blue tiers — they ARE the specs. Only three colors apply:
+Specifications skip Grey, White, Yellow, and Blue tiers — they ARE the specs. Only three colors apply:
 
 | Color | Meaning |
 |-------|---------|
@@ -165,7 +165,7 @@ Aeneas translates Rust functions to Lean definitions, which can then be specifie
 | Primary spec proven, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
 | Primary spec written and validated | Dark Blue |
 | Primary spec written but not validated | Light Blue |
-| Has translation, no spec | Light Cyan |
+| Has translation, no spec | Yellow |
 | Tracked, no translation | White |
 | External stub (intentionally excluded; `code-path: ""`, excluded from project counting) | Purple |
 | Untracked/disabled | Grey |
@@ -177,5 +177,5 @@ Aeneas translates Rust functions to Lean definitions, which can then be specifie
    - Naming convention (e.g., `foo_spec` for function `foo`)
    - Annotation system in Lean
    - First spec in declaration order
-3. Should Translated use Light Cyan or Light Purple? Light Cyan distinguishes it more clearly from the Blue tiers; Light Purple groups it visually closer to Trusted/Purple.
+3. Should Translated use Yellow or Light Purple? Yellow distinguishes it more clearly from the Blue tiers; Light Purple groups it visually closer to Trusted/Purple.
 4. For Aeneas Rust atoms, `is-relevant == !is-disabled` (both derived from `functions.json`). `is-disabled` is the canonical field; should `is-relevant` be removed from Rust atom enrichment as redundant? See [probe-aeneas#20](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/20).
