@@ -7,9 +7,9 @@
 # Scopes to project functions only (code-path != ""), excluding external crate
 # stubs. Grey count includes test functions.
 #
-# Grey, White, Light Cyan, Dark Blue, and Purple form a partition of the total.
+# Grey, White, Yellow, Dark Blue, and Purple form a partition of the total.
 # Dark Blue is cumulative: all specified non-trusted functions (superset of Green).
-# Sanity check: grey + white + cyan + blue + purple = total.
+# Sanity check: grey + white + yellow + blue + purple = total.
 #
 # See docs/verification-statuses.md for color definitions.
 #
@@ -67,7 +67,7 @@ jq -r '
     grey:        [.[] | select(._disabled == true)] | length,
     white:       [.[] | select(._disabled == false and ._has_spec == false and
                                 ._has_translation == false and ._trusted == false)] | length,
-    light_cyan:  [.[] | select(._disabled == false and ._has_translation == true and
+    yellow:      [.[] | select(._disabled == false and ._has_translation == true and
                                 ._has_spec == false and ._trusted == false)] | length,
     light_blue:  0,
     dark_blue:   [.[] | select(._has_spec == true and ._trusted == false)] | length,
@@ -81,7 +81,7 @@ jq -r '
   } |
   . + { purple: (.purple_impl + .axioms) } |
 
-  (.grey + .white + .light_cyan + .dark_blue + .purple_impl) as $cover |
+  (.grey + .white + .yellow + .dark_blue + .purple_impl) as $cover |
   (.light_green + .dark_green) as $verified |
   "Pipeline: \(.pipeline)",
   "",
@@ -89,7 +89,7 @@ jq -r '
   "--|-------------|------",
   "1 | Grey        | \(.grey)",
   "2 | White       | \(.white)",
-  "3 | Light Cyan  | \(.light_cyan)",
+  "3 | Yellow      | \(.yellow)",
   "4 | Light Blue  | \(.light_blue)",
   "5 | Dark Blue   | \(.dark_blue)",
   "6 | Light Green | \(.light_green)",
@@ -98,7 +98,7 @@ jq -r '
   "--|-------------|------",
   "  | Total       | \(.total)",
   (if $cover != .total then
-    "  WARNING: grey+white+cyan+blue+purple_impl (\($cover)) != total (\(.total))"
+    "  WARNING: grey+white+yellow+blue+purple_impl (\($cover)) != total (\(.total))"
   else empty end),
   (if $verified > .dark_blue then
     "  WARNING: green (\($verified)) > dark_blue (\(.dark_blue))"
