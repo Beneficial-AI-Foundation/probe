@@ -9,7 +9,9 @@
 #
 # Grey, White, Yellow, Dark Blue, and Purple form a partition of the total.
 # Dark Blue is cumulative: all specified non-trusted functions (superset of Green).
-# Sanity check: grey + white + yellow + blue + purple = total.
+# Sanity check: grey + white + yellow + blue + purple = total. Dark Blue carries
+# no disabled guard; the partition relies on has-spec => not-disabled (P24).
+# @kb: kb/engineering/properties.md#p24-a-specified-atom-is-in-analysis-scope
 #
 # See docs/verification-statuses.md for color definitions.
 #
@@ -71,6 +73,10 @@ jq -r '
                                 ._has_spec == false and ._trusted == false)] | length,
     light_blue:  0,
     dark_blue:   [.[] | select(._has_spec == true and ._trusted == false)] | length,
+    # Green requires both a verified status AND a spec. The _has_spec guard is
+    # redundant for Aeneas (status is spec-derived) but load-bearing for Verus
+    # (status maps the proof run, independent of spec presence). It keeps green a
+    # strict subset of dark_blue. See docs/verification-statuses.md (Colors).
     light_green: [.[] | select(.value["verification-status"] == "verified" and
                                 ._has_spec == true)] | length,
     dark_green:  [.[] | select(.value["verification-status"] == "transitively-verified" and
