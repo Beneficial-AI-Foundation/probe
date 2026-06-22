@@ -1,181 +1,83 @@
 # Verification Statuses
 
-This document defines verification statuses for software verification projects across multiple proof frameworks (Rust only, Rust with Verus, Lean only, Rust with Lean and Aeneas).
+Defines the per-atom status fields (from the tool schemas) and the color scheme derived from them. Color counts are produced by [`scripts/count-colors.sh`](../scripts/count-colors.sh); this document and that script must agree.
 
-## Atom Kinds
-
-Atoms are classified into two kinds based on their role in verification:
+## Atom kinds
 
 | Kind | Description | Examples |
-|----------|-------------|----------|
+|------|-------------|----------|
 | **Implementation** | Executable code that can have specs attached | Rust functions, Verus exec-defs, Aeneas-generated Lean `def`s |
-| **Specification** | Logical statements that define or prove properties | Verus spec-defs and `proof fn`, Lean `theorem`, `lemma`, non-translation `def`s |
+| **Specification** | Logical statements that define or prove properties | Verus spec-defs and `proof fn`, Lean `theorem`/`lemma`, non-translation `def`s |
 
-Key distinction: **Implementations** can have specifications attached to them. **Specifications** cannot—they ARE the specs.
+Implementations can have specs attached; specifications cannot — they *are* the specs (always `unspecified`).
 
-## Status Dimensions
+## Status fields
 
-### Verification Status (applies to both kinds)
+### `verification-status`
 
-| Status | Meaning |
-|--------|---------|
-| `transitively-verified` | Verified and all transitive dependencies are also verified or trusted ([P23](../kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination)) |
-| `verified` | Compiles successfully, all proofs discharged (but at least one transitive dep may be unverified/failed) |
+| Value | Meaning |
+|-------|---------|
+| `transitively-verified` | Verified, and every transitive dependency is verified or trusted ([P23](../kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination)) |
+| `verified` | Verified locally, but some transitive dependency is `unverified`/`failed` |
 | `unverified` | Has sorries, admits, or warnings |
-| `failed` | Has compile errors |
-| `trusted` | Axiomatically assumed (e.g., `axiom`, `#[verifier::external_body]`) |
-| `null` | Not subject to verification (test functions, constants) |
+| `failed` | Compile/verification errors |
+| `trusted` | Axiomatically assumed (`axiom`, `#[verifier::external_body]`, `admit()`) |
+| `null` | Not subject to verification (tests, constants, external stubs) |
 
-The distinction between `"transitively-verified"` and `"verified"` is computed by `probe enrich` (reverse-BFS contamination over the dependency graph). probe-verus and probe-aeneas run this enrichment automatically as the last step of `extract`.
+The `transitively-verified` vs `verified` split is computed by `probe enrich` (reverse-BFS contamination); probe-verus and probe-aeneas run it as the last step of `extract`.
 
-### Specification Status (applies to implementations only)
+What `"verified"` asserts is defined by each tool's schema and differs by pipeline:
 
-| Status | Condition |
-|--------|-----------|
-| `specified` | Has associated specs (`specs` list is non-empty) |
-| `unspecified` | No associated specs (`specs` list is empty or null) |
+- **Aeneas/Lean** — [derived from the primary spec theorem](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md#rust-specific-fields): the spec's status *is* the function's status; no spec ⇒ `"unverified"`. So `"verified"` always implies a proven spec.
+- **Verus** — [mapped from the proof run](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md#verification-status-mapping) (`success → "verified"`), independent of spec presence.
 
-Specifications are always `unspecified` by definition—they cannot have specs attached to them.
+### `specified`
 
-## Color Mapping
+An implementation is `specified` if its `specs` list is non-empty, else `unspecified`.
 
-Colors provide visual feedback based on verification progress. The scheme follows a progression from untracked to fully verified, with a separate branch for trusted/axiomatic items.
+## Colors
 
-**Verification scope:** Green comes in two strengths depending on whether explicit contamination (`"unverified"` or `"failed"`) exists in the transitive dependency closure:
-
-- **Transitively verified** (`verification-status: "transitively-verified"`): The function is verified and no transitive dependency is explicitly `"unverified"` or `"failed"`. Dependencies with missing `verification-status` (untracked Rust functions, spec functions) and dependencies absent from the atom map are transparent — they do not block transitive scope. Trusted (axiomatic) dependencies are also transparent.
-- **Locally verified** (`verification-status: "verified"`): The function is verified, but at least one transitive dependency is explicitly `"unverified"` or `"failed"`.
-
-### Implementation colors
-
-Colors apply to Rust functions from the project under analysis — that is, atoms with `language: "rust"` and a non-empty `code-path`. Stubs with `code-path: ""` represent functions from external crates and are excluded from color assignment and counting.
+Each implementation gets one color from its (spec status, verification status). Colors apply only to project Rust functions (`language: "rust"`, non-empty `code-path`); external-crate stubs (`code-path: ""`) are excluded.
 
 | # | Color | Meaning |
 |---|-------|---------|
-| 1 | **Grey** | Not subject to verification, disabled (`is-disabled: true`), or excluded |
-| 2 | **White** | Tracked (`is-disabled: false`) but not yet translated (Aeneas) or no spec written (Verus/Lean) |
-| 3 | **Yellow** | Translated (e.g., Rust→Lean via Aeneas) but not yet specified |
-| 4 | **Light Blue** | Has specs but not yet validated (placeholder — see note) |
-| 5 | **Dark Blue** | Has specs and those specs have been validated |
-| 6 | **Light Green** | Verified but at least one transitive dependency is unverified or failed |
-| 7 | **Dark Green** | Verified and no transitive dependency is unverified or failed |
-| — | **Purple** | Intentionally assumed correct — axiomatic or excluded from verification |
+| 1 | Grey | Not subject to verification, disabled (`is-disabled: true`), or a test |
+| 2 | White | Tracked, but not yet translated (Aeneas) / no spec yet (Verus, Lean) |
+| 3 | Yellow | Translated (Rust→Lean via Aeneas) but not yet specified |
+| 4 | Light Blue | Has a spec, not yet validated — *placeholder, see below* |
+| 5 | Dark Blue | Has a validated spec |
+| 6 | Light Green | Spec proven; some transitive dep is `unverified`/`failed` |
+| 7 | Dark Green | Spec proven; no transitive dep is `unverified`/`failed` |
+| — | Purple | Trusted: intentionally axiomatic or excluded |
 
-### Color priority
+Progression: Grey → White → Yellow → Light Blue → Dark Blue → Light Green → Dark Green. Purple is a separate branch (intentional assumption, not incomplete work).
 
-The progression from least to most verified:
+Green requires a *proven spec*, so it is always a subset of Dark Blue — never just "the code compiles".
 
-```
-Grey → White → Yellow → Light Blue → Dark Blue → Light Green → Dark Green
-```
+**Specifications** (not implementations) only ever take Light Green / Dark Green (same transitive rule) or Purple (axiomatic).
 
-Purple (Trusted) indicates intentional axiomatic assumptions rather than incomplete work.
+> **Light Blue is currently unused.** A spec is present in the JSON only if it is on `main` (passed PR review), so every present spec is treated as validated → Dark Blue. Light Blue is reserved for future spec-invalidation support.
 
-> **Spec validation note:** All specs are currently considered validated if they appear in the JSON — to be present, the spec must be on `main`, meaning it passed PR review. Light Blue is kept as a placeholder for future spec-invalidation support; until then, all specified-but-unverified functions are Dark Blue.
+### Framework differences
 
-### Counting Rust functions per color
+The ladder above is the Aeneas case; others use a subset:
 
-Use [`scripts/count-colors.sh`](../scripts/count-colors.sh) to count Rust project functions per color. Auto-detects `probe-aeneas/extract` and `probe-verus/extract` JSON:
+- **Rust only** — no verification framework: everything is Grey.
+- **Verus** — spec and proof are one verifier pass, so the Blue tiers don't apply (no "specified but unproven" state), and there is no translation step (no Yellow): functions go White (no pre/post) → Green. Trusted = `#[verifier::external_body]` / `admit()`; Grey = `#[test]`.
+- **Lean** — full ladder except Yellow (no translation step). White = no specs yet. Trusted = `axiom` or `*External.lean`.
+- **Aeneas** — full ladder. Each Rust function maps to one Lean translation and inherits its primary spec's status; Yellow = translated, no spec. Trusted = external stub or a trusted translation.
+
+### Counting
 
 ```bash
-scripts/count-colors.sh input.json
+scripts/count-colors.sh input.json   # auto-detects probe-aeneas / probe-verus extract JSON
 ```
 
-The script scopes to project functions (`code-path != ""`), excluding external crate stubs. Grey includes test functions. Grey, White, Yellow, Dark Blue, and Purple form a partition of the total; Green is an informational overlay within Dark Blue (verified subset of specified functions). Functions that are specified but not yet verified (`"unverified"` or `"failed"`) are counted in Dark Blue but not in Green.
+Scoped to project functions (`code-path != ""`); Grey includes tests. Grey, White, Yellow, Dark Blue, and Purple (implementations) partition the total; axiom specs are counted separately. Green is an overlay within Dark Blue (the proven subset).
 
-### Specification colors
+Counting Green requires both a verified status *and* a non-empty spec — redundant for Aeneas (status is spec-derived) but a deliberate guard for Verus (status is proof-derived). It keeps `green ≤ dark_blue` regardless of how upstream computes the status.
 
-Specifications skip Grey, White, Yellow, and Blue tiers — they ARE the specs. Only three colors apply:
+## Open questions
 
-| Color | Meaning |
-|-------|---------|
-| **Light Green** | Locally verified |
-| **Dark Green** | Transitively verified |
-| **Purple** | Trusted (axiomatic) |
-
-## Framework-Specific Behavior
-
-### Rust Only
-
-Functions are **Grey** (untracked) — no formal verification framework is in use, so no verification will be performed.
-
-### Rust with Verus
-
-**Implementations (exec-defs):**
-
-In Verus, spec validation and proof happen atomically in a single verifier pass — you cannot have "specs validated but function not verified." Therefore Blue tiers (which represent the gap between spec authoring and proof) do not apply. Blue tiers are meaningful for Lean/Aeneas where spec authoring and proof are separable steps.
-
-| Condition | Color |
-|-----------|-------|
-| Proofs complete, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
-| Proofs complete, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
-| Subject to verification, but no pre/post conditions yet | White |
-| `#[verifier::external_body]` (intentionally excluded) | Purple |
-| `#[test]` function | Grey |
-
-**Specifications (`proof fn`, spec-defs):**
-
-| Condition | Color |
-|-----------|-------|
-| Proofs complete, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
-| Proofs complete, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
-| Trusted assumption (intentionally axiomatic) | Purple |
-
-### Lean Only
-
-**Implementations (`def` with associated theorems):**
-
-| Condition | Color |
-|-----------|-------|
-| Has specs, all proven, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
-| Has specs, all proven, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
-| Has specs, specs validated (proven) | Dark Blue |
-| Has specs, specs not yet validated | Light Blue |
-| Subject to verification, but no specs | White |
-| Not subject to verification | Grey |
-
-**Specifications (`theorem`, `lemma`, standalone `def`):**
-
-| Condition | Color |
-|-----------|-------|
-| Compiles successfully, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
-| Compiles successfully, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
-| `axiom` declaration (intentionally axiomatic) | Purple |
-
-### Rust with Lean and Aeneas
-
-Aeneas translates Rust functions to Lean definitions, which can then be specified and verified.
-
-**Structure:**
-- Each Rust function → one Lean translation (`def`)
-- A translation may call other translations (e.g., loop bodies)
-- Each translation may have one or more specs (theorems)
-- One spec is the **primary spec**; others are auxiliary lemmas
-
-**Status inheritance:**
-- A Lean translation is `specified` if it has a primary spec
-- The Rust function inherits status from its Lean translation
-- External function stubs → `trusted` (Purple)
-
-**Color assignment:**
-
-| Condition | Color |
-|-----------|-------|
-| Primary spec proven, no explicit `"unverified"` / `"failed"` in transitive deps | Dark Green |
-| Primary spec proven, at least one transitive dep is explicitly `"unverified"` / `"failed"` | Light Green |
-| Primary spec written and validated | Dark Blue |
-| Primary spec written but not validated | Light Blue |
-| Has translation, no spec | Yellow |
-| Tracked, no translation | White |
-| External stub (intentionally excluded; `code-path: ""`, excluded from project counting) | Purple |
-| Untracked/disabled | Grey |
-
-## Open Questions
-
-1. Should `failed` have its own color (red) distinct from `unverified`?
-2. How to identify the "primary spec"? Options:
-   - Naming convention (e.g., `foo_spec` for function `foo`)
-   - Annotation system in Lean
-   - First spec in declaration order
-3. Should Translated use Yellow or Light Purple? Yellow distinguishes it more clearly from the Blue tiers; Light Purple groups it visually closer to Trusted/Purple.
-4. For Aeneas Rust atoms, `is-relevant == !is-disabled` (both derived from `functions.json`). `is-disabled` is the canonical field; should `is-relevant` be removed from Rust atom enrichment as redundant? See [probe-aeneas#20](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/20).
+1. Should `failed` get its own color (red), distinct from `unverified`?
+2. For Aeneas, `is-relevant == !is-disabled`; should the redundant `is-relevant` be dropped? See [probe-aeneas#20](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/20).
