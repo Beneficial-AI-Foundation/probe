@@ -2,14 +2,28 @@
 
 Defines the per-atom status fields (from the tool schemas) and the color scheme derived from them. Color counts are produced by [`scripts/count-colors.sh`](../scripts/count-colors.sh), which this document and the script must agree on — the script is currently out of date with the scheme below and will be reconciled in a follow-up PR (see [Counting](#counting)).
 
+## Proved vs verified
+
+Two different claims hide under the word "verified"; keeping them apart is the key to the rest of this document.
+
+- A **theorem proves**. A logical statement stands on its own when its body is free of `sorry`/`admit` (relative to an intended [trust base](../kb/engineering/glossary.md#trust-base)). This is a claim about a proposition — no implementation is involved.
+- An **implementation verifies** against a chosen spec. This needs *two* things: a spec selected for the implementation, and a proof that the implementation meets it. Verus checks this **directly** (the spec lives on the Rust function); Aeneas checks it **indirectly** (a Lean translation plus a primary-spec theorem about that translation).
+
+So a single `verification-status: "verified"` reads as *"verifies against its spec"* for an implementation that has one, and simply *"proved"* for a bare theorem.
+
+This distinction also separates the two kinds of project this document describes:
+
+- **Verification projects** (Verus, Aeneas, or a Lean project that adopts a spec convention) make the strong claim: *this implementation verifies against its spec*.
+- **Generic Lean projects** (mathlib-style — a body of definitions and theorems) make only the weak claim: *this theorem is proved*. In general, Lean projects carry no mechanical rule that says "this construct is the spec of that one", so probe-lean cannot separate an implementation from its specification; the most it can say is whether a construct is proved.
+
 ## Atom kinds
 
 | Kind | Description | Examples |
 |------|-------------|----------|
-| **Implementation** | Executable code that can have specs attached | Rust functions, Verus exec-defs, Aeneas-generated Lean `def`s |
-| **Specification** | Logical statements that define or prove properties | Verus spec-defs and `proof fn`, Lean `theorem`/`lemma`, non-translation `def`s |
+| **Implementation** | Executable code that can have a spec attached and *verify* against it | Rust functions, Verus exec-defs, Aeneas-generated Lean `def`s |
+| **Specification** | A logical statement that is *proved* (or not) | Verus spec-defs and `proof fn`, Lean `theorem`/`lemma`, non-translation `def`s |
 
-Implementations can have specs attached; specifications cannot — they *are* the specs (always `unspecified`).
+Implementations can have specs attached; specifications cannot — they *are* the specs (always `unspecified`). The Implementation/Specification split is only mechanically available in a verification project; in a generic Lean project every atom is treated uniformly, by whether it is proved.
 
 ## Status fields
 
@@ -17,8 +31,8 @@ Implementations can have specs attached; specifications cannot — they *are* th
 
 | Value | Meaning |
 |-------|---------|
-| `transitively-verified` | Verified, and every transitive dependency is verified or trusted ([P23](../kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination)) |
-| `verified` | Verified locally, but some transitive dependency is `unverified`/`failed` |
+| `transitively-verified` | Verified/proved, and every transitive dependency is verified or trusted ([P23](../kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination)) |
+| `verified` | Verified/proved locally, but some transitive dependency is `unverified`/`failed` |
 | `unverified` | Has sorries, admits, or warnings |
 | `failed` | Compile/verification errors |
 | `trusted` | Axiomatically assumed (`axiom`, `#[verifier::external_body]`, `admit()`) |
@@ -26,17 +40,17 @@ Implementations can have specs attached; specifications cannot — they *are* th
 
 The `transitively-verified` vs `verified` split is computed by `probe enrich` (reverse-BFS contamination); probe-verus and probe-aeneas run it as the last step of `extract`.
 
-What `"verified"` asserts differs by pipeline:
+What `"verified"` asserts differs by pipeline (this is the *verifies* claim; for a bare theorem the same status just means *proved* — locally sorry-free):
 
 - **Aeneas / Lean (indirect).** A Rust function is `"verified"` only if (1) it has a Lean translation, (2) that translation has a [primary spec theorem](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md#rust-specific-fields), and (3) that theorem is proved. The Rust atom inherits the theorem's status; with no translation or no primary spec it is `"unverified"` (a translation that is itself `"trusted"`/`"failed"` propagates that status). So `"verified"` always implies a proven spec.
 - **Verus (direct).** The spec (`requires`/`ensures`) lives on the Rust function and Verus [proves the body satisfies it](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md#verification-status-mapping) (`success → "verified"`). A spec-less function is `is-disabled: true` and carries no `verification-status` — never `"verified"`, and (unlike Aeneas) not `"unverified"` either.
 
 ### `specified`
 
-A function is `specified` if it has a spec attached, else `unspecified`. Where the spec lives differs by pipeline:
+An implementation is `specified` if it has a spec attached, else `unspecified`. The carrier is `primary-spec` in every pipeline, but where it lives and what it holds differs:
 
-- **probe-verus** — `primary-spec` holds the inline spec text (`requires` + `ensures`) on the Rust function. Non-empty `primary-spec` ⇔ `is-disabled: false` ⇔ specified.
-- **probe-lean** — `specs` lists the spec-theorem code-names and `primary-spec` names the chosen one; an atom is `specified` if `specs` is non-empty ([P18](../kb/engineering/properties.md#p18-lean-specified-is-derived-not-stored)).
+- **probe-verus** — `primary-spec` is on the Rust function and holds the inline spec text (`requires` + `ensures`). Non-empty `primary-spec` ⇔ `is-disabled: false` ⇔ specified.
+- **probe-lean** — `primary-spec` names the chosen spec theorem and `specs` lists every spec-theorem code-name; an atom is `specified` if `specs` is non-empty, equivalently if `primary-spec` is present ([P18](../kb/engineering/properties.md#p18-lean-specified-is-derived-not-stored)). `specs` is a *generic* signal — every theorem whose dependencies include the atom — so it names a spec *of an implementation* only under a spec convention: an `@[primary_spec]`/`@[progress]`/`@[pspec]`/`@[step]` attribute, a `_spec` suffix, or Aeneas-generated code (see [how `primary-spec` is selected](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md#probe-leanextract-unified-atoms)). A generic Lean project adopts no such convention, so its atoms have empty `specs` and are all `unspecified` — they are colored by whether they are *proved*, not against a spec.
 - **probe-aeneas** — a Rust function carries no spec of its own; `specified` is read off its Lean translation (the atom named by `translation-name`).
 
 ## Colors
@@ -45,7 +59,12 @@ A color is derived from per-atom JSON fields produced by `probe-<tool> extract`:
 
 Atoms that should not appear in VeriLib — external-crate stubs (`code-path: ""`) and atoms flagged `is-hidden` / `is-ignored` / `is-extraction-artifact` — are dropped before coloring (they have no color because they are not shown). A pure-Rust project (no verification framework) is shown all **White** with no counts: it is browse-only, with nothing claimed about verification. (Grey is *not* used here — it signals "excluded from verification" *within* a verification project, which would wrongly imply verification intent.)
 
-### Verus / Aeneas `exec` atoms
+The two tables mirror the [proved-vs-verified](#proved-vs-verified) split:
+
+- The first colors **implementations** by whether they *verify* — `specified` plus proof status. These are the Rust functions a verification project cares about.
+- The second colors **specifications and proofs** by whether they are *proved* — `verification-status` alone. It applies to every Lean atom, so a **generic Lean project uses only this second table**.
+
+### Implementations — does it *verify*? (Verus / Aeneas `exec` atoms)
 
 The executable Rust atoms (`kind: "exec"`), colored by whether they are [`specified`](#specified) and, if so, the proof status. *Specified* is the tool-specific signal from that section — Verus: non-empty `primary-spec` (i.e. `is-disabled: false`); Aeneas: the function's Lean translation is `specified`.
 
@@ -59,11 +78,11 @@ The executable Rust atoms (`kind: "exec"`), colored by whether they are [`specif
 | `"trusted"` | Purple |
 | `"failed"` | Red |
 
-A spec-less Verus function is Grey even though it might "verify" vacuously — Green requires being `specified`. (`"verified"`/`"transitively-verified"` already imply a proven spec, so those rows are necessarily `specified`.)
+Green requires being `specified` — a function can only *verify* against a spec, so a spec-less Verus function is Grey. (`"verified"`/`"transitively-verified"` already imply a proven spec, so those rows are necessarily `specified`.)
 
-### Lean atoms and Verus `proof` / `spec`
+### Specifications and proofs — is it *proved*? (Lean atoms and Verus `proof` / `spec`)
 
-Colored **directly by `verification-status`**. This covers *every* Lean atom — any `kind`, in both pure-Lean and Aeneas projects, **including Aeneas-translated `def`s** — and Verus `proof`/`spec` declarations. (probe-lean cannot mechanically separate an implementation from its specification, so a Lean construct is simply proven or not.)
+Colored **directly by `verification-status`**. This covers *every* Lean atom — any `kind`, in both pure-Lean and Aeneas projects, **including Aeneas-translated `def`s** — and Verus `proof`/`spec` declarations. (In general, Lean projects do not distinguish implementation from specification, so the most probe-lean can say is whether a Lean construct is proved.)
 
 | `verification-status` | colour |
 |-----------------------|--------|
@@ -74,7 +93,7 @@ Colored **directly by `verification-status`**. This covers *every* Lean atom —
 | `"trusted"` | Purple |
 | `"failed"` | Red |
 
-A Lean construct with a `sorry` is `"unverified"` → **Blue** (its statement is an unproven spec; for the rare `def`-with-`sorry`, Blue is an approximation, since probe-lean cannot separate an implementation from its specification). A Lean atom with *no* `verification-status` — a type declaration like `structure`/`class` — is **White**: pure-Lean has no "disabled"/excluded notion, so it never goes Grey.
+A Lean construct with a `sorry` is `"unverified"` → **Blue** (its statement is an unproven spec; for the rare `def`-with-`sorry`, Blue is an approximation, since in Lean projects in general there is no notion of implementation vs specification). A Lean atom with *no* `verification-status` — a type declaration like `structure`/`class` — is **White**: pure-Lean has no "disabled"/excluded notion, so it never goes Grey.
 
 ### Notes
 
