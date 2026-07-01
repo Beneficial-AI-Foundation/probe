@@ -93,7 +93,7 @@ Colored **directly by `verification-status`**. This covers *every* Lean atom —
 | `"trusted"` | Purple |
 | `"failed"` | Red |
 
-A Lean construct with a `sorry` is `"unverified"` → **Blue** (its statement is an unproven spec; for the rare `def`-with-`sorry`, Blue is an approximation, since in Lean projects in general there is no notion of implementation vs specification). A Lean atom with *no* `verification-status` — a type declaration like `structure`/`class` — is **White**: pure-Lean has no "disabled"/excluded notion, so it never goes Grey.
+A Lean construct with a `sorry` is `"unverified"` → **Blue**. For a theorem this fits — its statement is a spec that is not yet proven. A `def`, though, is an implementation rather than a spec, so a `def`-with-`sorry` colored Blue is only an approximation; but since Lean in general offers no mechanical way to tell an implementation apart from a specification, both unproven cases collapse to the same Blue. A Lean atom with *no* `verification-status` — a type declaration like `structure`/`class` — is **White**: pure-Lean has no "disabled"/excluded notion, so it never goes Grey.
 
 ### Notes
 
