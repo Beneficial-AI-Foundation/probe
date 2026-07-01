@@ -4,7 +4,7 @@ Defines the per-atom status fields (from the tool schemas) and the color scheme 
 
 ## Proved vs verified
 
-Two different claims hide under the word "verified"; keeping them apart is the key to the rest of this document.
+Two different claims hide under the word "verified":
 
 - A **theorem proves**. A logical statement stands on its own when its body is free of `sorry`/`admit` (relative to an intended [trust base](../kb/engineering/glossary.md#trust-base)). This is a claim about a proposition — no implementation is involved.
 - An **implementation verifies** against a chosen spec. This needs *two* things: a spec selected for the implementation, and a proof that the implementation meets it. Verus checks this **directly** (the spec lives on the Rust function); Aeneas checks it **indirectly** (a Lean translation plus a primary-spec theorem about that translation).
@@ -42,7 +42,7 @@ The `transitively-verified` vs `verified` split is computed by `probe enrich` (r
 
 What `"verified"` asserts differs by pipeline (this is the *verifies* claim; for a bare theorem the same status just means *proved* — locally sorry-free):
 
-- **Aeneas / Lean (indirect).** A Rust function is `"verified"` only if (1) it has a Lean translation, (2) that translation has a [primary spec theorem](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md#rust-specific-fields), and (3) that theorem is proved. The Rust atom inherits the theorem's status; with no translation or no primary spec it is `"unverified"` (a translation that is itself `"trusted"`/`"failed"` propagates that status). So `"verified"` always implies a proven spec.
+- **Aeneas / Lean (indirect).** A Rust function is `"verified"` only if (1) it has a Lean translation, (2) that translation has a [primary spec theorem](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md#rust-specific-fields), and (3) that theorem is proved. A *translated* Rust atom inherits its translation's status — the primary spec theorem's status, or `"unverified"` when the translation has no primary spec (translated but unspecified → Yellow; a translation that is itself `"trusted"`/`"failed"` propagates that status). A Rust function with **no translation** gets **no** `verification-status` at all — it is out of scope (typically `is-disabled: true` → Grey), *not* `"unverified"`. So `"verified"` always implies a proven spec.
 - **Verus (direct).** The spec (`requires`/`ensures`) lives on the Rust function and Verus [proves the body satisfies it](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md#verification-status-mapping) (`success → "verified"`). A spec-less function is `is-disabled: true` and carries no `verification-status` — never `"verified"`, and (unlike Aeneas) not `"unverified"` either.
 
 ### `specified`
