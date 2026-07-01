@@ -11,10 +11,11 @@ This repository contains:
 
 ## Documentation
 
-- [docs/CONSUMER_GUIDE.md](docs/CONSUMER_GUIDE.md) -- **Start here**: how to use all four probe tools, examples, and working with the data
+- [docs/consumer-guide.md](docs/consumer-guide.md) -- **Start here**: how to use all four probe tools, examples, and working with the data
 - [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format (Schema 2.0)
-- [docs/UI-VIEWS.md](docs/UI-VIEWS.md) -- How a UI should implement language toggles, call graph / file map / crate map views
-- [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) -- Testing that your visualization matches the probe data
+- [docs/schema-validation.md](docs/schema-validation.md) -- Validating probe output against the JSON Schema (Rust, Lean, CI)
+- [docs/ui-views.md](docs/ui-views.md) -- How a UI should implement language toggles, call graph / file map / crate map views
+- [docs/testing-guide.md](docs/testing-guide.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
 - [docs/merge-algorithm.md](docs/merge-algorithm.md) -- Merge algorithm specification
 - [docs/mappings-spec.md](docs/mappings-spec.md) -- Cross-language mapping file format
@@ -22,6 +23,18 @@ This repository contains:
 - [docs/extract-check-design.md](docs/extract-check-design.md) -- Design of the extract-check validation tool
 - [probe-extract-check/TESTING.md](probe-extract-check/TESTING.md) -- Test guide for probe-extract-check
 - [schemas/atom-envelope.schema.json](schemas/atom-envelope.schema.json) -- JSON Schema
+
+### Per-tool docs across the ecosystem
+
+Each probe repo has `docs/USAGE.md` (command reference) and `docs/SCHEMA.md` (JSON schema):
+
+| Repo | Usage | Schema | Schema scope |
+|------|-------|--------|-------------|
+| **[probe](https://github.com/Beneficial-AI-Foundation/probe)** | -- | [`docs/SCHEMA.md`](docs/SCHEMA.md) | Interchange spec: core fields, common optional fields, code-name conventions |
+| **[probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/SCHEMA.md) | Rust-specific fields |
+| **[probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md) | Lean-specific fields |
+| **[probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md) | Verus-specific fields |
+| **[probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md) | Aeneas-specific fields |
 
 ## Usage
 
@@ -45,57 +58,11 @@ cargo test
 
 ## JSON Schema
 
-The file [`schemas/atom-envelope.schema.json`](schemas/atom-envelope.schema.json) is a
-[JSON Schema (draft 2020-12)](https://json-schema.org/draft/2020-12/schema) that validates
-both single-tool and merged-atoms envelopes, including the core atom fields. It is the
-machine-readable contract that all `probe-*` codebases should validate against.
-
-### Validating in Rust (probe, probe-verus)
-
-Add `jsonschema` as a dev-dependency and validate in tests:
-
-```rust
-use jsonschema::Validator;
-
-#[test]
-fn output_conforms_to_schema() {
-    let schema: serde_json::Value =
-        serde_json::from_str(include_str!("../schemas/atom-envelope.schema.json")).unwrap();
-    let validator = Validator::new(&schema).unwrap();
-
-    let output: serde_json::Value = /* your tool's JSON output */;
-    assert!(validator.validate(&output).is_ok());
-}
-```
-
-### Validating in Lean (probe-lean)
-
-Use a JSON library to parse the output and check required fields, or shell out to a
-schema validator:
-
-```bash
-# Using jsonschema-rs CLI (install via cargo install jsonschema-cli)
-jsonschema validate --schema schemas/atom-envelope.schema.json --instance output.json
-
-# Using Python jsonschema (pip install jsonschema)
-python -m jsonschema -i output.json schemas/atom-envelope.schema.json
-```
-
-### Validating in CI
-
-Any CI pipeline can validate probe output against the schema. Download it from the repo:
-
-```bash
-curl -sL https://raw.githubusercontent.com/Beneficial-AI-Foundation/probe/main/schemas/atom-envelope.schema.json \
-  -o atom-envelope.schema.json
-```
-
-### What the schema covers
-
-- **Envelope structure**: `schema`, `schema-version`, `tool`, `source`/`inputs`, `timestamp`, `data`
-- **Single-tool vs merged**: discriminated by the `schema` field (`probe-*/atoms` vs `probe/merged-*`)
-- **Core atom fields**: `display-name`, `dependencies`, `code-module`, `code-path`, `code-text`, `kind`, `language`
-- **Extensions**: `additionalProperties: true` on atoms allows language-specific fields to pass through
+[`schemas/atom-envelope.schema.json`](schemas/atom-envelope.schema.json) is a
+[JSON Schema (draft 2020-12)](https://json-schema.org/draft/2020-12/schema) validating both
+single-tool and merged-atoms envelopes -- the machine-readable contract all `probe-*`
+codebases should validate against. See [docs/schema-validation.md](docs/schema-validation.md)
+for validation examples (Rust, Lean, CI) and what the schema covers.
 
 ## Acknowledgements
 

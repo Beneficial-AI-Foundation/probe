@@ -11,9 +11,8 @@ below).
 
 ## Testing your visualization (data fidelity)
 
-These tests verify that your rendered graph accurately represents the
-probe output. They only need the JSON file -- no access to the original
-source code.
+These tests check that your rendered graph matches the probe output. They
+need only the JSON file, not the source code.
 
 ### Schema validation
 
@@ -128,9 +127,7 @@ match your implementation.
 
 ## How the probes test extraction correctness
 
-You do not need to verify that the probe JSON accurately reflects the
-source code -- each probe repository has its own test suite that covers
-this. Here is what each repo tests:
+What each probe repo's own test suite covers (so you don't have to):
 
 ### probe (this repo)
 
@@ -152,9 +149,8 @@ Run with `cargo test` in the probe repo.
 
 ### Individual probes
 
-Each probe repository has its own test suite covering extraction
-correctness. See each probe's `TESTING.md` for full test inventory,
-run instructions, and CI details.
+See each probe's `TESTING.md` for the full test inventory, run
+instructions, and CI details.
 
 | Probe | Test command | Details |
 |-------|-------------|---------|

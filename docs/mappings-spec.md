@@ -4,10 +4,8 @@ Version: draft
 Date: 2026-06-03
 Parent document: [SCHEMA.md](SCHEMA.md)
 
-This document specifies the cross-language mappings file format used by `probe merge`
-to match code-names across languages. Mappings enable cross-language merging where the
-same logical function has different code-names in different probe outputs (e.g., a Rust
-function atomized by probe-verus and its Lean counterpart extracted by probe-lean).
+The cross-language mappings file format used by `probe merge` to match code-names across
+languages.
 
 ## Motivation
 

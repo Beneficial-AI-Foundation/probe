@@ -4,11 +4,9 @@ Version: 2.0
 
 ## Purpose
 
-This document defines the interchange format for atom files produced by `probe-*` tools
-(probe-verus, probe-lean, probe-latex, etc.). Any tool that produces or consumes atom files
-should conform to this specification.
-
-The goal is a shared schema that enables:
+The interchange format for atom files produced by `probe-*` tools (probe-verus,
+probe-lean, probe-latex, etc.). Any tool that produces or consumes atom files should
+conform to it. A shared schema enables:
 
 - Merging atoms from different languages/tools into a single file
 - Generic consumers (verilib-cli, specs browser, etc.) that work across languages
@@ -389,33 +387,28 @@ value schemas.
 
 ### Why code-names are fully qualified URIs
 
-Code-names like `probe:curve25519-dalek/4.1.3/scalar/Scalar#add()` include the crate
-name and version even though the envelope identifies the producing tool. This is intentional:
+Code-names like `probe:curve25519-dalek/4.1.3/scalar/Scalar#add()` embed crate name and
+version even though the envelope already identifies the producing tool:
 
-**Crate/version is a per-atom fact, not a per-file fact.** A single file can contain atoms
-from multiple crates -- after `merge-atoms`, or when indexing a Cargo workspace with
-multiple packages. Putting crate/version in the envelope would be incorrect for these
-cases. The code-name is the only location that correctly captures per-atom origin.
+**Crate/version is a per-atom fact.** A single file can hold atoms from multiple crates --
+after `merge-atoms`, or when indexing a multi-package Cargo workspace -- so crate/version
+belongs on the atom, not the envelope.
 
-**Self-contained references.** Atom A's `dependencies` list contains code-names of other
-atoms, potentially from different crates. The dependency
-`probe:crate-b/1.0/helpers/compute()` is a cross-crate reference that must be
-interpretable without envelope context. Fully qualified URIs make every reference
-self-contained.
+**References are self-contained.** An atom's `dependencies` may point across crates (e.g.
+`probe:crate-b/1.0/helpers/compute()`); fully qualified URIs stay interpretable without
+envelope context.
 
-**Copy-paste resilience.** A code-name pasted into a bug report, log, or database
-identifies its atom uniquely. A short ID like `scalar/Scalar#add()` would be ambiguous
-without knowing which crate and version it came from.
+**Copy-paste resilience.** A code-name pasted into a bug report or database identifies its
+atom uniquely; a short ID like `scalar/Scalar#add()` would not.
 
-This follows established practice: HTTP URLs, SCIP symbols, DOIs, and RDF IRIs are all
-fully qualified even when surrounding context could supply parts of the identifier.
+This matches HTTP URLs, SCIP symbols, DOIs, and RDF IRIs, which are all fully qualified.
 
 ### Why `code-module` and `display-name` duplicate parts of the code-name
 
-`code-module` (e.g., `"scalar"`) is extractable from the code-name URI. `display-name`
-(e.g., `"Scalar::add"`) is a human-friendly version of the function component. This is
-intentional denormalization for consumer convenience: grouping atoms by module or
-displaying a name should not require URI parsing.
+`code-module` (e.g., `"scalar"`) is extractable from the code-name URI, and `display-name`
+(e.g., `"Scalar::add"`) is a human-friendly version of the function component. Intentional
+denormalization: grouping atoms by module or displaying a name should not require URI
+parsing.
 
 ### What the envelope contains vs. what it does not
 
@@ -442,9 +435,8 @@ Code-name   "about the atom"    crate, version, module, type, function (canonica
 Atom fields "convenient access" display-name, code-module, code-path, code-text, kind, language
 ```
 
-The envelope is per-file metadata. The code-name is the canonical per-atom identifier.
-Atom fields denormalize parts of the code-name (and add source location) for consumer
-convenience. No information is duplicated across the envelope and per-atom layers.
+Atom fields denormalize parts of the code-name (and add source location) for convenience;
+no information is duplicated across the envelope and per-atom layers.
 
 ## Versioning
 

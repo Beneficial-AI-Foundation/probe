@@ -19,22 +19,17 @@ Today these files are **bare JSON dictionaries** with no metadata:
 }
 ```
 
-This document explains why we need to wrap these dictionaries in a metadata envelope,
-what the envelope should contain, and how this relates to industry standards.
+A metadata envelope wrapping these dictionaries solves the problems below.
 
 ## Why an Envelope Is Needed
 
 ### 1. Schema evolution and backward compatibility
 
-When the atom format changes (new required fields, renamed fields, changed semantics),
-consumers need to know which version of the format they are reading. Without a
-`schema-version` field, every consumer must guess the format by probing for field names --
-"does this file have a `kind` field or a `mode` field?"
-
-This is a problem probe *will* hit as the schema evolves. Every major interchange format
-(SARIF, CycloneDX, SCIP, SPDX) versions its schema explicitly. The version field is what
-allows old consumers to reject incompatible files with a clear error instead of silently
-misinterpreting them.
+When the format changes, consumers need to know which version they are reading. Without
+`schema-version`, every consumer must guess by probing for field names ("does this file
+have `kind` or `mode`?"). Every major interchange format (SARIF, CycloneDX, SCIP, SPDX)
+versions its schema so old consumers can reject incompatible files with a clear error
+instead of misinterpreting them.
 
 ### 2. Type discrimination
 
@@ -58,17 +53,15 @@ Without the envelope, diagnosing problems requires grepping git history or guess
 
 ### 4. Staleness detection
 
-The recommended workflow is: commit before running atomize/specify/verify; if not
-committed, regenerate everything. The `source.commit` field in the envelope is what makes
-this check possible -- `verilib-cli` can compare the envelope's commit against the repo's
-HEAD and know whether the probe output is current.
+Recommended workflow: commit before running atomize/specify/verify, else regenerate.
+`source.commit` makes this possible -- `verilib-cli` compares it against the repo's HEAD
+to tell whether the output is current.
 
 ### 5. Multi-tool coordination
 
-When `verilib-cli` orchestrates probe-lean and probe-verus, the envelope lets it verify
-that the outputs are compatible (same `schema-version`) and correspond to the expected
-source (`source.package`, `source.commit`). Without this, verilib-cli has to trust that the
-files are what the filenames claim they are.
+When `verilib-cli` orchestrates probe-lean and probe-verus, the envelope lets it check that
+outputs are compatible (same `schema-version`) and correspond to the expected source
+(`source.package`, `source.commit`) rather than trusting filenames.
 
 ### 6. Merging
 

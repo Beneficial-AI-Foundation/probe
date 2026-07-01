@@ -1,6 +1,6 @@
 # Categorical Framework for Probe Tools
 
-This document describes the categorical structure underlying the probe tools architecture, drawing on two frameworks:
+The categorical structure underlying the probe tools architecture, drawing on two frameworks:
 
 - **DOTS** (Double Operadic Theory of Systems) by Libkind & Myers ([arXiv 2505.18329](https://arxiv.org/abs/2505.18329))
 - **SSProve** (State-Separating Proofs) by Spitters et al. ([ePrint 2021/397](https://eprint.iacr.org/2021/397))

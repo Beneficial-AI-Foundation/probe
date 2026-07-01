@@ -2,14 +2,13 @@
 
 Version: draft
 Date: 2026-03-17
-Parent document: [CONSUMER_GUIDE.md](CONSUMER_GUIDE.md)
+Parent document: [consumer-guide.md](consumer-guide.md)
 
-This document describes the views a UI should implement to let users
-explore probe atom data. It covers language toggles, the three
-visualization layouts (call graph, file map, crate map), and
-filtering by atom metadata. A reference implementation of these views
-exists in the [scip-callgraph](https://github.com/Beneficial-AI-Foundation/scip-callgraph)
-interactive viewer, deployed at
+The views a UI should implement to let users explore probe atom data: language toggles,
+the three visualization layouts (call graph, file map, crate map), and filtering by atom
+metadata. A reference implementation is the
+[scip-callgraph](https://github.com/Beneficial-AI-Foundation/scip-callgraph) viewer,
+deployed at
 [beneficial-ai-foundation.github.io/scip-callgraph](https://beneficial-ai-foundation.github.io/scip-callgraph/).
 
 ## Language toggles
@@ -31,10 +30,9 @@ a probe-aeneas extraction), the UI should offer:
 | **Lean view** | Only atoms where `language == "lean"`. Dependency edges are restricted to Lean-to-Lean. |
 | **Combined view** | All atoms. Cross-language edges (created by `probe merge --mappings`) are visible. |
 
-Switching between these modes is a client-side filter on the loaded
-JSON -- no re-fetching is needed. The toggle should be prominent (e.g.
-a segmented control in the toolbar) because the two views represent
-fundamentally different perspectives on the same codebase.
+Switching modes is a client-side filter on the loaded JSON -- no re-fetching. The toggle
+should be prominent (e.g. a segmented control in the toolbar), since the two views are
+different perspectives on the same codebase.
 
 ### What changes between views
 
@@ -49,9 +47,8 @@ atom metadata:
 | **File paths** | `src/scalar.rs` | `Mathlib/Data/Nat.lean` |
 | **Module grouping** | Rust module paths (`backend/serial/u64/field`) | Lean namespaces (`Curve25519Dalek.Backend.Serial`) |
 
-A UI that understands these differences can adapt its rendering:
-display `requires`/`ensures` blocks inline for Rust atoms, but show a
-link to the specification theorem for Lean atoms.
+A UI can adapt its rendering to these differences: `requires`/`ensures` blocks inline for
+Rust atoms, a link to the specification theorem for Lean atoms.
 
 ### Cross-language links
 
@@ -67,9 +64,8 @@ corresponding Lean atom.
 
 ## Visualization views
 
-The three views below are ordered from finest to coarsest granularity.
-All three operate on the same underlying graph (nodes = atoms,
-edges = dependencies). They differ in layout and grouping.
+The three views below run from finest to coarsest granularity. All operate on the same
+graph (nodes = atoms, edges = dependencies), differing only in layout and grouping.
 
 ### Call graph view
 
@@ -78,11 +74,11 @@ edges = dependencies). They differ in layout and grouping.
 > describes the layout algorithm (hybrid Sugiyama + force-directed simulation)
 > used by scip-callgraph.
 
-A force-directed (or hierarchical) graph where each node is a single
-atom and each edge is a dependency.
+A force-directed (or hierarchical) graph where each node is one atom and each edge a
+dependency.
 
-**Purpose:** Function-level exploration. Answer questions like "what
-does `batch_invert` call?" or "who calls `reduce`?"
+**Purpose:** Function-level exploration -- "what does `batch_invert` call?", "who calls
+`reduce`?"
 
 **Key features:**
 - **Source / sink filtering.** Enter a function name as source to see
@@ -98,8 +94,8 @@ does `batch_invert` call?" or "who calls `reduce`?"
 **Example (scip-callgraph):**
 
 [`scalar::batch_invert` at depth 1](https://beneficial-ai-foundation.github.io/scip-callgraph/?source=scalar%3A%3Abatch_invert&depth=1)
-shows the immediate callees of the `batch_invert` function in
-curve25519-dalek. Clicking a callee expands it to show *its* callees.
+shows the immediate callees of `batch_invert` in curve25519-dalek. Clicking a callee
+expands *its* callees.
 
 **Mapping from probe atoms:**
 
@@ -119,14 +115,12 @@ curve25519-dalek. Clicking a callee expands it to show *its* callees.
 > describes the compound DAG layout (transitive reduction + dagre/Sugiyama)
 > used by scip-callgraph.
 
-A hierarchical layout that groups atoms by their source file.
-Each file is a compound box containing its atoms as inner nodes.
-Edges between atoms in different files are drawn between the
-file groups.
+A hierarchical layout grouping atoms by source file. Each file is a compound box
+containing its atoms; edges between atoms in different files are drawn between the file
+groups.
 
-**Purpose:** Understand module-level structure. Answer questions like
-"what functions are in `src/scalar.rs`?" or "which files depend on
-`src/field.rs`?"
+**Purpose:** Module-level structure -- "what functions are in `src/scalar.rs`?", "which
+files depend on `src/field.rs`?"
 
 **Key features:**
 - **File grouping.** Group atoms by `code-path`. Atoms with the same
@@ -155,12 +149,11 @@ or omit them and show them only as edge targets.
 > interaction model (collapsed / expanded edge / boundary) used by
 > scip-callgraph.
 
-A high-level overview where each node is a crate (Rust) or package
-(Lean) and edges represent cross-crate function calls.
+A high-level overview where each node is a crate (Rust) or package (Lean) and edges are
+cross-crate function calls.
 
-**Purpose:** Understand inter-crate dependencies at a glance. Answer
-questions like "which crates does `curve25519-dalek` depend on?" or
-"how many functions does crate A call in crate B?"
+**Purpose:** Inter-crate dependencies at a glance -- "which crates does `curve25519-dalek`
+depend on?", "how many functions does crate A call in crate B?"
 
 **Key features:**
 - **Crate-level nodes.** Aggregate atoms by the crate/package portion

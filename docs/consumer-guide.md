@@ -136,22 +136,9 @@ project.
 
 ## Documentation
 
-Each repo has `docs/USAGE.md` (command reference) and `docs/SCHEMA.md` (JSON schema):
-
-| Repo | Usage | Schema | Schema scope |
-|------|-------|--------|-------------|
-| **[probe](https://github.com/Beneficial-AI-Foundation/probe)** | -- | [`docs/SCHEMA.md`](SCHEMA.md) | Interchange spec: core fields, common optional fields, code-name conventions |
-| **[probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/SCHEMA.md) | Rust-specific fields |
-| **[probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md) | Lean-specific fields |
-| **[probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md) | Verus-specific fields |
-| **[probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md) | Aeneas-specific fields |
-
-Additional reference docs in [`probe/docs/`](https://github.com/Beneficial-AI-Foundation/probe/tree/main/docs):
-- [`UI-VIEWS.md`](UI-VIEWS.md) — How a UI should implement language toggles, call graph / file map / crate map views
-- [`TESTING_GUIDE.md`](TESTING_GUIDE.md) — How to test that your visualization correctly represents the probe data
-- [`merge-algorithm.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/merge-algorithm.md) — How `probe merge` combines files
-- [`mappings-spec.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/mappings-spec.md) — Cross-language mapping file format
-- [`envelope-rationale.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/envelope-rationale.md) — Why the metadata envelope exists
+For the full doc index -- per-tool `USAGE.md`/`SCHEMA.md` across the ecosystem and the
+other reference docs in this repo -- see the
+[probe README](https://github.com/Beneficial-AI-Foundation/probe#documentation).
 
 ## Working with the data
 

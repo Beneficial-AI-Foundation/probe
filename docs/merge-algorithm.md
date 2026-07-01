@@ -4,15 +4,14 @@ Version: draft
 Date: 2026-03-06
 Parent document: [SCHEMA.md](SCHEMA.md)
 
-This document specifies the algorithm for `probe merge`, which combines data files from
-multiple `probe-*` tools into a single merged file. The merge tool handles three
-categories of data: **atoms**, **specs**, and **proofs**. All inputs must be the same
-category; the category is auto-detected from the `schema` field.
+The algorithm for `probe merge`, which combines data files from multiple `probe-*` tools
+into one. It handles three categories -- **atoms**, **specs**, and **proofs** -- each
+auto-detected from the `schema` field; all inputs must be the same category.
 
 ## Overview
 
-`probe merge` takes two or more Schema 2.0 files and produces a single output file. The
-output schema depends on the input category:
+`probe merge` takes two or more Schema 2.0 files and produces one output file. The output
+schema depends on the input category:
 
 | Input category | Output schema |
 |----------------|---------------|
