@@ -70,11 +70,3 @@ for validation examples (Rust, Lean, CI) and what the schema covers.
 The probe ecosystem's development methodology — knowledge bases, auditor skills, and
 Ralph Loops (implement → audit → fix → repeat) — follows the spec-driven agentic
 development approach proposed in [kb-sync-demo](https://github.com/yurug/kb-sync-demo).
-
-## Related projects
-
-- [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) -- Rust call graph atoms from SCIP index
-- [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) -- Rust/Verus call graph atoms and verification
-- [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) -- Lean call graph atoms and verification
-- [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) -- Cross-language Rust+Lean merged atoms (Aeneas projects)
-- [scip-callgraph](https://github.com/Beneficial-AI-Foundation/scip-callgraph) -- Interactive web viewer for probe data ([live demo](https://beneficial-ai-foundation.github.io/scip-callgraph/))
