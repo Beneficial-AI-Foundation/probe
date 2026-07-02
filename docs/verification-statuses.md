@@ -41,6 +41,8 @@ An implementation is `specified` if it has a `primary-spec`. Where the `primary-
 - **probe-aeneas:** on the function's Lean translation, reached through `translation-name`, not on the Rust function itself.
 - **probe-lean:** derived from a spec convention — an `@[primary_spec]`/`@[progress]`/`@[pspec]`/`@[step]` attribute, a `_spec` suffix, or Aeneas-generated code ([P18](../kb/engineering/properties.md#p18-lean-specified-is-derived-not-stored)). Together with `rust-source` (the Rust origin probe-lean preserves on Aeneas-generated `def`s), these are the pairing signals that give a pure-Lean project an implementations ladder (see [Implementations](#implementations-does-an-implementation-verify-against-its-spec)). A generic Lean project carries neither, so every atom is `unspecified`.
 
+  probe-lean additionally emits a `primary-spec` by **sole-spec inference**: when a `def` is referenced by exactly one theorem, that theorem is recorded as its primary spec. "One theorem happens to cite this def" is not a pairing claim the project authors made, so consumers must not treat it as one: `count-colors.sh` accepts a `def`'s `primary-spec` only when *documented* — the spec theorem carries one of the attributes above or follows the `<def>_spec` naming convention.
+
 ## Colors
 
 Color encodes verification status. Atom roles are a separate axis, derived from `kind` plus the `translation-name`, `primary-spec`, and `rust-source` links; language is `rust`, `verus`, or `lean`.  `"trusted"` is Purple and `"failed"` is Red in every group. The palette is Grey, Yellow, Orange, Blue, Light Green, Dark Green, Purple, Red, and White. Orange flags an incomplete proof (a `sorry`/`assume`); Blue marks a Verus spec.
@@ -67,7 +69,7 @@ These roles map onto Verus's own `spec`, `proof`, and `exec` [modes](https://ver
 
 ### Implementations: does an implementation verify against its spec?
 
-Implementations are Rust `exec` atoms, plus the Lean `def`s paired with a Rust function: a translation target (some `exec`'s `translation-name` points at it), a specified `def` (it has a `primary-spec`), or an Aeneas-generated `def` (it has `rust-source`) — checked in that order. All are colored by the same ladder:
+Implementations are Rust `exec` atoms, plus the Lean `def`s paired with a Rust function: a translation target (some `exec`'s `translation-name` points at it), a specified `def` (it has a *documented* `primary-spec`; sole-spec inference does not count), or an Aeneas-generated `def` (it has `rust-source`) — checked in that order. All are colored by the same ladder:
 
 | state | color |
 |-------|-------|
@@ -79,7 +81,7 @@ Implementations are Rust `exec` atoms, plus the Lean `def`s paired with a Rust f
 | `"trusted"` | Purple |
 | `"failed"` | Red |
 
-A translation target takes its Rust function's color, so the pair shows one verdict twice (one atom under `rust`, one under `lean`); a specified `def` takes its verdict from its primary-spec theorem's status. This keeps a probe-lean-only extract, which has no `exec` atoms, colored like the merged view.
+A translation target takes its Rust function's color; a specified `def` takes its verdict from its primary-spec theorem's status. Each function is *counted* once: when an exec and its Lean stand-in are both shown, the count lives on the exec and the stand-in is only painted (VeriLib renders both nodes; see [Counting](#counting)). A probe-lean-only extract has no `exec` atoms, so there the stand-ins carry the implementation counts — the file still colors like the merged view.
 
 Green requires a spec, so a spec-less implementation is never Green: it is Grey (Verus `is-disabled`, or Aeneas not translated) or Yellow (translated or Aeneas-generated but unspecified). An implementation is never Blue: Blue marks a stated spec, while an implementation is colored by proof progress against its spec — an unfinished proof is Orange. `count-colors.sh` never reads `is-disabled`: a function that is in scope (`is-disabled: false`) but untranslated — e.g. `#[test]` functions that Aeneas skips — is Grey exactly like a disabled one, because "not translated" already means "outside the verification pipeline".
 
@@ -125,7 +127,7 @@ A generic Lean project has no mechanical rule pairing an implementation with its
 - A `theorem` is colored by proof status, as in [Proofs and theorem-specs](#proofs-and-theorem-specs-is-it-proved).
 - Everything else (`def`, `structure`, and so on) is a definition, as in [Definitions and type declarations](#definitions-and-type-declarations).
 
-Grey, Yellow, and Blue never appear: there are no excluded implementations, no translations, and no standalone specs. So a generic Lean project uses only Light Green, Dark Green, Orange, Red, Purple, and White.
+Grey, Yellow, and Blue never appear: there are no excluded implementations, no translations, and no standalone specs. So a generic Lean project uses only Light Green, Dark Green, Orange, Red, Purple, and White. In `count-colors.sh` output this is visible directly: the Implementations and Specifications groups are empty by construction, and empty groups print no table.
 
 ## Notes
 
@@ -137,10 +139,12 @@ Grey, Yellow, and Blue never appear: there are no excluded implementations, no t
 
 [`scripts/count-colors.sh`](../scripts/count-colors.sh) counts a Schema 2.0 atoms file, single-tool or merged. It first drops atoms with `code-path: ""` (corresponding to functions from external crates), and atoms flagged `is-hidden`/`is-ignored`/`is-extraction-artifact`, then assigns each remaining atom one color and one role, broken down by language. The groups are as follows:
 
-- **Implementations:** Rust `exec`, plus Lean `def`s that are translation targets, specified, or Aeneas-generated.
+- **Implementations:** Rust `exec`, plus Lean `def`s that are translation targets, specified (documented `primary-spec` only), or Aeneas-generated.
 - **Specifications:** Verus `spec fn`.
 - **Proofs and theorem-specs:** Verus `proof fn` and Lean `theorem`.
 - **Definitions and type declarations:** everything else.
+
+The tables count each function once: a Lean `def` whose exec is itself shown would repeat the exec's verdict, so it is excluded from the tables and reported in a footnote; when the exec is hidden or absent, the `def` carries the count. A group with nothing counted prints no table, so a generic Lean project shows only Proofs and Definitions.
 
 A browse-only file (no verification framework and no verification information on any shown atom) is reported as all White with no counts.
 
@@ -151,4 +155,4 @@ In tables mode (not `--per-atom`) the script also warns about data problems; it 
 - a Verus `proof` atom with no status ([probe-verus#33](https://github.com/Beneficial-AI-Foundation/probe-verus/issues/33));
 - violations of [P24](../kb/engineering/properties.md#p24-a-specified-atom-is-in-analysis-scope) (disabled yet specified) and [P25](../kb/engineering/properties.md#p25-a-graded-atom-is-in-analysis-scope) (disabled yet graded).
 
-`--per-atom` emits one JSON object per shown atom (`{id, language, group, kind, color}`).
+`--per-atom` emits one JSON object per shown atom (`{id, language, group, kind, color}`) — including both atoms of an exec/stand-in pair, since VeriLib paints both nodes; the count-once rule applies to the tables only.

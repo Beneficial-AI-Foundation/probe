@@ -16,11 +16,20 @@
 # Roles (see docs/verification-statuses.md):
 #   Implementation  — Rust `exec`, and a Lean `def` standing for a Rust function:
 #                     a translation-name target (inherits the exec's verify-status),
-#                     a `def` with its own primary-spec (colored by that spec
-#                     theorem's status), or an Aeneas-generated `def` (rust-source
-#                     present, no spec -> Yellow). A translation that merely
-#                     compiles is NOT counted Green unless the function it
+#                     a `def` with a *documented* primary-spec (colored by that
+#                     spec theorem's status), or an Aeneas-generated `def`
+#                     (rust-source present, no spec -> Yellow). A translation that
+#                     merely compiles is NOT counted Green unless the function it
 #                     implements is verified against a spec.
+#                     A primary-spec link is *documented* when the spec theorem
+#                     carries a spec attribute (primary_spec / progress / pspec /
+#                     step) or follows the `<def>_spec` naming convention.
+#                     probe-lean also emits primary-spec by sole-spec inference
+#                     (the def is referenced by exactly one theorem); that signal
+#                     is too loose to make the def an implementation, so it is
+#                     ignored here and the def stays in the Definitions group.
+#                     A generic Lean project carries no pairing evidence at all,
+#                     so its Implementations group is empty by construction.
 #   Spec definition — a Verus `spec fn` (kind: "spec"): a stated condition, no
 #                     proof obligation of its own -> Blue.
 #   Proof / theorem — Verus `proof fn`, Lean `theorem`: colored by proof status.
@@ -41,9 +50,16 @@
 # @kb: kb/engineering/properties.md#p24-a-specified-atom-is-in-analysis-scope
 # @kb: kb/engineering/properties.md#p25-a-graded-atom-is-in-analysis-scope
 #
+# The tables count each function once: a Lean def whose Rust exec is itself
+# shown repeats the exec's verdict, so it is left out of the tables (reported
+# as a footnote). A probe-lean-only extract has no exec atoms, so there the
+# Lean stand-ins carry the implementation counts. Empty groups print no table.
+#
 # Usage: scripts/count-colors.sh <input.json> [--per-atom]
 #   --per-atom  emit one JSON object per shown atom: {id, language, group, kind, color}
-#               (for VeriLib node coloring) instead of the human tables.
+#               (for VeriLib node coloring) instead of the human tables. Emits
+#               BOTH atoms of an exec/translation pair (VeriLib paints both
+#               nodes); the table dedupe applies to tables mode only.
 
 set -euo pipefail
 
@@ -83,15 +99,27 @@ jq -r --arg mode "$MODE" '
     elif $translated then "yellow"
     else "grey" end;
 
+  # A def-to-primary-spec link is documented when the spec theorem carries a
+  # spec attribute or is named `<def>_spec`. Excludes probe-lean sole-spec
+  # inference. Context (.) must be the full data map; $id is the def atom id.
+  def documented_spec($id; $v):
+    ($v["primary-spec"] // "") as $ps |
+    $ps != "" and (
+      $ps == ($id + "_spec")
+      or ( ((.[$ps] // {})["attributes"] // [])
+           | any(IN("primary_spec", "progress", "pspec", "step")) )
+    );
+
   # Implementation color for a Lean def standing for a Rust function.
   # $inherited = color inherited from the exec whose translation-name targets it
-  # (null if none). Context (.) must be the full data map for primary-spec lookup.
-  def def_impl_color($v; $inherited):
+  # (null if none); $specok = the primary-spec link is documented. Context (.)
+  # must be the full data map for primary-spec lookup.
+  def def_impl_color($v; $inherited; $specok):
     ($v["verification-status"] // null) as $vs |
     if   $vs == "trusted" then "purple"
     elif $vs == "failed"  then "red"
     elif $inherited != null then $inherited
-    elif (($v["primary-spec"] // "") != "") then
+    elif $specok then
       ( (.[$v["primary-spec"]] // {})["verification-status"] // null ) as $ss |
       (if   $ss == "transitively-verified" then "dark_green"
        elif $ss == "verified"              then "light_green"
@@ -149,6 +177,14 @@ jq -r --arg mode "$MODE" '
       if $tn != null then .[$tn] = ($d | impl_color($e.value)) else . end
     ) ) as $xlate |
 
+  # Translation targets whose exec is itself SHOWN: their def stand-ins would
+  # repeat a counted verdict, so the tables dedupe them (per-atom mode keeps
+  # them). When the exec is hidden or absent, the def carries the count.
+  ( reduce ($shown[] | select(.value.kind == "exec")) as $e ({};
+      ($e.value["translation-name"] // null) as $tn |
+      if $tn != null then .[$tn] = true else . end
+    ) ) as $shown_exec_target |
+
   if $browse_only then
     "Schema: \($schema)   (browse-only — no verification information)",
     "",
@@ -164,16 +200,18 @@ jq -r --arg mode "$MODE" '
         ($v.language // "?") as $lang |
         ($v["verification-status"] // null) as $vs |
         ($xlate[$id] // null) as $inherited |
+        ($d | documented_spec($id; $v)) as $specok |
         ( if   $k == "exec" then {group: "impl", color: ($d | impl_color($v))}
           elif ($k == "def" and
                 ($inherited != null
-                 or (($v["primary-spec"] // "") != "")
+                 or $specok
                  or (($v["rust-source"] // null) != null)))
-            then {group: "impl", color: ($d | def_impl_color($v; $inherited))}
+            then {group: "impl", color: ($d | def_impl_color($v; $inherited; $specok))}
           elif $k == "spec" then {group: "spec", color: (if $vs == "failed" then "red" elif $vs == "trusted" then "purple" else "blue" end)}
           elif ($k == "proof" or $k == "theorem") then {group: "proof", color: proof_color($vs)}
           else {group: "def", color: def_color($vs)} end )
         + {id: $id, language: $lang, kind: $k}
+      | . + {dup: (.group == "impl" and .kind == "def" and ($shown_exec_target[.id] == true))}
     ] as $atoms |
 
     if $mode == "per-atom" then
@@ -185,11 +223,16 @@ jq -r --arg mode "$MODE" '
                  elif startswith("probe/")       then "merged"
                  else "mixed" end) as $pipeline |
 
+      # Table atoms: each function counted once (dup stand-ins excluded).
+      [ $atoms[] | select(.dup | not) ] as $tatoms |
+      ([ $atoms[] | select(.dup) ] | length) as $deduped |
+
       # counters
-      def cnt($g; $lang; $c): [ $atoms[] | select(.group==$g and .language==$lang and .color==$c) ] | length;
-      def langs($g): [ $atoms[] | select(.group==$g) | .language ] | unique;
-      def sub($g; $lang): [ $atoms[] | select(.group==$g and .language==$lang) ] | length;
-      def tot($c): [ $atoms[] | select(.color==$c) ] | length;
+      def cnt($g; $lang; $c): [ $tatoms[] | select(.group==$g and .language==$lang and .color==$c) ] | length;
+      def langs($g): [ $tatoms[] | select(.group==$g) | .language ] | unique;
+      def sub($g; $lang): [ $tatoms[] | select(.group==$g and .language==$lang) ] | length;
+      def grp($g): [ $tatoms[] | select(.group==$g) ] | length;
+      def tot($c): [ $tatoms[] | select(.color==$c) ] | length;
 
       # generic row renderer: pads columns loosely (markdown-ish)
       def row($g; $lang; $cols): ($lang + "  | " + ([ $cols[] as $c | (cnt($g;$lang;$c)|tostring) ] | join("  | ")) + "  | " + (sub($g;$lang)|tostring));
@@ -201,29 +244,38 @@ jq -r --arg mode "$MODE" '
 
       "Pipeline: \($pipeline)   (shown \($shown|length), dropped \($dropped) not-shown)",
       "",
-      "Implementations — does it *verify against its spec*?   (color = verify status)",
-      "lang  | Grey | Yellow | Orange | LtGreen | DkGreen | Purple | Red | Subtotal",
-      ( langs("impl")[] as $l | (sub("impl";$l) > 0 | if . then row("impl";$l;$impl_cols) else empty end) ),
-      "",
-      "Specifications (stated conditions) — Verus spec fn, not proved   (Blue)",
-      "lang  | Blue | Purple | Red | Subtotal",
-      ( langs("spec")[] as $l | (sub("spec";$l) > 0 | if . then row("spec";$l;$spec_cols) else empty end) ),
-      "",
-      "Proofs & theorem-specs — is it *proved*?",
-      "lang  | Orange | LtGreen | DkGreen | Purple | Red | White | Subtotal",
-      ( langs("proof")[] as $l | (sub("proof";$l) > 0 | if . then row("proof";$l;$proof_cols) else empty end) ),
-      "",
-      "Definitions & type declarations   (White; Orange if a def has a sorry)",
-      "lang  | White | Orange | Purple | Red | Subtotal",
-      ( langs("def")[] as $l | (sub("def";$l) > 0 | if . then row("def";$l;$def_cols) else empty end) ),
-      "",
+      ( if grp("impl") > 0 then
+          "Implementations — does it *verify against its spec*?   (color = verify status)",
+          "lang  | Grey | Yellow | Orange | LtGreen | DkGreen | Purple | Red | Subtotal",
+          ( langs("impl")[] as $l | (sub("impl";$l) > 0 | if . then row("impl";$l;$impl_cols) else empty end) ),
+          ""
+        else empty end ),
+      ( if grp("spec") > 0 then
+          "Specifications (stated conditions) — Verus spec fn, not proved   (Blue)",
+          "lang  | Blue | Purple | Red | Subtotal",
+          ( langs("spec")[] as $l | (sub("spec";$l) > 0 | if . then row("spec";$l;$spec_cols) else empty end) ),
+          ""
+        else empty end ),
+      ( if grp("proof") > 0 then
+          "Proofs & theorem-specs — is it *proved*?",
+          "lang  | Orange | LtGreen | DkGreen | Purple | Red | White | Subtotal",
+          ( langs("proof")[] as $l | (sub("proof";$l) > 0 | if . then row("proof";$l;$proof_cols) else empty end) ),
+          ""
+        else empty end ),
+      ( if grp("def") > 0 then
+          "Definitions & type declarations   (White; Orange if a def has a sorry)",
+          "lang  | White | Orange | Purple | Red | Subtotal",
+          ( langs("def")[] as $l | (sub("def";$l) > 0 | if . then row("def";$l;$def_cols) else empty end) ),
+          ""
+        else empty end ),
       "Combined (universal color, all groups/languages)",
       "Color       | Count",
       "------------|------",
       ( ["grey","white","yellow","blue","orange","light_green","dark_green","purple","red"][] as $c
         | (tot($c) > 0 | if . then ($c + " | " + (tot($c)|tostring)) else empty end) ),
       "------------|------",
-      "Total shown | \($atoms|length)",
+      "Total counted | \($tatoms|length)",
+      (if $deduped > 0 then "(+ \($deduped) Lean stand-ins of counted execs, not double-counted; per-atom mode emits them)" else empty end),
       ( [ $shown[] | select(.value["translation-name"] != null and ($d[.value["translation-name"]] == null)) ] | length ) as $dangling_xlate |
       (if $dangling_xlate > 0 then "  WARNING: \($dangling_xlate) atom(s) have a translation-name absent from the file" else empty end),
       ( [ $shown[] | select(.value.kind == "def" and ((.value["primary-spec"] // "") != "") and ($d[.value["primary-spec"]] == null)) ] | length ) as $dangling_spec |

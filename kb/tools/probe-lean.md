@@ -90,7 +90,7 @@ Additional filtering via `.verilib/probes/config.json`:
 Unlike probe-verus where specs are extracted from requires/ensures clauses, in Lean specs are identified by reverse dependency: a theorem that depends on a definition is a spec for that definition.
 
 - `specs` field: array of theorem code-names that depend on this atom
-- `primary-spec`: set by `@[primary_spec]` attribute or inferred from `<name>_spec` naming convention
+- `primary-spec`: chosen by precedence — `@[primary_spec]` attribute > known framework attribute (`@[progress]`/`@[pspec]`/`@[step]`) > `<name>_spec` naming convention > sole-spec inference (the def is referenced by exactly one theorem). Sole-spec inference is a weak signal ("one theorem happens to cite this def" is not a pairing claim); consumers such as `count-colors.sh` accept a `def`'s `primary-spec` only when it comes from the attribute or naming conventions
 - Whether an atom is "specified" is inferred from `specs` being non-empty — no separate `specified` field. See [P18](../engineering/properties.md#p18-lean-specified-is-derived-not-stored).
 
 ## Subcommands
