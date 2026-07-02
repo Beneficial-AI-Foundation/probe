@@ -128,10 +128,11 @@ Abbreviation for `rust-qualified-name` — a [Charon](#charon)-derived fully qua
 
 ## trusted (verification-status)
 
-A `verification-status` value (see [P16](properties.md#p16-verification-status-mapping) and [probe-lean tool doc](../tools/probe-lean.md)) indicating that a declaration is assumed correct without formal proof. Applies to Lean [axioms](#kind) and declarations in `*External.lean` files (Aeneas convention for hand-written models of external Rust functions/types). These form the **trust base** of a verified project — assumptions the rest of the proofs rely on.
+A `verification-status` value (see [P16](properties.md#p16-verification-status-mapping) and [probe-lean tool doc](../tools/probe-lean.md)) indicating that a declaration is assumed correct without formal proof. Applies to Lean [axioms](#kind), declarations tagged `@[externally_verified]`, and declarations in `*External.lean` files (Aeneas convention for hand-written models of external Rust functions/types). These form the **trust base** of a verified project — assumptions the rest of the proofs rely on.
 
 When `verification-status` is `"trusted"`, a `trusted-reason` field is also present:
 - `"axiom"` — Lean `axiom` keyword (probe-lean)
+- `"externally_verified"` — `@[externally_verified]` attribute, proof discharged outside Lean (probe-lean)
 - `"external"` — `*External.lean` file convention (probe-lean)
 - `"admit"` — `admit()` call (probe-verus)
 - `"external-body"` — `#[verifier::external_body]` attribute (probe-verus)
@@ -145,7 +146,7 @@ After enrichment, the distinction between `"transitively-verified"` and `"verifi
 - `"transitively-verified"` — no transitive dependency is explicitly `"unverified"` or `"failed"` (Dark Green in UX)
 - `"verified"` — at least one transitive dependency is explicitly `"unverified"` or `"failed"` (Light Green in UX)
 
-probe-verus and probe-aeneas run enrichment as the last step of `extract` (skippable via `--skip-enrich`). The `probe enrich` CLI command is also available for standalone use.
+probe-verus, probe-aeneas, and probe-lean run enrichment as the last step of `extract` (probe-verus/probe-aeneas via `enrich_verification_status`, probe-lean via its own Lean implementation of the same algorithm; skippable via `--skip-enrich`). The `probe enrich` CLI command is also available for standalone use.
 
 ## trust base
 

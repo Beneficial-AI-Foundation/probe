@@ -14,19 +14,23 @@
 # (code-path == "") and atoms flagged is-hidden / is-ignored / is-extraction-artifact.
 #
 # Roles (see docs/verification-statuses.md):
-#   Implementation  — Rust `exec`, and an Aeneas Lean translation `def` (a `def`
-#                     that is some exec's translation-name target). A translation
-#                     inherits its Rust function's verify-status, so a translation
-#                     that merely compiles is NOT counted Green unless the function
-#                     it implements is verified against a spec.
+#   Implementation  — Rust `exec`, and a Lean `def` standing for a Rust function:
+#                     a translation-name target (inherits the exec's verify-status),
+#                     a `def` with its own primary-spec (colored by that spec
+#                     theorem's status), or an Aeneas-generated `def` (rust-source
+#                     present, no spec -> Yellow). A translation that merely
+#                     compiles is NOT counted Green unless the function it
+#                     implements is verified against a spec.
 #   Spec definition — a Verus `spec fn` (kind: "spec"): a stated condition, no
 #                     proof obligation of its own -> Blue.
 #   Proof / theorem — Verus `proof fn`, Lean `theorem`: colored by proof status.
-#   Definition      — a non-translation `def`/`abbrev`/`opaque`/..., or a type
+#                     A proof with no status is White (not matched to a
+#                     verification result — extraction bug, see probe-verus#33).
+#   Definition      — a non-implementation `def`/`abbrev`/`opaque`/..., or a type
 #                     declaration (`structure`/`inductive`/`class`): White, unless
 #                     a `def` body carries a sorry (-> Orange) or it is trusted.
 #
-# Colors (status): Grey unspecified impl; Yellow Aeneas translated-but-unspecified;
+# Colors (status): Grey unspecified impl; Yellow translated/generated-but-unspecified;
 #   Orange "unverified" (a Verus assume() / Lean sorry); Light Green "verified";
 #   Dark Green "transitively-verified"; Purple "trusted"; Red "failed"; White nothing
 #   to grade; Blue a Verus spec definition. "trusted"->Purple and "failed"->Red take
@@ -35,6 +39,7 @@
 # A browse-only project (no verification framework, no verification information on
 # any shown atom) is reported as all White, with no counts.
 # @kb: kb/engineering/properties.md#p24-a-specified-atom-is-in-analysis-scope
+# @kb: kb/engineering/properties.md#p25-a-graded-atom-is-in-analysis-scope
 #
 # Usage: scripts/count-colors.sh <input.json> [--per-atom]
 #   --per-atom  emit one JSON object per shown atom: {id, language, group, kind, color}
@@ -78,10 +83,26 @@ jq -r --arg mode "$MODE" '
     elif $translated then "yellow"
     else "grey" end;
 
-  # Proof/theorem color (proved axis) for status $vs.
-  # The final "white" is a fallback for a proof/theorem with no verification-status
-  # (rare, e.g. verification skipped); the Proofs table in the doc lists only the
-  # graded rows. It keeps the partition total correct if such an atom ever appears.
+  # Implementation color for a Lean def standing for a Rust function.
+  # $inherited = color inherited from the exec whose translation-name targets it
+  # (null if none). Context (.) must be the full data map for primary-spec lookup.
+  def def_impl_color($v; $inherited):
+    ($v["verification-status"] // null) as $vs |
+    if   $vs == "trusted" then "purple"
+    elif $vs == "failed"  then "red"
+    elif $inherited != null then $inherited
+    elif (($v["primary-spec"] // "") != "") then
+      ( (.[$v["primary-spec"]] // {})["verification-status"] // null ) as $ss |
+      (if   $ss == "transitively-verified" then "dark_green"
+       elif $ss == "verified"              then "light_green"
+       elif $ss == "trusted"               then "purple"
+       elif $ss == "failed"                then "red"
+       else "orange" end)
+    else "yellow" end;
+
+  # Proof/theorem color (proved axis) for status $vs. The "white" fallback is
+  # the documented "no status" row: the atom was never matched to a
+  # verification result (extraction bug, probe-verus#33).
   def proof_color($vs):
     if   $vs == "trusted"               then "purple"
     elif $vs == "failed"                then "red"
@@ -116,12 +137,14 @@ jq -r --arg mode "$MODE" '
               or ((.value["primary-spec"] // "") != "")
               or (((.value["specs"] // []) | length) > 0)
               or ((.value["translation-name"] // null) != null)
+              or ((.value["rust-source"] // null) != null)
           ) ) | not )
   ) as $browse_only |
 
   # Map: translation-target id -> the impl color of the exec that owns it.
-  # Lets a Lean translation def inherit its Rust function verify-status.
-  ( reduce ($shown[] | select(.value.kind == "exec")) as $e ({};
+  # Built from ALL execs (not just shown ones) so a translation def is still
+  # an implementation when its exec is hidden.
+  ( reduce ($d | to_entries[] | select(.value.kind == "exec")) as $e ({};
       ($e.value["translation-name"] // null) as $tn |
       if $tn != null then .[$tn] = ($d | impl_color($e.value)) else . end
     ) ) as $xlate |
@@ -133,6 +156,8 @@ jq -r --arg mode "$MODE" '
     "(dropped \($dropped) not-shown atoms)"
   else
     # Classify every shown atom: {id, lang, kind, group, color}.
+    # The if/elif/else is total, so the four groups partition the shown atoms
+    # by construction.
     [ $shown[]
       | .key as $id | .value as $v |
         ($v.kind // "") as $k |
@@ -140,7 +165,11 @@ jq -r --arg mode "$MODE" '
         ($v["verification-status"] // null) as $vs |
         ($xlate[$id] // null) as $inherited |
         ( if   $k == "exec" then {group: "impl", color: ($d | impl_color($v))}
-          elif ($k == "def" and $inherited != null) then {group: "impl", color: $inherited}
+          elif ($k == "def" and
+                ($inherited != null
+                 or (($v["primary-spec"] // "") != "")
+                 or (($v["rust-source"] // null) != null)))
+            then {group: "impl", color: ($d | def_impl_color($v; $inherited))}
           elif $k == "spec" then {group: "spec", color: (if $vs == "failed" then "red" elif $vs == "trusted" then "purple" else "blue" end)}
           elif ($k == "proof" or $k == "theorem") then {group: "proof", color: proof_color($vs)}
           else {group: "def", color: def_color($vs)} end )
@@ -195,17 +224,26 @@ jq -r --arg mode "$MODE" '
         | (tot($c) > 0 | if . then ($c + " | " + (tot($c)|tostring)) else empty end) ),
       "------------|------",
       "Total shown | \($atoms|length)",
-      ( ([$atoms[]|select(.group=="impl")]|length)  as $impl_n |
-        ([$atoms[]|select(.group=="spec")]|length)  as $spec_n |
-        ([$atoms[]|select(.group=="proof")]|length) as $proof_n |
-        ([$atoms[]|select(.group=="def")]|length)   as $def_n |
-        if ($impl_n + $spec_n + $proof_n + $def_n) != ($shown|length) then
-          "  WARNING: impl+spec+proof+def (\($impl_n+$spec_n+$proof_n+$def_n)) != shown (\($shown|length))"
-        else empty end ),
-      ( [ $shown[] | select(.value["translation-name"] != null and ($d[.value["translation-name"]] == null)) ] | length ) as $dangling |
-      (if $dangling > 0 then "  WARNING: \($dangling) atom(s) have a translation-name absent from the file" else empty end),
+      ( [ $shown[] | select(.value["translation-name"] != null and ($d[.value["translation-name"]] == null)) ] | length ) as $dangling_xlate |
+      (if $dangling_xlate > 0 then "  WARNING: \($dangling_xlate) atom(s) have a translation-name absent from the file" else empty end),
+      ( [ $shown[] | select(.value.kind == "def" and ((.value["primary-spec"] // "") != "") and ($d[.value["primary-spec"]] == null)) ] | length ) as $dangling_spec |
+      (if $dangling_spec > 0 then "  WARNING: \($dangling_spec) def(s) have a primary-spec absent from the file" else empty end),
       ( [ $shown[] | .value["verification-status"] // null | select(. != null and ((. | IN("verified","transitively-verified","unverified","failed","trusted")) | not)) ] | length ) as $unknown |
-      (if $unknown > 0 then "  WARNING: \($unknown) atom(s) have an unrecognized verification-status" else empty end)
+      (if $unknown > 0 then "  WARNING: \($unknown) atom(s) have an unrecognized verification-status" else empty end),
+      ( [ $shown[] | select(.value.kind == "proof" and ((.value["verification-status"] // null) == null)) ] | length ) as $graded_gap |
+      (if $graded_gap > 0 then "  WARNING: \($graded_gap) proof atom(s) have no verification-status (probe-verus#33)" else empty end),
+      ( [ $shown[] | select(
+            ((.value["is-disabled"] // false) == true) and
+            ( ((.value["primary-spec"] // "") != "")
+              or ( (.value["translation-name"] // null) as $tn |
+                   $tn != null and (($d[$tn]["primary-spec"] // "") != "") ) )
+        ) ] | length ) as $p24 |
+      (if $p24 > 0 then "  WARNING: \($p24) atom(s) violate P24 (disabled yet specified)" else empty end),
+      ( [ $shown[] | select(
+            ((.value["is-disabled"] // false) == true) and
+            ((.value["verification-status"] // null) != null)
+        ) ] | length ) as $p25 |
+      (if $p25 > 0 then "  WARNING: \($p25) atom(s) violate P25 (disabled yet graded)" else empty end)
     end
   end
 ' "$INPUT"

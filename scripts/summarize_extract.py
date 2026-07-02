@@ -37,6 +37,7 @@ TRUST_LABELS = {
     "assume-specification": "assumed spec",
     "axiom": "axiom",
     "external": "external",
+    "externally_verified": "externally verified",
 }
 
 # Tool-specific configuration keyed by detected tool family.
@@ -53,7 +54,7 @@ TOOL_CONFIG = {
     "lean": {
         "verifier_name": "Lean",
         "axiom_reasons": ("axiom",),
-        "external_reasons": ("external",),
+        "external_reasons": ("external", "externally_verified"),
         "axiom_description": "Axioms — propositions assumed without proof.",
         "lemma_kinds": ("theorem",),
         "remaining_kinds": ("def", "abbrev", "projection", "opaque", "instance", "class", "structure", "inductive"),
@@ -62,7 +63,7 @@ TOOL_CONFIG = {
     "aeneas": {
         "verifier_name": "Lean (via Aeneas)",
         "axiom_reasons": ("axiom",),
-        "external_reasons": ("external",),
+        "external_reasons": ("external", "externally_verified"),
         "axiom_description": "Axioms — propositions assumed without proof.",
         "lemma_kinds": ("theorem",),
         "remaining_kinds": ("def", "abbrev", "projection", "opaque", "instance"),
@@ -175,8 +176,32 @@ def _trust_base_section(out, data, cfg):
     )
 
 
-def _unverified_section(out, data):
-    """Section 4: Unverified and failed functions (separate subsections)."""
+def _unverified_kind_category(atom, cfg):
+    """Classify an atom by kind into function / lemma / definition / other.
+
+    Kinds vary per tool, so this uses the tool config to decide:
+    - `exec` is always an executable function (Rust / Verus exec).
+    - `lemma_kinds` (e.g. `theorem`, `proof`) are lemmas.
+    - remaining non-exec kinds (e.g. `def`, `instance`) are definitions.
+    Anything else falls through to "other".
+    """
+    kind = get_val(atom, "kind")
+    if kind == "exec":
+        return "function"
+    if kind in cfg["lemma_kinds"]:
+        return "lemma"
+    if kind in cfg["remaining_kinds"]:
+        return "definition"
+    return "other"
+
+
+def _unverified_section(out, data, cfg):
+    """Section 4: Unverified and failed atoms.
+
+    Unverified atoms are split by kind so that, e.g., an unproved Lean
+    `theorem` is reported as an unverified lemma rather than being lumped in
+    with executable functions.
+    """
     unverified = filtered_ids(
         data, lambda a: get_val(a, "verification-status") == "unverified"
     )
@@ -184,12 +209,30 @@ def _unverified_section(out, data):
         data, lambda a: get_val(a, "verification-status") == "failed"
     )
     combined = len(unverified) + len(failed)
-    out.append(f"## 4. Unverified and failed functions ({combined})\n")
+    out.append(f"## 4. Unverified and failed atoms ({combined})\n")
 
-    out.append(f"### 4a. Unverified functions ({len(unverified)})\n")
-    out.append(bullet_list(unverified))
+    buckets = {"function": [], "lemma": [], "definition": [], "other": []}
+    for pid in unverified:
+        buckets[_unverified_kind_category(data[pid], cfg)].append(pid)
 
-    out.append(f"### 4b. Failed functions ({len(failed)})\n")
+    # 4a. Functions are always shown (this is the primary category).
+    out.append(f"### 4a. Unverified functions ({len(buckets['function'])})\n")
+    out.append(bullet_list(buckets["function"]))
+
+    # Optional subsections — only emitted when non-empty to avoid noise for
+    # tools that have no lemmas/definitions (e.g. probe-rust).
+    sub = ord("b")
+    for category, label in (
+        ("lemma", "Unverified lemmas"),
+        ("definition", "Unverified definitions"),
+        ("other", "Unverified (other)"),
+    ):
+        if buckets[category]:
+            out.append(f"### 4{chr(sub)}. {label} ({len(buckets[category])})\n")
+            out.append(bullet_list(buckets[category]))
+            sub += 1
+
+    out.append(f"### 4{chr(sub)}. Failed functions ({len(failed)})\n")
     out.append(bullet_list(failed))
 
     return combined
@@ -263,7 +306,7 @@ def _generate_lean_report(out, data, cfg):
     _trust_base_section(out, data, cfg)
 
     # --- 4. Unverified and failed (shared) ---
-    combined = _unverified_section(out, data)
+    combined = _unverified_section(out, data, cfg)
 
     # --- 5. Verified remaining (empty for Lean) ---
     out.append(f"## 5. Verified remaining {remaining_label} functions (0)\n")
@@ -341,7 +384,7 @@ def _generate_non_lean_report(out, data, cfg, tool):
     _trust_base_section(out, data, cfg)
 
     # --- 4. Unverified and failed (shared) ---
-    _unverified_section(out, data)
+    _unverified_section(out, data, cfg)
 
     # --- 5. Verified remaining functions ---
     verified_remaining = filtered_ids(

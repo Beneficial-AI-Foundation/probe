@@ -64,6 +64,7 @@ Verification status mapping:
 | Condition | `verification-status` | `trusted-reason` |
 |-----------|----------------------|-----------------|
 | `kind == "axiom"` | `"trusted"` | `"axiom"` |
+| `@[externally_verified]` attribute (proof discharged outside Lean) | `"trusted"` | `"externally_verified"` |
 | `code-path` ends with `External.lean` | `"trusted"` | `"external"` |
 | No sorry | `"verified"` | absent |
 | Has sorry | `"unverified"` | absent |
@@ -145,8 +146,8 @@ Output goes to `.verilib/views/`.
 | `rust-source` | string/null | Rust source path from Aeneas docstring |
 | `specs` | array | Theorem code-names depending on this. Absent when empty. |
 | `primary-spec` | string | Primary spec theorem code-name. Absent when none. |
-| `verification-status` | string | `"verified"`, `"unverified"`, `"failed"`, `"trusted"`. Absent when skipped. |
-| `trusted-reason` | string | `"axiom"` or `"external"`. Present only when `verification-status` is `"trusted"`. |
+| `verification-status` | string | `"transitively-verified"`, `"verified"`, `"unverified"`, `"failed"`, `"trusted"`. Absent when skipped. |
+| `trusted-reason` | string | `"axiom"`, `"externally_verified"`, or `"external"`. Present only when `verification-status` is `"trusted"`. |
 
 ## Determinism (P14)
 
