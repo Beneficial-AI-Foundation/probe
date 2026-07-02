@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `probe merge` now supports 1-to-many mappings: a single `from` key can map to multiple `to` targets
 - Terminology: generic cross-language linking concept renamed from "translation" to "mapping" across KB, docs, and code; "translation" retained for Aeneas-specific transpilation context
 - `scripts/count-colors.sh` reworked to implement the two-table color scheme in `docs/verification-statuses.md`: per-atom coloring across all pipelines (incl. Lean and merged files), single Blue (was light/dark), adds Red (`failed`), browse-only detection for framework-less files, drops `is-hidden`/`is-ignored`/`is-extraction-artifact` atoms, and checks `specified` before proof status so an unspecified impl cannot be counted Green. Reconciled the doc's Counting section and property P24.
+- Color scheme refined so each color carries one meaning, with role and language as separate axes (`docs/verification-statuses.md` + `scripts/count-colors.sh`):
+  - **Orange** flags an incomplete proof (`"unverified"` — a Verus `assume()` / Lean `sorry`), replacing Blue on implementations and placed next to Red so unfinished proofs stand out; a Verus `admit()` stays Purple (intentional trust) while `assume()` is Orange.
+  - **Blue** marks a Verus spec *definition* (`kind: "spec"`), a stated condition with no proof obligation.
+  - **Color = status; role (impl / spec / proof / definition / type decl) is a separate axis** derived from `kind` + the `translation-name`/`primary-spec` links, intended for shape encoding in VeriLib.
+  - `count-colors.sh` now counts **four role groups, broken down by language** (`rust`/`verus`/`lean`): Implementations (Rust `exec` + Aeneas Lean translation `def`s — "does it verify against its spec?"), Specifications (Verus `spec fn` stated conditions → Blue, never proved), Proofs & theorem-specs (Verus `proof fn`, Lean `theorem` — "is it proved?"), and Definitions & type declarations. Verus specs-as-properties are kept out of the "is it proved?" group since they are stated, not proved.
+  - An Aeneas Lean translation `def` **inherits its Rust function's** verify-status (so a translation that merely compiles is not Green unless the function verifies against a spec; a spec-less translation is Yellow). **Green is reserved for verifying implementations and for `theorem`/`proof`** — a sorry-free `def` is White, a `def`-with-`sorry` is Orange.
+  - New `--per-atom` mode emits `{id, language, group, kind, color}` per shown atom for VeriLib.
+  - See probe-aeneas#23: translation `def`s currently take status from sorry-freeness rather than their spec theorem; the script compensates by inheriting the Rust exec's status.
 
 ### Fixed
 - C8: Duplicate `from` keys in mapping files no longer silently overwrite (last-wins); all targets are now collected and applied
