@@ -239,9 +239,9 @@ If an atom has a spec, it is not disabled: `has-spec ⟹ ¬is-disabled`. Equival
 - **probe-aeneas** — guaranteed structurally. `has-spec` requires a `translation-name` (sourced from functions.json `lean_name`) whose translation carries a `primary-spec`; `is-disabled` means the atom's RQN is absent from functions.json. A spec therefore implies the RQN is in functions.json, which implies relevant (not disabled).
 - **probe-verus / probe-lean** — guaranteed by the specify step, which only attaches specs to in-scope atoms. The schema fields are independent, so this is a tooling convention rather than a structural consequence.
 
-**Why it matters**: the verification-color partition (Grey, White, Yellow, Dark Blue, Purple) relies on this. `Grey` selects all disabled atoms and `Dark Blue` selects specified-non-trusted atoms *without* a disabled guard; were the invariant violated, such an atom would be counted in both, breaking `grey + white + yellow + dark_blue + purple_impl == total`.
+**Why it matters**: the implementations color table ([docs/verification-statuses.md](../../docs/verification-statuses.md#colors)) colors a `specified` `exec` atom Blue / Light Green / Dark Green and an unspecified one Grey (Verus) or Yellow (Aeneas). `count-colors.sh` decides `specified` from `primary-spec` (or the Aeneas translation's), not from `is-disabled` directly. This invariant keeps the two consistent: because every disabled atom is spec-less, a disabled atom is counted Grey rather than being mistaken for a specified, in-scope (Blue/Green) atom.
 
-**Validation**: `scripts/count-colors.sh` emits a partition warning if its color buckets do not sum to the total — the backstop that would surface any violation. See [docs/verification-statuses.md](../../docs/verification-statuses.md#colors).
+**Validation**: guaranteed upstream (see above). `scripts/count-colors.sh` *relies on* this invariant rather than re-checking it — it reads `specified` from `primary-spec`/translation, not from `is-disabled`, so a violating atom (disabled yet specified) would be mis-counted as specified, not flagged. The script's subtotal checks only confirm that every shown atom received exactly one color. See [docs/verification-statuses.md](../../docs/verification-statuses.md#colors).
 
 ## Known bugs and edge cases
 
