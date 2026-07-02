@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: Public types renamed: `TranslationMapping` → `Mapping`, `TranslationsFile` → `MappingsFile`, `load_translations()` → `load_mappings()`
 - `probe merge` now supports 1-to-many mappings: a single `from` key can map to multiple `to` targets
 - Terminology: generic cross-language linking concept renamed from "translation" to "mapping" across KB, docs, and code; "translation" retained for Aeneas-specific transpilation context
+- `scripts/count-colors.sh` reworked to implement the two-table color scheme in `docs/verification-statuses.md`: per-atom coloring across all pipelines (incl. Lean and merged files), single Blue (was light/dark), adds Red (`failed`), browse-only detection for framework-less files, drops `is-hidden`/`is-ignored`/`is-extraction-artifact` atoms, and checks `specified` before proof status so an unspecified impl cannot be counted Green. Reconciled the doc's Counting section and property P24.
 
 ### Fixed
 - C8: Duplicate `from` keys in mapping files no longer silently overwrite (last-wins); all targets are now collected and applied

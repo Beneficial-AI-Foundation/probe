@@ -1,6 +1,6 @@
 # Verification Statuses
 
-Defines the per-atom status fields (from the tool schemas) and the color scheme derived from them. Color counts are produced by [`scripts/count-colors.sh`](../scripts/count-colors.sh), which this document and the script must agree on — the script is currently out of date with the scheme below and will be reconciled in a follow-up PR (see [Counting](#counting)).
+Defines the per-atom status fields (from the tool schemas) and the color scheme derived from them. Color counts are produced by [`scripts/count-colors.sh`](../scripts/count-colors.sh), which implements the scheme defined here (see [Counting](#counting)).
 
 ## Proved vs verified
 
@@ -51,7 +51,7 @@ An implementation is `specified` if it has a spec attached, else `unspecified`. 
 
 - **probe-verus** — `primary-spec` is on the Rust function and holds the inline spec text (`requires` + `ensures`). Non-empty `primary-spec` ⇔ `is-disabled: false` ⇔ specified.
 - **probe-lean** — `primary-spec` names the chosen spec theorem and `specs` lists every spec-theorem code-name; an atom is `specified` if `specs` is non-empty, equivalently if `primary-spec` is present ([P18](../kb/engineering/properties.md#p18-lean-specified-is-derived-not-stored)). `specs` is a *generic* signal — every theorem whose dependencies include the atom — so it names a spec *of an implementation* only under a spec convention: an `@[primary_spec]`/`@[progress]`/`@[pspec]`/`@[step]` attribute, a `_spec` suffix, or Aeneas-generated code (see [how `primary-spec` is selected](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md#probe-leanextract-unified-atoms)). A generic Lean project adopts no such convention, so its atoms have empty `specs` and are all `unspecified` — they are colored by whether they are *proved*, not against a spec.
-- **probe-aeneas** — a Rust function carries no spec of its own; `specified` is read off its Lean translation (the atom named by `translation-name`).
+- **probe-aeneas** — a Rust function carries no spec of its own; `specified` is read off its Lean translation (the atom named by `translation-name`) — specifically whether that translation has a `primary-spec` (the chosen spec theorem, matching the verified-requires-a-primary-spec rule above). A non-empty `specs` alone does *not* make it specified: for Aeneas-generated code `specs` is the generic "every theorem in the dependency cone" signal, so it names specs of *other* functions too.
 
 ## Colors
 
@@ -71,14 +71,17 @@ The executable Rust atoms (`kind: "exec"`), colored by whether they are [`specif
 | state | colour |
 |-------|--------|
 | Verus **unspecified** (i.e. `is-disabled: true`); Aeneas not translated | Grey |
-| Aeneas: translated but **unspecified** | Yellow |
-| **specified**, not yet proven (`"unverified"`) | Blue |
-| `"verified"` | Light Green |
-| `"transitively-verified"` | Dark Green |
+| Aeneas: translated but **unspecified** | Yellow *(Aeneas only)* |
+| **specified** but not yet proven (`"unverified"`) | Blue |
+| **specified** and `"verified"` | Light Green |
+| **specified** and `"transitively-verified"` | Dark Green |
 | `"trusted"` | Purple |
 | `"failed"` | Red |
 
-Green requires being `specified` — a function can only *verify* against a spec, so a spec-less Verus function is Grey. (`"verified"`/`"transitively-verified"` already imply a proven spec, so those rows are necessarily `specified`.)
+#### Note
+
+1. Green requires being `specified` — a function can only *verify* against a spec, so a spec-less Verus function is Grey. (`"verified"`/`"transitively-verified"` already imply a proven spec, so those rows are necessarily `specified`.)
+2. What makes an atom `specified` differs by tool — Verus reads the Rust function's own inline `primary-spec` (non-empty ⇔ `is-disabled: false`), whereas Aeneas reads it off the function's Lean translation. See [`specified`](#specified) above.
 
 ### Specifications and proofs — is it *proved*? (Lean atoms and Verus `proof` / `spec`)
 
@@ -105,7 +108,12 @@ A Lean construct with a `sorry` is `"unverified"` → **Blue**. For a theorem th
 
 ### Counting
 
-> ⚠️ `scripts/count-colors.sh` and KB property [P24](../kb/engineering/properties.md#p24-a-specified-atom-is-in-analysis-scope) still encode the older partition (separate White/Blue buckets, no Red). They will be reconciled with this scheme in a follow-up PR.
+[`scripts/count-colors.sh`](../scripts/count-colors.sh) reports per-color counts for a Schema 2.0 atoms file — single-tool (`probe-<tool>/extract`) or a merged `probe/merged-atoms`. It first drops the atoms that are not shown in VeriLib (external-crate stubs `code-path: ""`, plus `is-hidden` / `is-ignored` / `is-extraction-artifact`), then assigns each remaining atom exactly one color and counts it in one of two groups mirroring the tables above:
+
+- **Implementations** (`kind: "exec"`) — the first table: Grey / Yellow / Blue / Light Green / Dark Green / Purple / Red.
+- **Specifications and proofs** (every other atom) — the second table: White / Blue / Light Green / Dark Green / Purple / Red.
+
+The two groups partition the shown atoms, so `impl-subtotal + spec-subtotal = shown`, and — because each atom gets a single color — the buckets within a group sum to its subtotal; the script warns if either check fails. A browse-only file — one with no verification framework and no verification information (`probe-rust/extract`, or a merged file whose shown atoms carry no `verification-status`, `primary-spec`, `specs`, or `translation-name`) — is reported as all White with no per-color counts. A `probe-verus`/`-aeneas`/`-lean` extract always uses the two tables, so its spec-less execs are Grey rather than White even when nothing is specified yet. `specified` is evaluated before proof status, so an unspecified `exec` atom is counted Grey/Yellow even if its `verification-status` is `"verified"` — Green requires being specified, which relies on `has-spec ⟹ ¬is-disabled` ([P24](../kb/engineering/properties.md#p24-a-specified-atom-is-in-analysis-scope)).
 
 ## Open questions
 
