@@ -35,13 +35,13 @@ What `"verified"` asserts differs by pipeline:
 
 ### `specified`
 
-An implementation is `specified` if it has a `primary-spec`. Where the `primary-spec` sits differs:
+An implementation is `specified` when it has a `primary-spec` reflecting a deliberate spec pairing. Where the `primary-spec` sits — and what counts as deliberate — differs by tool:
 
 - **probe-verus:** on the function itself, as its inline `requires`/`ensures` (non-empty is equivalent to `is-disabled: false`).
 - **probe-aeneas:** on the function's Lean translation, reached through `translation-name`, not on the Rust function itself.
-- **probe-lean:** derived from a spec convention — an `@[primary_spec]`/`@[progress]`/`@[pspec]`/`@[step]` attribute, a `_spec` suffix, or Aeneas-generated code ([P18](../kb/engineering/properties.md#p18-lean-specified-is-derived-not-stored)). Together with `rust-source` (the Rust origin probe-lean preserves on Aeneas-generated `def`s), these are the pairing signals that give a pure-Lean project an implementations ladder (see [Implementations](#implementations-does-an-implementation-verify-against-its-spec)). A generic Lean project carries neither, so every atom is `unspecified`.
+- **probe-lean:** the `primary-spec` is derived, not stored ([P18](../kb/engineering/properties.md#p18-lean-specified-is-derived-not-stored)) — from an `@[primary_spec]`/`@[progress]`/`@[pspec]`/`@[step]` attribute or a `<def>_spec` naming convention. A `def` also carries `rust-source` when Aeneas generated it. A Lean `def` is paired with a Rust function — and so an implementation — when it is a translation target, has such a **documented** `primary-spec`, or has `rust-source` (see [Implementations](#implementations-does-an-implementation-verify-against-its-spec)). A generic Lean project has none of these, so every `def` is an unspecified definition.
 
-  probe-lean additionally emits a `primary-spec` by **sole-spec inference**: when a `def` is referenced by exactly one theorem, that theorem is recorded as its primary spec. "One theorem happens to cite this def" is not a pairing claim the project authors made, so consumers must not treat it as one: `count-colors.sh` accepts a `def`'s `primary-spec` only when *documented* — the spec theorem carries one of the attributes above or follows the `<def>_spec` naming convention.
+  probe-lean additionally emits a `primary-spec` by **sole-spec inference**: when a `def` is referenced by exactly one theorem, that theorem is recorded as its primary spec. "One theorem happens to cite this def" is not a pairing claim the project authors made, so consumers must not treat it as one: a `def` whose `primary-spec` comes only from sole-spec inference is **not** an implementation. `count-colors.sh` accepts a `def`'s `primary-spec` only when *documented* — the spec theorem carries one of the attributes above or follows the `<def>_spec` naming convention.
 
 ## Colors
 
@@ -57,7 +57,7 @@ A verification project pairs each implementation with a spec and asks whether it
 
 | Role | What it is | Provable? | Examples | Color* |
 |------|-----------|-----------|----------|-------|
-| **Implementation** | executable code that verifies against a spec | it *verifies*, not "proved" | Rust fn, Verus exec, specified or Aeneas-generated Lean `def` | verify status |
+| **Implementation** | executable code that verifies against a spec | it *verifies*, not "proved" | Rust fn, Verus exec, Lean `def` paired with a Rust fn | verify status |
 | **Spec-as-property** | a stated condition; a definition with no proof of its own | no | Verus `spec fn` | Blue |
 | **Proof** | discharges a proof obligation | yes | Verus `proof fn`, Lean supporting `theorem` | proof status |
 | **Theorem-spec** | a Lean `theorem` that fuses the property (its type) with its proof (its term) | yes | Lean primary-spec `theorem` | proof status |
@@ -69,7 +69,7 @@ These roles map onto Verus's own `spec`, `proof`, and `exec` [modes](https://ver
 
 ### Implementations: does an implementation verify against its spec?
 
-Implementations are Rust `exec` atoms, plus the Lean `def`s paired with a Rust function: a translation target (some `exec`'s `translation-name` points at it), a specified `def` (it has a *documented* `primary-spec`; sole-spec inference does not count), or an Aeneas-generated `def` (it has `rust-source`) — checked in that order. All are colored by the same ladder:
+Implementations are Rust `exec` atoms, plus any Lean `def` paired with a Rust function — a translation target (some `exec`'s `translation-name` points at it), a `def` with a *documented* `primary-spec` (from an attribute or `<def>_spec` naming; sole-spec inference does not count), or an Aeneas-generated `def` (it has `rust-source`). Membership needs only one of the three. All are colored by the same ladder; when a `def` matches more than one, its color is resolved in that order — a translation target inherits its exec's color, otherwise a documented spec colors it by that theorem's status, otherwise it falls to the Yellow (generated-but-unspecified) rung:
 
 | state | color |
 |-------|-------|
@@ -81,7 +81,7 @@ Implementations are Rust `exec` atoms, plus the Lean `def`s paired with a Rust f
 | `"trusted"` | Purple |
 | `"failed"` | Red |
 
-A translation target takes its Rust function's color; a specified `def` takes its verdict from its primary-spec theorem's status. Each function is *counted* once: when an exec and its Lean stand-in are both shown, the count lives on the exec and the stand-in is only painted (VeriLib renders both nodes; see [Counting](#counting)). A probe-lean-only extract has no `exec` atoms, so there the stand-ins carry the implementation counts — the file still colors like the merged view.
+A translation target takes its Rust function's color; a documented-spec `def` takes its verdict from its primary-spec theorem's status. Each function is *counted* once: when an exec and its Lean stand-in are both shown, the count lives on the exec and the stand-in is only painted (VeriLib renders both nodes; see [Counting](#counting)). A probe-lean-only extract has no `exec` atoms, so there the stand-ins carry the implementation counts — the file still colors like the merged view.
 
 Green requires a spec, so a spec-less implementation is never Green: it is Grey (Verus `is-disabled`, or Aeneas not translated) or Yellow (translated or Aeneas-generated but unspecified). An implementation is never Blue: Blue marks a stated spec, while an implementation is colored by proof progress against its spec — an unfinished proof is Orange. `count-colors.sh` never reads `is-disabled`: a function that is in scope (`is-disabled: false`) but untranslated — e.g. `#[test]` functions that Aeneas skips — is Grey exactly like a disabled one, because "not translated" already means "outside the verification pipeline".
 
@@ -109,7 +109,7 @@ Verus `proof fn` and every Lean `theorem`, including a theorem-spec (a primary-s
 
 ### Definitions and type declarations
 
-Constructs with nothing to prove: `def`/`abbrev`/`opaque`/`instance`/`projection`, and `structure`/`inductive`/`class` — except that a `def` that is a translation target, specified, or Aeneas-generated is an [implementation](#implementations-does-an-implementation-verify-against-its-spec) instead.
+Constructs with nothing to prove: `def`/`abbrev`/`opaque`/`instance`/`projection`, and `structure`/`inductive`/`class` — except that a `def` that is a translation target, has a *documented* `primary-spec`, or is Aeneas-generated (`rust-source`) is an [implementation](#implementations-does-an-implementation-verify-against-its-spec) instead. A `def` whose `primary-spec` comes only from sole-spec inference stays here, as a definition.
 
 | condition | color |
 |-----------|-------|
