@@ -69,7 +69,7 @@ These roles map onto Verus's own `spec`, `proof`, and `exec` [modes](https://ver
 
 ### Implementations: does an implementation verify against its spec?
 
-Implementations are Rust `exec` atoms, plus any Lean `def` paired with a Rust function — a translation target (some `exec`'s `translation-name` points at it), a `def` with a *documented* `primary-spec` (from an attribute or `<def>_spec` naming; sole-spec inference does not count), or an Aeneas-generated `def` (it has `rust-source`). Membership needs only one of the three. All are colored by the same ladder; when a `def` matches more than one, its color is resolved in that order — a translation target inherits its exec's color, otherwise a documented spec colors it by that theorem's status, otherwise it falls to the Yellow (generated-but-unspecified) rung:
+Implementations are Rust `exec` atoms, plus any Lean `def` paired with a Rust function — a translation target (some `exec`'s `translation-name` points at it), a `def` with a *documented* `primary-spec` (from an attribute or `<def>_spec` naming; sole-spec inference does not count), or an Aeneas-generated `def` (it has `rust-source`). Membership needs only one of the three. Every implementation is colored by the same ladder — a Rust `exec` by its own `verification-status`, a Lean `def` by its documented primary-spec theorem's status (Yellow when it has no documented spec):
 
 | state | color |
 |-------|-------|
@@ -81,7 +81,11 @@ Implementations are Rust `exec` atoms, plus any Lean `def` paired with a Rust fu
 | `"trusted"` | Purple |
 | `"failed"` | Red |
 
-A translation target takes its Rust function's color; a documented-spec `def` takes its verdict from its primary-spec theorem's status. Each function is *counted* once: when an exec and its Lean stand-in are both shown, the count lives on the exec and the stand-in is only painted (VeriLib renders both nodes; see [Counting](#counting)). A probe-lean-only extract has no `exec` atoms, so there the stand-ins carry the implementation counts — the file still colors like the merged view.
+A Lean `def` is graded by its **own** documented primary-spec theorem — the same Lean spec that probe-aeneas propagates onto the Rust `exec`'s status — not by borrowing the exec's color. This is the natural direction: in Aeneas the verdict originates in the Lean proof and flows to the Rust function, so the Lean translation reads it at the source. A `def` with no documented spec is Yellow (translated or generated, but unspecified).
+
+Because the `exec` and its translation each read their status independently, they normally show the same color, but can differ when probe-aeneas's per-node transitive enrichment lands differently on the two atoms — e.g. an `exec` marked `transitively-verified` (Dark Green) whose spec theorem is only locally `verified` (Light Green). Both are "verified"; the shades differ, and the split reflects the underlying data rather than being smoothed over.
+
+Each function is *counted* once: when an exec and its Lean stand-in are both shown, the count lives on the exec and the stand-in is only painted (VeriLib renders both nodes; see [Counting](#counting)). A probe-lean-only extract has no `exec` atoms, so there the stand-ins carry the implementation counts.
 
 Green requires a spec, so a spec-less implementation is never Green: it is Grey (Verus `is-disabled`, or Aeneas not translated) or Yellow (translated or Aeneas-generated but unspecified). An implementation is never Blue: Blue marks a stated spec, while an implementation is colored by proof progress against its spec — an unfinished proof is Orange. `count-colors.sh` never reads `is-disabled`: a function that is in scope (`is-disabled: false`) but untranslated — e.g. `#[test]` functions that Aeneas skips — is Grey exactly like a disabled one, because "not translated" already means "outside the verification pipeline".
 

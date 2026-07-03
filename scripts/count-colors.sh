@@ -15,12 +15,14 @@
 #
 # Roles (see docs/verification-statuses.md):
 #   Implementation  — Rust `exec`, and a Lean `def` standing for a Rust function:
-#                     a translation-name target (inherits the exec's verify-status),
-#                     a `def` with a *documented* primary-spec (colored by that
-#                     spec theorem's status), or an Aeneas-generated `def`
-#                     (rust-source present, no spec -> Yellow). A translation that
-#                     merely compiles is NOT counted Green unless the function it
-#                     implements is verified against a spec.
+#                     a translation-name target, a `def` with a *documented*
+#                     primary-spec, or an Aeneas-generated `def` (rust-source).
+#                     A Lean def is graded by its OWN documented primary-spec
+#                     theorem (the same Lean spec that probe-aeneas propagates to
+#                     the Rust exec), not by borrowing the exec's color; a def
+#                     with no documented spec is Yellow. So a translation that
+#                     merely compiles is NOT counted Green unless it is verified
+#                     against a spec.
 #                     A primary-spec link is *documented* when the spec theorem
 #                     carries a spec attribute (primary_spec / progress / pspec /
 #                     step) or follows the `<def>_spec` naming convention.
@@ -81,24 +83,6 @@ fi
 
 jq -r --arg mode "$MODE" '
   # ---- helpers -------------------------------------------------------------
-  # Implementation color (verify axis) for an exec-like value $v.
-  def impl_color($v):
-    ($v["verification-status"] // null) as $vs |
-    (
-      (($v["primary-spec"] // "") != "")
-      or ( ($v["translation-name"] // null) as $tn |
-           $tn != null and ((.[$tn]["primary-spec"] // "") != "") )
-    ) as $specified |
-    (($v["translation-name"] // null) != null) as $translated |
-    if   $vs == "trusted" then "purple"
-    elif $vs == "failed"  then "red"
-    elif $specified then
-      (if   $vs == "transitively-verified" then "dark_green"
-       elif $vs == "verified"              then "light_green"
-       else "orange" end)
-    elif $translated then "yellow"
-    else "grey" end;
-
   # A def-to-primary-spec link is documented when the spec theorem carries a
   # spec attribute or is named `<def>_spec`. Excludes probe-lean sole-spec
   # inference. Context (.) must be the full data map; $id is the def atom id.
@@ -110,23 +94,51 @@ jq -r --arg mode "$MODE" '
            | any(IN("primary_spec", "progress", "pspec", "step")) )
     );
 
-  # Implementation color for a Lean def standing for a Rust function.
-  # $inherited = color inherited from the exec whose translation-name targets it
-  # (null if none); $specok = the primary-spec link is documented. Context (.)
-  # must be the full data map for primary-spec lookup.
-  def def_impl_color($v; $inherited; $specok):
-    ($v["verification-status"] // null) as $vs |
-    if   $vs == "trusted" then "purple"
-    elif $vs == "failed"  then "red"
-    elif $inherited != null then $inherited
-    elif $specok then
+  # Color from a documented primary-spec theorem: the atom is graded by the
+  # status of the theorem that specifies it. $id/$v are the specified atom;
+  # returns null when the atom has no documented spec. Context (.) = data map.
+  def spec_status_color($id; $v):
+    if documented_spec($id; $v) then
       ( (.[$v["primary-spec"]] // {})["verification-status"] // null ) as $ss |
       (if   $ss == "transitively-verified" then "dark_green"
        elif $ss == "verified"              then "light_green"
        elif $ss == "trusted"               then "purple"
        elif $ss == "failed"                then "red"
        else "orange" end)
-    else "yellow" end;
+    else null end;
+
+  # Implementation color (verify axis) for a Rust exec value $v with id $id.
+  # probe-aeneas propagates the Lean spec theorem''s verdict onto the exec''s
+  # own verification-status, so the exec is colored by that status; $specified
+  # (its own inline spec, or its translation''s documented spec) only decides
+  # Green-eligibility. Context (.) must be the full data map.
+  def impl_color($id; $v):
+    ($v["verification-status"] // null) as $vs |
+    (
+      (($v["primary-spec"] // "") != "")
+      or ( ($v["translation-name"] // null) as $tn |
+           $tn != null and documented_spec($tn; (.[$tn] // {})) )
+    ) as $specified |
+    (($v["translation-name"] // null) != null) as $translated |
+    if   $vs == "trusted" then "purple"
+    elif $vs == "failed"  then "red"
+    elif $specified then
+      (if   $vs == "transitively-verified" then "dark_green"
+       elif $vs == "verified"              then "light_green"
+       else "orange" end)
+    elif $translated then "yellow"
+    else "grey" end;
+
+  # Implementation color for a Lean def standing for a Rust function. It is
+  # graded by its OWN documented primary-spec theorem — the same Lean spec that
+  # probe-aeneas propagates to the Rust exec — not borrowed from the exec. A
+  # def with no documented spec (translated or Aeneas-generated but unspecified)
+  # is Yellow. Context (.) must be the full data map.
+  def def_impl_color($id; $v):
+    ($v["verification-status"] // null) as $vs |
+    if   $vs == "trusted" then "purple"
+    elif $vs == "failed"  then "red"
+    else ( spec_status_color($id; $v) // "yellow" ) end;
 
   # Proof/theorem color (proved axis) for status $vs. The "white" fallback is
   # the documented "no status" row: the atom was never matched to a
@@ -169,13 +181,13 @@ jq -r --arg mode "$MODE" '
           ) ) | not )
   ) as $browse_only |
 
-  # Map: translation-target id -> the impl color of the exec that owns it.
-  # Built from ALL execs (not just shown ones) so a translation def is still
-  # an implementation when its exec is hidden.
+  # Set of all translation targets (from ALL execs, shown or hidden): a Lean
+  # def in this set is an implementation even if it lacks rust-source. Used for
+  # group membership only — the color comes from the def''s own spec.
   ( reduce ($d | to_entries[] | select(.value.kind == "exec")) as $e ({};
       ($e.value["translation-name"] // null) as $tn |
-      if $tn != null then .[$tn] = ($d | impl_color($e.value)) else . end
-    ) ) as $xlate |
+      if $tn != null then .[$tn] = true else . end
+    ) ) as $xlate_target |
 
   # Translation targets whose exec is itself SHOWN: their def stand-ins would
   # repeat a counted verdict, so the tables dedupe them (per-atom mode keeps
@@ -199,14 +211,13 @@ jq -r --arg mode "$MODE" '
         ($v.kind // "") as $k |
         ($v.language // "?") as $lang |
         ($v["verification-status"] // null) as $vs |
-        ($xlate[$id] // null) as $inherited |
         ($d | documented_spec($id; $v)) as $specok |
-        ( if   $k == "exec" then {group: "impl", color: ($d | impl_color($v))}
+        ( if   $k == "exec" then {group: "impl", color: ($d | impl_color($id; $v))}
           elif ($k == "def" and
-                ($inherited != null
+                (($xlate_target[$id] == true)
                  or $specok
                  or (($v["rust-source"] // null) != null)))
-            then {group: "impl", color: ($d | def_impl_color($v; $inherited; $specok))}
+            then {group: "impl", color: ($d | def_impl_color($id; $v))}
           elif $k == "spec" then {group: "spec", color: (if $vs == "failed" then "red" elif $vs == "trusted" then "purple" else "blue" end)}
           elif ($k == "proof" or $k == "theorem") then {group: "proof", color: proof_color($vs)}
           else {group: "def", color: def_color($vs)} end )
