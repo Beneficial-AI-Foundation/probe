@@ -206,6 +206,7 @@ Each probe tool emits tool-specific `trusted-reason` values that reflect the sou
 | `axiom` | `"admit"` | `"axiom"` | Property assumed without proof |
 | `external` | `"external-body"` | `"external"` | Implementation trusted without checking |
 | `assumed spec` | `"assume-specification"` | — | External function whose declared spec is not proved |
+| `externally verified` | — | `"externally_verified"` | Proof discharged outside Lean (`@[externally_verified]` attribute) |
 
 Tools must NOT rename their `trusted-reason` values to match another tool — the values are part of each tool's public contract. Normalization happens in consumers (e.g., `scripts/summarize_extract.py`).
 
@@ -228,7 +229,7 @@ Key rules:
 - **Deterministic** — uses `BTreeMap`/`BTreeSet` throughout (P14).
 - **Idempotent** — running enrichment on already-enriched output produces the same result.
 
-**Integrated into extractors**: probe-verus and probe-aeneas call `enrich_verification_status` as the final step of their `extract` command (skippable via `--skip-enrich`). The `probe enrich` CLI command remains available for re-processing or standalone use.
+**Integrated into extractors**: probe-verus and probe-aeneas call `enrich_verification_status` as the final step of their `extract` command, and probe-lean runs its own Lean implementation of the same algorithm as the final step of its `extract` (all skippable via `--skip-enrich`). The `probe enrich` CLI command remains available for re-processing or standalone use.
 
 **Implemented in**: `probe/src/commands/propagate.rs`
 
@@ -239,9 +240,21 @@ If an atom has a spec, it is not disabled: `has-spec ⟹ ¬is-disabled`. Equival
 - **probe-aeneas** — guaranteed structurally. `has-spec` requires a `translation-name` (sourced from functions.json `lean_name`) whose translation carries a `primary-spec`; `is-disabled` means the atom's RQN is absent from functions.json. A spec therefore implies the RQN is in functions.json, which implies relevant (not disabled).
 - **probe-verus / probe-lean** — guaranteed by the specify step, which only attaches specs to in-scope atoms. The schema fields are independent, so this is a tooling convention rather than a structural consequence.
 
-**Why it matters**: the implementations color table ([docs/verification-statuses.md](../../docs/verification-statuses.md#colors)) colors a `specified` `exec` atom Blue / Light Green / Dark Green and an unspecified one Grey (Verus) or Yellow (Aeneas). `count-colors.sh` decides `specified` from `primary-spec` (or the Aeneas translation's), not from `is-disabled` directly. This invariant keeps the two consistent: because every disabled atom is spec-less, a disabled atom is counted Grey rather than being mistaken for a specified, in-scope (Blue/Green) atom.
+**Why it matters**: the implementations color table ([docs/verification-statuses.md](../../docs/verification-statuses.md#colors)) colors a `specified` `exec` atom Orange / Light Green / Dark Green and an unspecified one Grey (Verus) or Yellow (Aeneas). `count-colors.sh` decides `specified` from `primary-spec` (or the Aeneas translation's), not from `is-disabled` directly. This invariant keeps the two consistent: because every disabled atom is spec-less, a disabled atom is counted Grey rather than being mistaken for a specified, in-scope (Orange/Green) atom.
 
-**Validation**: guaranteed upstream (see above). `scripts/count-colors.sh` *relies on* this invariant rather than re-checking it — it reads `specified` from `primary-spec`/translation, not from `is-disabled`, so a violating atom (disabled yet specified) would be mis-counted as specified, not flagged. The script's subtotal checks only confirm that every shown atom received exactly one color. See [docs/verification-statuses.md](../../docs/verification-statuses.md#colors).
+**Validation**: guaranteed upstream (see above). `scripts/count-colors.sh` colors from `primary-spec`/translation, not from `is-disabled` — its group partition is total by construction — but it emits a backstop warning (`N atom(s) violate P24 (disabled yet specified)`) when a shown atom is disabled yet carries a spec, so a violation is flagged rather than silently mis-counted. See [docs/verification-statuses.md](../../docs/verification-statuses.md#colors).
+
+## P25. A graded atom is in analysis scope
+
+If an atom has a `verification-status`, it is not disabled: `has-verification-status ⟹ ¬is-disabled`. Equivalently, every disabled atom is status-less. A trust reason (`admit`, `external-body`, `assume-specification`, `axiom`, `externally_verified`, `external`) is a deliberate human act that puts the atom in scope, so in particular `"trusted"` implies enabled — even when the atom carries no spec text (a Verus `#[verifier::external_body]` function without `requires`/`ensures`).
+
+- **probe-aeneas** — holds: a status is only assigned through a translation, which implies the RQN is in functions.json (not disabled).
+- **probe-lean** — holds: probe-lean does not emit `is-disabled`.
+- **probe-verus** — currently **violated** for spec-less trusted atoms: `is_disabled` is computed from spec text only (`src/commands/extract.rs:633`), independently of `trusted_reason` (`extract.rs:665`), so an `external_body` function with no `requires`/`ensures` is emitted as both `is-disabled: true` and `"trusted"` (14 such atoms in `examples/verus_curve25519-dalek_4.1.3.json`). Tracked in [probe-verus#32](https://github.com/Beneficial-AI-Foundation/probe-verus/issues/32); the fix is to overwrite `is-disabled` to `false` whenever a `trusted-reason` is present.
+
+**Why it matters**: `is-disabled` is the "excluded from verification" signal; a trusted atom is a trust-base member, which is the opposite of excluded. Consumers filtering on `is-disabled` would silently drop trust-base atoms from verification accounting.
+
+**Validation**: `scripts/count-colors.sh` emits `WARNING: N atom(s) violate P25 (disabled yet graded)` for shown atoms that are disabled yet carry a status. Its colors are unaffected (trusted → Purple is decided before anything else; the script never reads `is-disabled`) — the property governs the `is-disabled` field itself.
 
 ## Known bugs and edge cases
 

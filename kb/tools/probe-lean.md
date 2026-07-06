@@ -64,6 +64,7 @@ Verification status mapping:
 | Condition | `verification-status` | `trusted-reason` |
 |-----------|----------------------|-----------------|
 | `kind == "axiom"` | `"trusted"` | `"axiom"` |
+| `@[externally_verified]` attribute (proof discharged outside Lean) | `"trusted"` | `"externally_verified"` |
 | `code-path` ends with `External.lean` | `"trusted"` | `"external"` |
 | No sorry | `"verified"` | absent |
 | Has sorry | `"unverified"` | absent |
@@ -89,7 +90,7 @@ Additional filtering via `.verilib/probes/config.json`:
 Unlike probe-verus where specs are extracted from requires/ensures clauses, in Lean specs are identified by reverse dependency: a theorem that depends on a definition is a spec for that definition.
 
 - `specs` field: array of theorem code-names that depend on this atom
-- `primary-spec`: set by `@[primary_spec]` attribute or inferred from `<name>_spec` naming convention
+- `primary-spec`: chosen by precedence — `@[primary_spec]` attribute > known framework attribute (`@[progress]`/`@[pspec]`/`@[step]`) > `<name>_spec` naming convention > sole-spec inference (the def is referenced by exactly one theorem). Sole-spec inference is a weak signal ("one theorem happens to cite this def" is not a pairing claim); consumers such as `count-colors.sh` accept a `def`'s `primary-spec` only when it comes from the attribute or naming conventions
 - Whether an atom is "specified" is inferred from `specs` being non-empty — no separate `specified` field. See [P18](../engineering/properties.md#p18-lean-specified-is-derived-not-stored).
 
 ## Subcommands
@@ -145,8 +146,8 @@ Output goes to `.verilib/views/`.
 | `rust-source` | string/null | Rust source path from Aeneas docstring |
 | `specs` | array | Theorem code-names depending on this. Absent when empty. |
 | `primary-spec` | string | Primary spec theorem code-name. Absent when none. |
-| `verification-status` | string | `"verified"`, `"unverified"`, `"failed"`, `"trusted"`. Absent when skipped. |
-| `trusted-reason` | string | `"axiom"` or `"external"`. Present only when `verification-status` is `"trusted"`. |
+| `verification-status` | string | `"transitively-verified"`, `"verified"`, `"unverified"`, `"failed"`, `"trusted"`. Absent when skipped. |
+| `trusted-reason` | string | `"axiom"`, `"externally_verified"`, or `"external"`. Present only when `verification-status` is `"trusted"`. |
 
 ## Determinism (P14)
 
