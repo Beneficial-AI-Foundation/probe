@@ -19,15 +19,13 @@ probe-aeneas has no indexer of its own. It uses probe-rust and probe-lean, and j
 
 ## The probes generate JSON
 
-Every probe emits the same shape of data: one entry per code atom (a rust function, a verus construct, a lean construct), with its dependencies. What each pipeline can say about an atom depends on what its indexer knows.
+Every probe emits the same shape of data: one entry per code atom (a rust function, a verus construct, a lean construct), with its [dependencies and other info](https://github.com/Beneficial-AI-Foundation/probe#per-tool-docs-across-the-ecosystem). 
 
 | Project | Typical information per atom |
 |---------|------------------------------|
 | Rust | function calls (the call graph) |
-| Verus, Aeneas | function calls plus verification status |
-| Lean | dependencies plus proof status |
-
-The schemas for each probe are described in each probe repo. [Links](https://github.com/Beneficial-AI-Foundation/probe#per-tool-docs-across-the-ecosystem)
+| Verus, Aeneas | function calls plus verification status; thm dependencies plus proof status |
+| Lean | thm dependencies plus proof status |
 
 ---
 
@@ -104,9 +102,9 @@ We work with three kinds of projects (until now), and each asks a different ques
 │  Functional      │  │  Mathlib-style   │  │  Security         │
 │  verification    │  │  formalization   │  │  protocol (Lean)  │
 │                  │  │                  │  │                   │
-│   f ⊨ spec       │  │     ⊢  thm       │  │    AEAD           │
+│   f ⊨ spec       │  │     ⊢  thm       │  │    AEAD ⊨ secure  │
 │                  │  │                  │  │                   │
-│  "does f meet    │  │  "is it          │  │  "is the          │
+│  "does f meet    │  │  "is thm         │  │  "is the AEAD     │
 │   its spec?"     │  │   proved?"       │  │   construction    │
 │                  │  │                  │  │   secure?"        │
 └──────────────────┘  └──────────────────┘  └───────────────────┘
@@ -126,17 +124,21 @@ We could try to see all three types (and potentially other types of projects tha
 
 The probes have one job: provide factual data about the code, as JSON.
 
-VeriLib takes that data and presents it currently by colors and statistics.
+VeriLib takes that data and presents it currently by colouring atoms and statistics.
 
-Colors and what to take as input for stats should be helpful but the questions "what colours, what stats" are also somewhat subjective (what one might find useful, another person would say "nay") so we need to reach consensus knowing we might not make everyone happy. 
-
-Take-away: probes only report facts about the code and take no position on how those facts should appear on verilib.
+- colours and what to take as input for stats should be helpful for the end user; 
+- the questions "what colours, what stats" are also somewhat subjective: what one might find useful, another person would say "nay"
 
 ```mermaid
 flowchart LR
   J[(JSON<br/>facts, no styling)] --> A[VeriLib · palette A]
   J --> B[VeriLib · palette B]
 ```
+
+So we need to reach consensus knowing we might not make everyone happy. 
+
+Take-away: probes only report facts about the code and take no position on how those facts should appear on verilib.
+
 
 ---
 
@@ -150,15 +152,15 @@ flowchart LR
 
 ## Typical probe "features"
 
-- probe-aeneas was designed starting from the only existing aeneas project: dalek-lean; spqr-verify then decided to use a different structure (to separate aeneas generated code from manually written lean code); consequently, probe-aeneas needed to be updated to work with the new structure
+- probe-aeneas was designed starting from the __only__ existing aeneas project: dalek-lean; spqr-verify decided to use a different structure (to separate aeneas generated code from manually written lean code); consequently, probe-aeneas needed to be updated to work with the new project structure
 - there are many sorts of projects, some have lakefile.toml at top level, some in a subfolder; some put some sort of info in lakefile.toml, others other sort of info; we could say that the human creativity is infinite so expecting that a probe tool a priori handles any type of project is futile;
-- in some cases, it is also almost impossible to handle some projects: for instance, some lean projects require to install different libraries, tools but only in written, but the probe tools won't be able to install whatever the authors of a project describe in words 
+- in some cases, it is also almost impossible to handle some projects: for instance, some lean projects require to install different libraries, tools but the info is provided only in written; the probe tools won't be able to install whatever the authors of a project describe in words 
 
 ---
 
 ## Colors
 
-With that separation in mind, we can talk about colors as a VeriLib concern, on top of the factual data the probes provide.
+With that separation in mind, we can talk about colours as a VeriLib concern, on top of the factual data the probes provide.
 
 ---
 
@@ -184,7 +186,7 @@ The probes don't (cannot) emit info about:
 
 In the current verif projects:
 - specs are validated through PRs, if a spec exists in the codebase, then it's validated
-- there's nothing saying that a function is tracked
+- there's nothing in the code saying that a function is tracked
 
 ---
 
@@ -195,18 +197,18 @@ In the current verif projects:
 
 So:
 - either we have: by default we track everything and a finished verification project will have tracked but not verified
-- or, by default, if a function doesn't have a spec it is considered as disabled; once we add a spec, it will have a verification status and we will see in the progress chart one more verified function (without having a total upper bound)
+- or, by default, if a function doesn't have a spec, it is considered as disabled; once we add a spec, it will have a verification status and we will see in the progress chart one more verified function (without having a total upper bound)
 
 ---
 
 ## White
 
 - currently, we use white for both rust projects (no verification) and for tracked functions, to me, it's inconsistent;
- if we want that VeriLib displays rust projects, then white seems to be the natural colour to display rust functions (to convery the message: not for verification); black, as the absence of colour would be a better choice conceptually but visually, probably not
+ if we want that VeriLib displays rust projects, then white seems to be the natural colour to display rust functions (to convery the message: not for verification); black, as the absence of colour, would be a better choice conceptually but visually, probably not
 
  So we need to decide how to distinguish between: an atom in a rust project; a tracked atom 
 
- If we give up the notion of tracked functions, we no longer have a problem: white can be for "outside verification scope".
+ If we give up the notion of tracked functions, we no longer have a problem: white can be used for "outside verification scope".
 
  ---
 
@@ -216,12 +218,12 @@ So:
 - <span style="color:#C99A00; font-weight:700">translated</span> (only for Aeneas)
 - <span style="color:#E8710A; font-weight:700">sorry / assumes</span>
 - <span style="color:#D32F2F; font-weight:700">error</span>
-- <span style="color:#2E7D32; font-weight:700">verified</span> (for a function verifies a spec and for a theorem is proved)
+- <span style="color:#2E7D32; font-weight:700">verified</span> (for a function verifies a spec, for a theorem is proved)
 - <span style="color:#7C3AED; font-weight:700">trusted</span>
 
 ---
 
-## Green
+## <span style="color:#2E7D32; font-weight:700">Green</span>
 
 - for verification projects, i think we're fine with green to denote verified for a "function satisfies its spec"
 - for mathlib projects, i think we're fine with green to denote proved "a theorem is proved"; i think it's somewhat misleading to use green for "a definition compiles"; see [this arbitrary def](https://github.com/digama0/lean4lean/blob/master/Lean4Lean/Theory/VDecl.lean#L11), i think it's misleading to have green as "this definition compiles" as the green in "this function satisfies its spec"
@@ -231,7 +233,7 @@ So:
 
 ## Lean defs
 
-My suggestion is to deal with lean defs depending on from where they come:
+My suggestion is to deal with lean defs depending on where they come from:
 - defs generated by aeneas: can be considered as having green in that they model implemenations?
 - for lean projects with verso-blueprint: we can assume that the authors of those projects already selected what they want to see so a wrapper to verso blueprint is the way to go
 - for generic lean projects without annotations/verso blueprint, the most we could say is which theorems are proved and which aren't (for these projects i would want to not have green defs)
@@ -241,10 +243,13 @@ My suggestion is to deal with lean defs depending on from where they come:
 
 ---
 
-## Blue
+## <span style="color:#2563EB">Blue</span>
 
 - VeriLib uses blue for "has a spec but no proof"; the thing is that if we have a function spec we also have a proof which verifies or not; so blue is eaten by green/orange/red
-- there is only one case for blue for specs: in Verus, we have specs which are used in pre/post conditions for rust functions
+- there is only one case for blue for specs: in Verus, we have specs which are used in pre/post conditions for rust functions, to take an example [to_nat](https://github.com/Beneficial-AI-Foundation/dalek-verus/blob/9bb7fd09c3b9dbd52ff2dca9a75e618c751b79a7/curve25519-dalek/src/specs/core_specs.rs#L229); in aeneas projects, we have similar defs, these could be blue.
+
+Note though:
+- in Verus, we have a dedicated syntax `spec fn`; in Lean, we only have `def`; so a Lean def can play the role of an impl, of a spec, or none; without some sort of user annotation, it's hard to differentiate the role of a def.
 
 --- 
 
