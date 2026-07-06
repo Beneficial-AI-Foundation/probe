@@ -22,6 +22,9 @@ In **Lean 4**, specs hide in **types**, **attributes**, **naming**, and **module
 
 ![w:1100](img/legend.png)
 
+<!-- Palette note: the diagram images (legend, aeneas, lean-zip, cedar, vcvio, loom) still use the earlier colours. Regenerate them to match the convention in probes-overview-slides.md: verified is Green (Light Green = verified locally, Dark Green = transitively verified), Blue is reserved for a stated spec, Grey is an unspecified in-scope function. In particular the old "Dark Blue = verified Rust function" becomes Dark Green. -->
+
+
 ---
 
 ## The Lean project spectrum
@@ -43,7 +46,7 @@ Extrinsic specs via **`@[progress]`** theorems on Aeneas-generated Lean translat
 
 ![w:1100](img/aeneas.png)
 
-Color flows right-to-left: a Rust function is Dark Blue only when its translation has a spec.
+Color flows right-to-left: a Rust function is <span style="color:#1B5E20">Dark Green</span> only when its translation has a proved spec.
 
 ---
 
@@ -73,7 +76,7 @@ Layered: **scheme** → **correctness** → **security** → **invariants**.
 
 ![w:700](img/vcvio.png)
 
-White = WIP, Light Green = locally verified invariants that don't yet compose transitively.
+White = WIP, <span style="color:#43A047">Light Green</span> = locally verified invariants that don't yet compose transitively.
 
 ---
 
@@ -83,7 +86,7 @@ Specs are **inline** — `requires`/`ensures` are part of the method declaration
 
 ![w:550](img/loom.png)
 
-`loom_solve` generates and discharges VCs automatically — verified methods go straight to Dark Green. Unspecified helpers (White) are the only nodes without inline annotations.
+`loom_solve` generates and discharges VCs automatically, so verified methods go straight to <span style="color:#1B5E20">Dark Green</span>. Unspecified helpers (<span style="color:#808080">Grey</span>) are the only nodes without inline annotations.
 
 ---
 
