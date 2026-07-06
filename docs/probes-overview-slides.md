@@ -1,21 +1,31 @@
-# Probes: factual data about verified code
-
-Slides are separated by `---`. Rendered with any Markdown slide tool (Marp, reveal-md) or read top to bottom.
+# Probes: factual data about (verified) code
 
 ---
 
 ## What the probes are
 
-The probes use code indexers to extract structured data about a codebase. They do not judge the code. They read what the indexer already understands and write it down.
+The probes use code indexers to extract structured data about a codebase. They read what the indexer already understands and write it down.
 
 Each probe wraps the indexer that fits its language:
 
 | Probe | Indexer it uses | Reads |
 |-------|-----------------|-------|
 | probe-rust | rust-analyzer | Rust source |
-| probe-verus | verus-analyzer | Verus source (Rust plus specs and proofs) |
+| probe-verus | verus-analyzer | Verus source (Rust plus Verus specs and proofs) |
 | probe-lean | Lean metaprogramming | Lean source |
-| probe-aeneas | Aeneas, then Lean metaprogramming | Rust transpiled to Lean, plus the Lean specs proved about it |
+
+probe-aeneas has no indexer of its own. It uses probe-rust and probe-lean, and joins them (next slide).
+
+---
+
+## probe-aeneas: probe-rust plus probe-lean
+
+An Aeneas project has two sides: the Rust crate, and the Aeneas-generated Lean that models it and the specs proved about it. probe-aeneas runs both probes and links their output.
+
+- **probe-rust** indexes the Rust crate with rust-analyzer, and additionally runs Charon to tag each Rust function with a Charon-derived qualified name.
+- **probe-lean** indexes the Lean side, where each Aeneas-generated definition remembers the Rust function it came from.
+
+The Rust atoms carry rust-analyzer ids; the Lean translations speak Charon names. Charon is the shared vocabulary: tagging each rust-analyzer atom with its Charon-derived qualified name is what makes the two comparable. Matching those names links a Rust function to the Lean definition that implements it and the theorem that specifies it.
 
 ---
 
