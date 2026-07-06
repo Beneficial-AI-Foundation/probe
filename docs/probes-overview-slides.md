@@ -6,26 +6,14 @@
 
 The probes use code indexers to extract structured data about a codebase. They read what the indexer already understands and write it down.
 
-Each probe wraps the indexer that fits its language:
-
-| Probe | Indexer it uses | Reads |
-|-------|-----------------|-------|
-| probe-rust | rust-analyzer | Rust source |
-| probe-verus | verus-analyzer | Verus source (Rust plus Verus specs and proofs) |
-| probe-lean | Lean metaprogramming | Lean source |
+```mermaid
+flowchart LR
+  RS[Rust source]  --> RA[rust-analyzer]        --> PR[probe-rust]  --> JR@{ shape: doc, label: "rust JSON" }
+  VS[Verus source] --> VA[verus-analyzer]       --> PV[probe-verus] --> JV@{ shape: doc, label: "verus JSON" }
+  LS[Lean source]  --> LM[Lean metaprogramming] --> PL[probe-lean]  --> JL@{ shape: doc, label: "lean JSON" }
+```
 
 probe-aeneas has no indexer of its own. It uses probe-rust and probe-lean, and joins them (next slide).
-
----
-
-## probe-aeneas: probe-rust plus probe-lean
-
-An Aeneas project has two sides: the Rust crate, and the Aeneas-generated Lean that models it and the specs proved about it. probe-aeneas runs both probes and links their output.
-
-- **probe-rust** indexes the Rust crate with rust-analyzer, and additionally runs Charon to tag each Rust function with a Charon-derived qualified name.
-- **probe-lean** indexes the Lean side, where each Aeneas-generated definition remembers the Rust function it came from.
-
-The Rust atoms carry rust-analyzer ids; the Lean translations speak Charon names. Charon is the shared vocabulary: tagging each rust-analyzer atom with its Charon-derived qualified name is what makes the two comparable. Matching those names links a Rust function to the Lean definition that implements it and the theorem that specifies it.
 
 ---
 
@@ -61,9 +49,18 @@ From `dalek-verus/.../verus_curve25519-dalek_4.1.3.json`. A Rust function, its c
 
 ---
 
-## An Aeneas atom: Rust and Lean, linked
+## probe-aeneas: probe-rust plus probe-lean
 
-From `curve25519-dalek-lean-verify/.../aeneas_curve25519-dalek_4.2.0.json`. `EdwardsPoint::mul_base` appears twice: the Rust function, and the Lean definition Aeneas generated for it.
+An Aeneas project has two sides: the Rust crate, and the Aeneas-generated Lean that models it and the specs proved about it. probe-aeneas runs both probes and links their output.
+
+- **probe-rust** indexes the Rust crate with rust-analyzer, and additionally runs Charon to tag each Rust function with a Charon-derived qualified name.
+- **probe-lean** indexes the Lean side, where each Aeneas-generated definition remembers the Rust function it came from.
+
+The Rust atoms carry rust-analyzer ids; the Lean translations speak Charon names. Charon is the shared vocabulary: tagging each rust-analyzer atom with its Charon-derived qualified name is what makes the two comparable. Matching those names links a Rust function to the Lean definition that implements it and the theorem that specifies it.
+
+---
+
+## An Aeneas atom: Rust and Lean, linked
 
 The Rust function. Its `rust-qualified-name` is the Charon-derived name, and `translation-name` points to its Lean side.
 
@@ -98,35 +95,46 @@ The Lean translation it points to, paired with the theorem that specifies it.
 
 ## Three kinds of projects, three questions
 
-We work with three kinds of projects, and each asks a different question.
+We work with three kinds of projects (until now), and each asks a different question.
 
-1. **Functional verification.** Does this function satisfy its spec?
-2. **Mathlib-style formalization.** Is this theorem proved?
-3. **Security-protocol formalized in Lean.** Is this construction secure?
+```
+┌──────────────────┐  ┌──────────────────┐  ┌───────────────────┐
+│  Functional      │  │  Mathlib-style   │  │  Security         │
+│  verification    │  │  formalization   │  │  protocol (Lean)  │
+│                  │  │                  │  │                   │
+│   f |= spec      │  │     ⊢  thm       │  │    AEAD           │
+│                  │  │                  │  │                   │
+│  "does f meet    │  │  "is it          │  │  "is the          │
+│   its spec?"     │  │   proved?"       │  │   construction    │
+│                  │  │                  │  │   secure?"        │
+└──────────────────┘  └──────────────────┘  └───────────────────┘
+```
 
-The question is not cosmetic. It decides what an atom even means and what a good answer looks like.
+The questions, to me, are different in nature and we should deal with each in a different way.
 
 ---
 
 ## One framework for all three can mislead
 
-It is tempting to fold the three into a single framework and grade every project the same way.
-
-We can always do this. Everything reduces to zeros and ones. But in reducing to a common denominator we throw away the meaning that made each question worth asking. "Is this construction secure?" is not "is this theorem proved?" with different labels.
-
-Forcing one framework on every project is the hammer that turns every project into a nail.
-
-**Suggestion: a separate view for each kind of project.** It keeps the meaning, and it is less work than bending three questions into one shape.
+We could try to see all three types (and potentially other types of projects that will appear) in the same way. In the end, any program boils down to 0s and 1s. But i think by doing so we lose meaning.
 
 ---
 
-## Probes provide data; VeriLib interprets it
+## Probes provide data; VeriLib displays it
 
 The probes have one job: provide factual data about the code, as JSON.
 
-VeriLib takes that data and decides how to present it, including colors and statistics.
+VeriLib takes that data and presents it currently by colors and statistics.
 
-Colors and stats are a matter of taste. They depend on what a given user wants to see and highlight. That makes them orthogonal to the probes, which only report facts about the code and take no position on how those facts should look.
+Colors and what to take as input for stats should be helpful but the questions "what colours, what stats" are also somewhat subjective (what one might find useful, another person would say "nay") so we need to reach consensus knowing we might not make everyone happy. 
+
+Take-away: probes only report facts about the code and take no position on how those facts should appear on verilib.
+
+```mermaid
+flowchart LR
+  J[(JSON<br/>facts, no styling)] --> A[VeriLib · palette A]
+  J --> B[VeriLib · palette B]
+```
 
 ---
 
