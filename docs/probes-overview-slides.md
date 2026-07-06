@@ -148,10 +148,74 @@ flowchart LR
 
 ---
 
+## Typical probe "features"
 
+- probe-aeneas was designed starting from the only existing aeneas project: dalek-lean; spqr-verify then decided to use a different structure (to separate aeneas generated code from manually written lean code); consequently, probe-aeneas needed to be updated to work with the new structure
+- there are many sorts of projects, some have lakefile.toml at top level, some in a subfolder; some put some sort of info in lakefile.toml, others other sort of info; we could say that the human creativity is infinite so expecting that a probe tool a priori handles any type of project is futile;
+- in some cases, it is also almost impossible to handle some projects: for instance, some lean projects require to install different libraries, tools but only in written, but the probe tools won't be able to install whatever the authors of a project describe in words 
+
+---
 
 ## Colors
 
 With that separation in mind, we can talk about colors as a VeriLib concern, on top of the factual data the probes provide.
 
+---
+
+## Currently
+
+The current design VeriLib offers fits functional verification projects. 
+
+Statuses:
+![alt text](image-1.png)
+
+Colors:
+![alt text](image.png)
+
+There's a gap between them (we should have a 1-to-1 correspondence between statuses and colours)
+
+---
+
+## Statuses
+
+The probes don't (cannot) emit info about:
+- a function being tracked
+- a spec being validated 
+
+In the current verif projects:
+- specs are validated through PRs, if a spec exists in the codebase, then it's validated
+- there's nothing saying that a function is tracked
+
+---
+
+## Tracking
+
+- we can say that a priori all functions are tracked; but in the end, we don't verify all functions (for instance, in dalek-verus, we didn't verify serialization, formatting...); so, in order to not have whites in what we considered a finished dalek, i took the liberty to say that any function that doesn't have a spec is disabled (this rule disables also tests)
+- if we introduce some sort of annotation which says "exclude from verification", then we can have "by default, any function which is excluded from verification is tracked"; we haven't adopted such an annotation yet (and i doubt all other verus projects will adopt our convention; we want the probes to apply to projects regardless of the conventions our teams would adopt)
+
+So:
+- either we have: by default we track everything and a finished verification project will have tracked but not verified
+- or, by default, if a function doesn't have a spec it is considered as disabled; once we add a spec, it will have a verification status and we will see in the progress chart one more verified function (without having a total upper bound)
+
+---
+
+## White
+
+- currently, we use white for both rust projects (no verification) and for tracked functions, to me, it's inconsistent;
+ if we want that VeriLib displays rust projects, then white seems to be the natural colour to display rust functions (to convery the message: not for verification); black, as the absence of colour would be a better choice conceptually but visually, probably not
+
+ So we need to decide how to distinguish between: an atom in a rust project; a tracked atom 
+
+ If we give up the notion of tracked functions, we no longer have a problem: white can be for "outside verification scope".
+
+ ---
+
+ ## Colour-Status mapping proposal
+
+- <span style="color:#808080; font-weight:700">disabled</span>
+- <span style="color:#C99A00; font-weight:700">translated</span>
+- <span style="color:#E8710A; font-weight:700">sorry / assumes</span>
+- <span style="color:#D32F2F; font-weight:700">error</span>
+- <span style="color:#2E7D32; font-weight:700">verified</span>
+- <span style="color:#7C3AED; font-weight:700">trusted</span>
 
