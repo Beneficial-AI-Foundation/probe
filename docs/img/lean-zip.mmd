@@ -4,9 +4,9 @@ flowchart TD
         f2[/"zlibDeflate"/]:::purple
     end
     subgraph native ["Native implementations — Zip/Native/"]
-        n1(["inflate"]):::darkBlue
-        n2(["deflateRaw"]):::darkBlue
-        n3(["Adler32.update"]):::darkBlue
+        n1(["inflate"]):::darkGreen
+        n2(["deflateRaw"]):::darkGreen
+        n3(["Adler32.update"]):::grey
     end
     subgraph spec ["Specs and proofs — Zip/Spec/"]
         s1[["inflate_correct"]]:::darkGreen
@@ -19,6 +19,6 @@ flowchart TD
     n2 -->|spec| s2
     n1 --> n3
     s1 --> s3
-    classDef purple fill:#9c27b0,color:#fff
-    classDef darkBlue fill:#1565c0,color:#fff
-    classDef darkGreen fill:#2e7d32,color:#fff
+    classDef purple fill:#7C3AED,color:#fff
+    classDef darkGreen fill:#1B5E20,color:#fff
+    classDef grey fill:#808080,color:#fff

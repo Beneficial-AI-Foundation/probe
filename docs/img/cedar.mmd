@@ -1,8 +1,8 @@
 flowchart TD
     subgraph spec ["Cedar/Spec/ — definitional spec"]
-        d1(["isAuthorized"]):::darkBlue
-        d2(["evaluate"]):::darkBlue
-        d3(["satisfied"]):::darkBlue
+        d1(["isAuthorized"]):::blue
+        d2(["evaluate"]):::blue
+        d3(["satisfied"]):::blue
         d4(["intOrErr"]):::white
     end
     subgraph thm ["Cedar/Thm/ — properties"]
@@ -11,7 +11,7 @@ flowchart TD
         t3[["order_and_dup_independent"]]:::darkGreen
     end
     subgraph validation ["Cedar/Validation/"]
-        v1(["typecheck"]):::darkBlue
+        v1(["typecheck"]):::blue
         v2[["soundness"]]:::darkGreen
     end
     d1 -->|spec| t1
@@ -23,5 +23,5 @@ flowchart TD
     v1 -->|spec| v2
     v2 -.->|uses| d1
     classDef white fill:#fff,color:#333,stroke:#999
-    classDef darkBlue fill:#1565c0,color:#fff
-    classDef darkGreen fill:#2e7d32,color:#fff
+    classDef blue fill:#2563EB,color:#fff
+    classDef darkGreen fill:#1B5E20,color:#fff

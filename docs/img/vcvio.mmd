@@ -1,7 +1,7 @@
 flowchart TD
     subgraph scheme ["Scheme layer"]
-        s1(["AEADScheme"]):::darkBlue
-        s2(["CKAScheme"]):::darkBlue
+        s1(["AEADScheme"]):::darkGreen
+        s2(["CKAScheme"]):::darkGreen
     end
     subgraph correctness ["Correctness layer"]
         c1[["AEADScheme.Correct"]]:::darkGreen
@@ -23,6 +23,5 @@ flowchart TD
     c2 -.->|uses| i2
     sec1 -.->|uses| i1
     classDef white fill:#fff,color:#333,stroke:#999
-    classDef darkBlue fill:#1565c0,color:#fff
-    classDef lightGreen fill:#81c784,color:#1b5e20
-    classDef darkGreen fill:#2e7d32,color:#fff
+    classDef darkGreen fill:#1B5E20,color:#fff
+    classDef lightGreen fill:#43A047,color:#fff

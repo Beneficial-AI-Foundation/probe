@@ -37,7 +37,7 @@ One colour per atom, from its verification status (the convention proposed in th
 - <span style="color:#D32F2F">Red</span> — error: does not compile, or verification fails
 - White — nothing to grade: a definition, or outside the verification scope
 
-<!-- Palette note: the diagram images (aeneas, lean-zip, cedar, vcvio, loom) still use the earlier colours; regenerate them to match this key. The old "Dark Blue = verified Rust function" becomes Dark Green. -->
+<!-- The diagram images follow this key. They are generated from the .mmd sources in img/ with mermaid-cli: `mmdc -i img/<name>.mmd -o img/<name>.png -b white`. -->
 
 ---
 
