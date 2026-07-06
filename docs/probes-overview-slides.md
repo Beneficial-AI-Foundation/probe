@@ -13,7 +13,7 @@ flowchart LR
   LS[Lean source]  --> LM[Lean metaprogramming] --> PL[probe-lean]  --> JL@{ shape: doc, label: "lean JSON" }
 ```
 
-probe-aeneas has no indexer of its own. It uses probe-rust and probe-lean, and joins them (next slide).
+probe-aeneas has no indexer of its own. It uses probe-rust and probe-lean, and joins them.
 
 ---
 
@@ -26,6 +26,8 @@ Every probe emits the same shape of data: one entry per code atom (a rust functi
 | Rust | function calls (the call graph) |
 | Verus, Aeneas | function calls plus verification status |
 | Lean | dependencies plus proof status |
+
+The schemas for each probe are described in each probe repo. [Links](https://github.com/Beneficial-AI-Foundation/probe#per-tool-docs-across-the-ecosystem)
 
 ---
 
@@ -102,7 +104,7 @@ We work with three kinds of projects (until now), and each asks a different ques
 │  Functional      │  │  Mathlib-style   │  │  Security         │
 │  verification    │  │  formalization   │  │  protocol (Lean)  │
 │                  │  │                  │  │                   │
-│   f |= spec      │  │     ⊢  thm       │  │    AEAD           │
+│   f ⊨ spec       │  │     ⊢  thm       │  │    AEAD           │
 │                  │  │                  │  │                   │
 │  "does f meet    │  │  "is it          │  │  "is the          │
 │   its spec?"     │  │   proved?"       │  │   construction    │
@@ -138,6 +140,18 @@ flowchart LR
 
 ---
 
-## Next: colors
+## Typical probe bugs
+
+- if a theorem appears as unproved when it should be proved
+- if a construct doesn't appear in the json (for instance, what Sergiu noticed about private lean lemmas)
+- more generally, inconsistencies between what the code says and what the json says
+
+---
+
+
+
+## Colors
 
 With that separation in mind, we can talk about colors as a VeriLib concern, on top of the factual data the probes provide.
+
+
