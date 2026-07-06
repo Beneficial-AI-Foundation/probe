@@ -20,10 +20,24 @@ In **Lean 4**, specs hide in **types**, **attributes**, **naming**, and **module
 
 **How could probe-lean find them?**
 
-![w:1100](img/legend.png)
 
-<!-- Palette note: the diagram images (legend, aeneas, lean-zip, cedar, vcvio, loom) still use the earlier colours. Regenerate them to match the convention in probes-overview-slides.md: verified is Green (Light Green = verified locally, Dark Green = transitively verified), Blue is reserved for a stated spec, Grey is an unspecified in-scope function. In particular the old "Dark Blue = verified Rust function" becomes Dark Green. -->
+---
 
+## Colour key
+
+One colour per atom, from its verification status (the convention proposed in the probes deck):
+
+- <span style="color:#808080">Grey</span> — in scope but not yet specified
+- <span style="color:#C99A00">Yellow</span> — translated or generated, but unspecified
+- <span style="color:#2563EB">Blue</span> — a stated spec, a condition that is not itself proved
+- <span style="color:#E8710A">Orange</span> — incomplete proof (a `sorry` or `assume`)
+- <span style="color:#43A047">Light Green</span> — verified locally, some dependency still open
+- <span style="color:#1B5E20">Dark Green</span> — transitively verified: it and everything it depends on
+- <span style="color:#7C3AED">Purple</span> — trusted (an axiom or an assumed spec)
+- <span style="color:#D32F2F">Red</span> — error: does not compile, or verification fails
+- White — nothing to grade: a definition, or outside the verification scope
+
+<!-- Palette note: the diagram images (aeneas, lean-zip, cedar, vcvio, loom) still use the earlier colours; regenerate them to match this key. The old "Dark Blue = verified Rust function" becomes Dark Green. -->
 
 ---
 
