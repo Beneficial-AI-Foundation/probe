@@ -114,6 +114,66 @@ The questions, to me, are different in nature and we should deal with each in a 
 
 ---
 
+## Same function, two ways: Verus and Lean (Aeneas)
+
+`FieldElement51 + FieldElement51`, verified in both projects (code abridged).
+
+<table>
+<tr><th>Verus (dalek-verus)</th><th>Lean via Aeneas</th></tr>
+<tr valign="top">
+<td>
+
+<pre><code>impl&lt;&#x27;a&gt; Add for &amp;&#x27;a FieldElement51 {
+  fn add(self, rhs: &amp;FieldElement51)
+        -&gt; (out: FieldElement51)
+    ensures
+      // element-wise sum of the limbs
+      fe51_as_nat(&amp;out)
+        == fe51_as_nat(self) + fe51_as_nat(rhs),
+      // bound propagation
+      bounded(self, 51) &amp;&amp; bounded(rhs, 51)
+        ==&gt; bounded(&amp;out, 52),
+  {
+    let mut out = *self;
+    for i in 0..5
+      invariant /* limb i is summed */
+    { out.limbs[i] += rhs.limbs[i]; }
+    proof { /* discharge the ensures */ }
+    out
+  }
+}   // spec + proof live in the function</code></pre>
+
+</td>
+<td>
+
+<pre><code>-- code: the Aeneas-generated translation
+def FieldElement51.add
+    (self rhs : FieldElement51) :
+    Result FieldElement51 :=
+  add_assign self rhs
+
+-- spec + proof: a separate theorem
+@[step] theorem add_spec (a b : Array U64 5)
+    (ha : ∀ i &lt; 5, a[i]!.val &lt; 2^53)
+    (hb : ∀ i &lt; 5, b[i]!.val &lt; 2^53) :
+    add a b ⦃ result =&gt;
+      (∀ i &lt; 5,
+        result[i]!.val = a[i]!.val + b[i]!.val) ∧
+      (∀ i &lt; 5, result[i]!.val &lt; 2^54) ⦄ := by
+  unfold add; step*</code></pre>
+
+</td>
+</tr>
+</table>
+
+- Verus keeps the spec as `requires`/`ensures` on the function, and the proof lives inside it (loop invariants, `proof { }`). Code, spec and proof are one artifact.
+- Aeneas gives Lean the translated function as code only. The spec is a separate `theorem`: its statement is the spec, its proof term is the proof.
+- So a Lean theorem-spec is spec plus proof, kept apart from the code, while a Verus contract keeps spec and proof attached to the code.
+
+Discussion: same maths (element-wise sum, limb bounds), two very different shapes.
+
+---
+
 ## One framework for all three can mislead
 
 We could try to see all three types (and potentially other types of projects that will appear) in the same way. In the end, any program boils down to 0s and 1s. But i think by doing so we lose meaning.
