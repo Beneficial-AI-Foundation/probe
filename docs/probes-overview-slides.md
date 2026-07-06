@@ -114,63 +114,195 @@ The questions, to me, are different in nature and we should deal with each in a 
 
 ---
 
-## Same function, two ways: Verus and Lean (Aeneas)
+## One framework for all three can mislead
 
-`FieldElement51 + FieldElement51`, verified in both projects (code abridged).
+We could try to see all three types (and potentially other types of projects that will appear) in the same way. In the end, any program boils down to 0s and 1s. But i think by doing so we lose meaning.
+
+---
+
+## Probes provide data; VeriLib displays it
+
+The probes have one job: provide factual data about the code, as JSON.
+
+VeriLib takes that data and presents it currently by colouring atoms and statistics.
+
+- colours and what to take as input for stats should be helpful for the end user; 
+- the questions "what colours, what stats" are also somewhat subjective: what one might find useful, another person would say "nay"
+
+```mermaid
+flowchart LR
+  J[(JSON<br/>facts, no styling)] --> A[VeriLib · palette A]
+  J --> B[VeriLib · palette B]
+```
+
+So we need to reach consensus knowing we might not make everyone happy. 
+
+Take-away: probes only report facts about the code and take no position on how those facts should appear on verilib.
+
+
+---
+
+## Typical probe bugs
+
+- if a theorem appears as unproved when it should be proved
+- if a construct doesn't appear in the json (for instance, what Sergiu noticed about private lean lemmas)
+- more generally, inconsistencies between what the code says and what the json says
+
+---
+
+## Typical probe "features"
+
+- probe-aeneas was designed starting from the __only__ existing aeneas project: dalek-lean; spqr-verify decided to use a different structure (to separate aeneas generated code from manually written lean code); consequently, probe-aeneas needed to be updated to work with the new project structure
+- there are many sorts of projects, some have lakefile.toml at top level, some in a subfolder; some put some sort of info in lakefile.toml, others other sort of info; we could say that the human creativity is infinite so expecting that a probe tool a priori handles any type of project is futile;
+- in some cases, it is also almost impossible to handle some projects: for instance, some lean projects require to install different libraries, tools but the info is provided only in written; the probe tools won't be able to install whatever the authors of a project describe in words 
+
+---
+
+## Colors
+
+With that separation in mind, we can talk about colours as a VeriLib concern, on top of the factual data the probes provide.
+
+---
+
+## Currently
+
+The current design VeriLib offers fits functional verification projects. 
+
+Statuses:
+![alt text](image-1.png)
+
+Colors:
+![alt text](image.png)
+
+There's a gap between them (we should have a 1-to-1 correspondence between statuses and colours)
+
+---
+
+## Statuses
+
+The probes don't (cannot) emit info about:
+- a function being tracked
+- a spec being validated 
+
+In the current verif projects:
+- specs are validated through PRs, if a spec exists in the codebase, then it's validated
+- there's nothing in the code saying that a function is tracked
+
+---
+
+## Tracking
+
+- we can say that a priori all functions are tracked; but in the end, we don't verify all functions (for instance, in dalek-verus, we didn't verify serialization, formatting...); so, in order to not have whites in what we considered a finished dalek, i took the liberty to say that any function that doesn't have a spec is disabled (this rule disables also tests)
+- if we introduce some sort of annotation which says "exclude from verification", then we can have "by default, any function which is excluded from verification is tracked"; we haven't adopted such an annotation yet (and i doubt all other verus projects will adopt our convention; we want the probes to apply to projects regardless of the conventions our teams would adopt)
+
+So:
+- either we have: by default we track everything and a finished verification project will have tracked but not verified
+- or, by default, if a function doesn't have a spec, it is considered as disabled; once we add a spec, it will have a verification status and we will see in the progress chart one more verified function (without having a total upper bound)
+
+---
+
+## White
+
+- currently, we use white for both rust projects (no verification) and for tracked functions, to me, it's inconsistent;
+ if we want that VeriLib displays rust projects, then white seems to be the natural colour to display rust functions (to convery the message: not for verification); black, as the absence of colour, would be a better choice conceptually but visually, probably not
+
+ So we need to decide how to distinguish between: an atom in a rust project; a tracked atom 
+
+ If we give up the notion of tracked functions, we no longer have a problem: white can be used for "outside verification scope".
+
+ ---
+
+ ## Colour-Status mapping proposal
+
+- <span style="color:#808080; font-weight:700">disabled</span>
+- <span style="color:#C99A00; font-weight:700">translated</span> (only for Aeneas)
+- <span style="color:#E8710A; font-weight:700">sorry / assumes</span>
+- <span style="color:#D32F2F; font-weight:700">error</span>
+- <span style="color:#2E7D32; font-weight:700">verified</span> (for a function verifies a spec, for a theorem is proved)
+- <span style="color:#7C3AED; font-weight:700">trusted</span>
+
+---
+
+## <span style="color:#2E7D32; font-weight:700">Green</span>
+
+- for verification projects, i think we're fine with green to denote verified for a "function satisfies its spec"
+- for mathlib projects, i think we're fine with green to denote proved "a theorem is proved"; i think it's somewhat misleading to use green for "a definition compiles"; see [this arbitrary def](https://github.com/digama0/lean4lean/blob/master/Lean4Lean/Theory/VDecl.lean#L11), i think it's misleading to have green as "this definition compiles" as the green in "this function satisfies its spec"
+
+
+---
+
+## Lean defs
+
+My suggestion is to deal with lean defs depending on where they come from:
+- defs generated by aeneas: can be considered as having green in that they model implemenations?
+- for lean projects with verso-blueprint: we can assume that the authors of those projects already selected what they want to see so a wrapper to verso blueprint is the way to go
+- for generic lean projects without annotations/verso blueprint, the most we could say is which theorems are proved and which aren't (for these projects i would want to not have green defs)
+- for vcvio based projects: we can leverage a bit and deduce more info like Jin did
+- for other lean projects that might come later: we'll extend/build upon probe-lean depending on the project
+
+
+---
+
+## <span style="color:#2563EB">Blue</span>
+
+- VeriLib uses blue for "has a spec but no proof"; the thing is that if we have a function spec we also have a proof which verifies or not; so blue is eaten by green/orange/red
+- there is only one case for blue for specs: in Verus, we have specs which are used in pre/post conditions for rust functions, to take an example [to_nat](https://github.com/Beneficial-AI-Foundation/dalek-verus/blob/9bb7fd09c3b9dbd52ff2dca9a75e618c751b79a7/curve25519-dalek/src/specs/core_specs.rs#L229); in aeneas projects, we have similar defs, these could be blue.
+
+Note though:
+- in Verus, we have a dedicated syntax `spec fn`; in Lean, we only have `def`; so a Lean def can play the role of an impl, of a spec, or none; without some sort of user annotation, it's hard to differentiate the role of a def.
+
+--- 
+
+## Same function, same spec, two styles
+
+`FieldElement51::is_negative`: the result is true exactly when the canonical representative (mod `p = 2^255 - 19`) is odd. Verified both ways, so the specs assert the same thing.
 
 <table>
 <tr><th>Verus (dalek-verus)</th><th>Lean via Aeneas</th></tr>
 <tr valign="top">
 <td>
 
-<pre><code>impl&lt;&#x27;a&gt; Add for &amp;&#x27;a FieldElement51 {
-  fn add(self, rhs: &amp;FieldElement51)
-        -&gt; (out: FieldElement51)
+<pre><code>// src/field.rs
+fn is_negative(&amp;self) -&gt; (result: Choice)
     ensures
-      // element-wise sum of the limbs
-      fe51_as_nat(&amp;out)
-        == fe51_as_nat(self) + fe51_as_nat(rhs),
-      // bound propagation
-      bounded(self, 51) &amp;&amp; bounded(rhs, 51)
-        ==&gt; bounded(&amp;out, 52),
-  {
-    let mut out = *self;
-    for i in 0..5
-      invariant /* limb i is summed */
-    { out.limbs[i] += rhs.limbs[i]; }
-    proof { /* discharge the ensures */ }
-    out
-  }
+        // true iff the canonical rep (mod p) is odd
+        choice_is_true(result)
+          == (spec_fe51_as_bytes(self)[0] &amp; 1 == 1),
+{
+    let bytes = self.as_bytes();
+    let result = Choice::from(bytes[0] &amp; 1);
+    proof {
+        lemma_as_bytes_equals_spec_fe51(self, &amp;bytes);
+    }
+    result
 }   // spec + proof live in the function</code></pre>
 
 </td>
 <td>
 
 <pre><code>-- code: the Aeneas-generated translation
-def FieldElement51.add
-    (self rhs : FieldElement51) :
-    Result FieldElement51 :=
-  add_assign self rhs
+def FieldElement51.is_negative
+    (self : FieldElement51) : Result Choice := do
+  let bytes ← FieldElement51.to_bytes self
+  let i     ← Array.index_usize bytes 0
+  Choice.from (i &amp;&amp;&amp; 1)
 
 -- spec + proof: a separate theorem
-@[step] theorem add_spec (a b : Array U64 5)
-    (ha : ∀ i &lt; 5, a[i]!.val &lt; 2^53)
-    (hb : ∀ i &lt; 5, b[i]!.val &lt; 2^53) :
-    add a b ⦃ result =&gt;
-      (∀ i &lt; 5,
-        result[i]!.val = a[i]!.val + b[i]!.val) ∧
-      (∀ i &lt; 5, result[i]!.val &lt; 2^54) ⦄ := by
-  unfold add; step*</code></pre>
+@[step] theorem is_negative_spec
+    (self : FieldElement51) :
+    is_negative self ⦃ (c : Choice) =&gt;
+      -- true iff the canonical rep (mod p) is odd
+      c.val = 1 ↔ (Field51_as_Nat self % p) % 2 = 1 ⦄
+  := by unfold is_negative; step*</code></pre>
 
 </td>
 </tr>
 </table>
 
-- Verus keeps the spec as `requires`/`ensures` on the function, and the proof lives inside it (loop invariants, `proof { }`). Code, spec and proof are one artifact.
+- Both specs state the same property: `result` is true iff the field element's canonical representative is odd.
+- Verus keeps the spec as the `ensures` on the function and the proof inside it (`proof { }`). Code, spec and proof are one artifact.
 - Aeneas gives Lean the translated function as code only. The spec is a separate `theorem`: its statement is the spec, its proof term is the proof.
-- So a Lean theorem-spec is spec plus proof, kept apart from the code, while a Verus contract keeps spec and proof attached to the code.
-
-Discussion: same maths (element-wise sum, limb bounds), two very different shapes.
+- Only phrasing differs: Verus reads parity off the low byte of the canonical encoding, Lean off `value % p % 2`. Same property, two ways to write it.
 
 ---
 
@@ -313,6 +445,66 @@ Note though:
 
 --- 
 
+## Same function, two ways: Verus and Lean (Aeneas)
+
+`FieldElement51 + FieldElement51`, verified in both projects (code abridged).
+
+<table>
+<tr><th>Verus (dalek-verus)</th><th>Lean via Aeneas</th></tr>
+<tr valign="top">
+<td>
+
+<pre><code>impl&lt;&#x27;a&gt; Add for &amp;&#x27;a FieldElement51 {
+  fn add(self, rhs: &amp;FieldElement51)
+        -&gt; (out: FieldElement51)
+    ensures
+      // element-wise sum of the limbs
+      fe51_as_nat(&amp;out)
+        == fe51_as_nat(self) + fe51_as_nat(rhs),
+      // bound propagation
+      bounded(self, 51) &amp;&amp; bounded(rhs, 51)
+        ==&gt; bounded(&amp;out, 52),
+  {
+    let mut out = *self;
+    for i in 0..5
+      invariant /* limb i is summed */
+    { out.limbs[i] += rhs.limbs[i]; }
+    proof { /* discharge the ensures */ }
+    out
+  }
+}   // spec + proof live in the function</code></pre>
+
+</td>
+<td>
+
+<pre><code>-- code: the Aeneas-generated translation
+def FieldElement51.add
+    (self rhs : FieldElement51) :
+    Result FieldElement51 :=
+  add_assign self rhs
+
+-- spec + proof: a separate theorem
+@[step] theorem add_spec (a b : Array U64 5)
+    (ha : ∀ i &lt; 5, a[i]!.val &lt; 2^53)
+    (hb : ∀ i &lt; 5, b[i]!.val &lt; 2^53) :
+    add a b ⦃ result =&gt;
+      (∀ i &lt; 5,
+        result[i]!.val = a[i]!.val + b[i]!.val) ∧
+      (∀ i &lt; 5, result[i]!.val &lt; 2^54) ⦄ := by
+  unfold add; step*</code></pre>
+
+</td>
+</tr>
+</table>
+
+- Verus keeps the spec as pre/post condition through `requires`/`ensures` on the function (we can think of this spec as a contract), and the proof lives inside it (loop invariants, `proof { }`). Code, spec and proof are one artifact.
+- Aeneas gives Lean the translated function. We somewhat abuse terminology by calling the theorem `add_spec` a spec: its statement is the spec, its proof term is the proof.
+- So a Lean theorem-spec is spec plus proof, kept apart from the code, while a Verus contract keeps spec and proof attached to the code.
+
+---
+
 ## Shapes
 
 - should distinguish roles; can be def/thm like in verso-blueprint; not sure if it makes sense for verus...
+
+---
