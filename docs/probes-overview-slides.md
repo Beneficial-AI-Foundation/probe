@@ -158,7 +158,7 @@ Take-away: probes only report facts about the code and take no position on how t
 
 ---
 
-## Colors
+## Colours
 
 With that separation in mind, we can talk about colours as a VeriLib concern, on top of the factual data the probes provide.
 
@@ -204,7 +204,7 @@ So:
 ## White
 
 - currently, we use white for both rust projects (no verification) and for tracked functions, to me, it's inconsistent;
- if we want that VeriLib displays rust projects, then white seems to be the natural colour to display rust functions (to convery the message: not for verification); black, as the absence of colour, would be a better choice conceptually but visually, probably not
+ if we want that VeriLib displays rust projects, then white seems to be a "neutral" colour to display rust functions (to convery the message: not for verification); black, as the absence of colour, would be a better choice conceptually but visually, probably not
 
  So we need to decide how to distinguish between: an atom in a rust project; a tracked atom 
 
@@ -257,6 +257,8 @@ Note though:
 
 `FieldElement51::is_negative`: the result is true exactly when the canonical representative (mod `p = 2^255 - 19`) is odd. Verified both ways, so the specs assert the same thing.
 
+Colour key: <span style="color:#2563EB">spec</span>, <span style="color:#2E7D32">proof</span>, plain text is code.
+
 <table>
 <tr><th>Verus (dalek-verus)</th><th>Lean via Aeneas</th></tr>
 <tr valign="top">
@@ -264,186 +266,70 @@ Note though:
 
 <pre><code>// src/field.rs
 fn is_negative(&amp;self) -&gt; (result: Choice)
-    ensures
+<span style="color:#2563EB">    ensures
         // true iff the canonical rep (mod p) is odd
         choice_is_true(result)
           == (spec_fe51_as_bytes(self)[0] &amp; 1 == 1),
-{
+</span>{
     let bytes = self.as_bytes();
     let result = Choice::from(bytes[0] &amp; 1);
-    proof {
+<span style="color:#2E7D32">    proof {
         lemma_as_bytes_equals_spec_fe51(self, &amp;bytes);
     }
-    result
-}   // spec + proof live in the function</code></pre>
+</span>    result
+}</code></pre>
 
 </td>
 <td>
 
-<pre><code>-- code: the Aeneas-generated translation
-def FieldElement51.is_negative
+<pre><code>def FieldElement51.is_negative
     (self : FieldElement51) : Result Choice := do
   let bytes ← FieldElement51.to_bytes self
   let i     ← Array.index_usize bytes 0
   Choice.from (i &amp;&amp;&amp; 1)
 
--- spec + proof: a separate theorem
-@[step] theorem is_negative_spec
-    (self : FieldElement51) :
-    is_negative self ⦃ (c : Choice) =&gt;
-      -- true iff the canonical rep (mod p) is odd
+@[step] theorem is_negative_spec (self : FieldElement51) :
+<span style="color:#2563EB">    is_negative self ⦃ (c : Choice) =&gt;
       c.val = 1 ↔ (Field51_as_Nat self % p) % 2 = 1 ⦄
-  := by unfold is_negative; step*</code></pre>
+</span><span style="color:#2E7D32">  := by unfold is_negative; step*</span></code></pre>
 
 </td>
 </tr>
 </table>
 
 - Both specs state the same property: `result` is true iff the field element's canonical representative is odd.
-- Verus keeps the spec as the `ensures` on the function and the proof inside it (`proof { }`). Code, spec and proof are one artifact.
-- Aeneas gives Lean the translated function as code only. The spec is a separate `theorem`: its statement is the spec, its proof term is the proof.
+- Verus keeps the <span style="color:#2563EB">spec</span> and the <span style="color:#2E7D32">proof</span> inside the function. One artifact holds code, spec and proof.
+- Aeneas gives Lean the function as a plain-code `def`. The <span style="color:#2563EB">spec</span> (the theorem's statement) and its <span style="color:#2E7D32">proof</span> live in a separate theorem.
 - Only phrasing differs: Verus reads parity off the low byte of the canonical encoding, Lean off `value % p % 2`. Same property, two ways to write it.
 
 ---
 
-## One framework for all three can mislead
+## Shapes
 
-We could try to see all three types (and potentially other types of projects that will appear) in the same way. In the end, any program boils down to 0s and 1s. But i think by doing so we lose meaning.
-
----
-
-## Probes provide data; VeriLib displays it
-
-The probes have one job: provide factual data about the code, as JSON.
-
-VeriLib takes that data and presents it currently by colouring atoms and statistics.
-
-- colours and what to take as input for stats should be helpful for the end user; 
-- the questions "what colours, what stats" are also somewhat subjective: what one might find useful, another person would say "nay"
-
-```mermaid
-flowchart LR
-  J[(JSON<br/>facts, no styling)] --> A[VeriLib · palette A]
-  J --> B[VeriLib · palette B]
-```
-
-So we need to reach consensus knowing we might not make everyone happy. 
-
-Take-away: probes only report facts about the code and take no position on how those facts should appear on verilib.
-
+Colours for statuses, shapes for roles:
+- can be def/thm like in verso-blueprint; not sure if it makes sense for verus...
 
 ---
 
-## Typical probe bugs
+## Questions
 
-- if a theorem appears as unproved when it should be proved
-- if a construct doesn't appear in the json (for instance, what Sergiu noticed about private lean lemmas)
-- more generally, inconsistencies between what the code says and what the json says
+- What do we want to see on VeriLib? 
+  - if we want to read green as "this function satisfies its spec" or "this theorem is proved", then:
+      - arbitrary Lean defs shouldn't have a verification colour
+      - aeneas generated Lean defs should have one of the following colours <span style="color:#C99A00; font-weight:700">yellow</span>/<span style="color:#E8710A; font-weight:700">orange</span>/<span style="color:#D32F2F; font-weight:700">red</span>/<span style="color:#2E7D32; font-weight:700">green</span>/<span style="color:#7C3AED; font-weight:700">purple</span>
+  - the above proposal is described [here](https://github.com/Beneficial-AI-Foundation/probe/blob/78d069ebc7c7856ab116387dba333f85bf1156c0/docs/verification-statuses.md)
 
----
+- Do we want blue?
+  - Verus specs are easy to detect (syntax `spec fn`); Lean defs that correspond to specs aren't (unless user annotated); the simplest solution in order to have a consistent framework would be to not colour specs; (though it bothers me somehow to not be able to identify visually the specs in a verification project)
 
-## Typical probe "features"
+- Do we want tracked to be by default any rust function?
+  - If yes, in order to have a finished verification project with no tracked functions which aren't specified, we'd need to use an annotation like `outside_verif_scope` (projects not using such an annotation will appear as incomplete on VeriLib)
+  - If no (the current setup), we don't have an upper bound for functions we will verify (though on the progress chart we'll see the number of verified functions increasing)
 
-- probe-aeneas was designed starting from the __only__ existing aeneas project: dalek-lean; spqr-verify decided to use a different structure (to separate aeneas generated code from manually written lean code); consequently, probe-aeneas needed to be updated to work with the new project structure
-- there are many sorts of projects, some have lakefile.toml at top level, some in a subfolder; some put some sort of info in lakefile.toml, others other sort of info; we could say that the human creativity is infinite so expecting that a probe tool a priori handles any type of project is futile;
-- in some cases, it is also almost impossible to handle some projects: for instance, some lean projects require to install different libraries, tools but the info is provided only in written; the probe tools won't be able to install whatever the authors of a project describe in words 
-
----
-
-## Colors
-
-With that separation in mind, we can talk about colours as a VeriLib concern, on top of the factual data the probes provide.
+- Do we want to display pure Rust projects on VeriLib?
+  - if yes, what colour should those atoms have?
 
 ---
-
-## Currently
-
-The current design VeriLib offers fits functional verification projects. 
-
-Statuses:
-![alt text](image-1.png)
-
-Colors:
-![alt text](image.png)
-
-There's a gap between them (we should have a 1-to-1 correspondence between statuses and colours)
-
----
-
-## Statuses
-
-The probes don't (cannot) emit info about:
-- a function being tracked
-- a spec being validated 
-
-In the current verif projects:
-- specs are validated through PRs, if a spec exists in the codebase, then it's validated
-- there's nothing in the code saying that a function is tracked
-
----
-
-## Tracking
-
-- we can say that a priori all functions are tracked; but in the end, we don't verify all functions (for instance, in dalek-verus, we didn't verify serialization, formatting...); so, in order to not have whites in what we considered a finished dalek, i took the liberty to say that any function that doesn't have a spec is disabled (this rule disables also tests)
-- if we introduce some sort of annotation which says "exclude from verification", then we can have "by default, any function which is excluded from verification is tracked"; we haven't adopted such an annotation yet (and i doubt all other verus projects will adopt our convention; we want the probes to apply to projects regardless of the conventions our teams would adopt)
-
-So:
-- either we have: by default we track everything and a finished verification project will have tracked but not verified
-- or, by default, if a function doesn't have a spec, it is considered as disabled; once we add a spec, it will have a verification status and we will see in the progress chart one more verified function (without having a total upper bound)
-
----
-
-## White
-
-- currently, we use white for both rust projects (no verification) and for tracked functions, to me, it's inconsistent;
- if we want that VeriLib displays rust projects, then white seems to be the natural colour to display rust functions (to convery the message: not for verification); black, as the absence of colour, would be a better choice conceptually but visually, probably not
-
- So we need to decide how to distinguish between: an atom in a rust project; a tracked atom 
-
- If we give up the notion of tracked functions, we no longer have a problem: white can be used for "outside verification scope".
-
- ---
-
- ## Colour-Status mapping proposal
-
-- <span style="color:#808080; font-weight:700">disabled</span>
-- <span style="color:#C99A00; font-weight:700">translated</span> (only for Aeneas)
-- <span style="color:#E8710A; font-weight:700">sorry / assumes</span>
-- <span style="color:#D32F2F; font-weight:700">error</span>
-- <span style="color:#2E7D32; font-weight:700">verified</span> (for a function verifies a spec, for a theorem is proved)
-- <span style="color:#7C3AED; font-weight:700">trusted</span>
-
----
-
-## <span style="color:#2E7D32; font-weight:700">Green</span>
-
-- for verification projects, i think we're fine with green to denote verified for a "function satisfies its spec"
-- for mathlib projects, i think we're fine with green to denote proved "a theorem is proved"; i think it's somewhat misleading to use green for "a definition compiles"; see [this arbitrary def](https://github.com/digama0/lean4lean/blob/master/Lean4Lean/Theory/VDecl.lean#L11), i think it's misleading to have green as "this definition compiles" as the green in "this function satisfies its spec"
-
-
----
-
-## Lean defs
-
-My suggestion is to deal with lean defs depending on where they come from:
-- defs generated by aeneas: can be considered as having green in that they model implemenations?
-- for lean projects with verso-blueprint: we can assume that the authors of those projects already selected what they want to see so a wrapper to verso blueprint is the way to go
-- for generic lean projects without annotations/verso blueprint, the most we could say is which theorems are proved and which aren't (for these projects i would want to not have green defs)
-- for vcvio based projects: we can leverage a bit and deduce more info like Jin did
-- for other lean projects that might come later: we'll extend/build upon probe-lean depending on the project
-
-
----
-
-## <span style="color:#2563EB">Blue</span>
-
-- VeriLib uses blue for "has a spec but no proof"; the thing is that if we have a function spec we also have a proof which verifies or not; so blue is eaten by green/orange/red
-- there is only one case for blue for specs: in Verus, we have specs which are used in pre/post conditions for rust functions, to take an example [to_nat](https://github.com/Beneficial-AI-Foundation/dalek-verus/blob/9bb7fd09c3b9dbd52ff2dca9a75e618c751b79a7/curve25519-dalek/src/specs/core_specs.rs#L229); in aeneas projects, we have similar defs, these could be blue.
-
-Note though:
-- in Verus, we have a dedicated syntax `spec fn`; in Lean, we only have `def`; so a Lean def can play the role of an impl, of a spec, or none; without some sort of user annotation, it's hard to differentiate the role of a def.
-
---- 
 
 ## Same function, two ways: Verus and Lean (Aeneas)
 
@@ -500,11 +386,3 @@ def FieldElement51.add
 - Verus keeps the spec as pre/post condition through `requires`/`ensures` on the function (we can think of this spec as a contract), and the proof lives inside it (loop invariants, `proof { }`). Code, spec and proof are one artifact.
 - Aeneas gives Lean the translated function. We somewhat abuse terminology by calling the theorem `add_spec` a spec: its statement is the spec, its proof term is the proof.
 - So a Lean theorem-spec is spec plus proof, kept apart from the code, while a Verus contract keeps spec and proof attached to the code.
-
----
-
-## Shapes
-
-- should distinguish roles; can be def/thm like in verso-blueprint; not sure if it makes sense for verus...
-
----
