@@ -31,7 +31,7 @@ The Rust atoms carry rust-analyzer ids; the Lean translations speak Charon names
 
 ## The probes generate JSON
 
-Every probe emits the same shape of data: one entry per code atom (a function, a spec, a proof, a definition), with its dependencies. What each pipeline can say about an atom depends on what its indexer knows.
+Every probe emits the same shape of data: one entry per code atom (a rust function, a verus construct, a lean construct), with its dependencies. What each pipeline can say about an atom depends on what its indexer knows.
 
 | Project | Typical information per atom |
 |---------|------------------------------|
@@ -61,9 +61,24 @@ From `dalek-verus/.../verus_curve25519-dalek_4.1.3.json`. A Rust function, its c
 
 ---
 
-## An Aeneas atom
+## An Aeneas atom: Rust and Lean, linked
 
-From `curve25519-dalek-lean-verify/.../aeneas_curve25519-dalek_4.2.0.json`. The Rust function `EdwardsPoint::mul_base`, transpiled to Lean, paired with the theorem that specifies it, and its proof status.
+From `curve25519-dalek-lean-verify/.../aeneas_curve25519-dalek_4.2.0.json`. `EdwardsPoint::mul_base` appears twice: the Rust function, and the Lean definition Aeneas generated for it.
+
+The Rust function. Its `rust-qualified-name` is the Charon-derived name, and `translation-name` points to its Lean side.
+
+```json
+"probe:curve25519-dalek/4.2.0/edwards/impl<&Scalar>#[EdwardsPoint]mul_base()": {
+  "kind": "exec",
+  "language": "rust",
+  "rust-qualified-name": "curve25519_dalek::edwards::{...EdwardsPoint}::mul_base",
+  "translation-name": "probe:curve25519_dalek.edwards.EdwardsPoint.mul_base",
+  "verification-status": "transitively-verified",
+  "dependencies": ["probe:.../[Mul<&EdwardsBasepointTable>]mul()"]
+}
+```
+
+The Lean translation it points to, paired with the theorem that specifies it.
 
 ```json
 "probe:curve25519_dalek.edwards.EdwardsPoint.mul_base": {
@@ -87,7 +102,7 @@ We work with three kinds of projects, and each asks a different question.
 
 1. **Functional verification.** Does this function satisfy its spec?
 2. **Mathlib-style formalization.** Is this theorem proved?
-3. **Security-protocol formalization in Lean.** Is this construction secure?
+3. **Security-protocol formalized in Lean.** Is this construction secure?
 
 The question is not cosmetic. It decides what an atom even means and what a good answer looks like.
 
