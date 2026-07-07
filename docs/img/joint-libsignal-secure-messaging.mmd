@@ -1,0 +1,43 @@
+flowchart LR
+    subgraph model ["secure-messaging (Lean, proved secure)"]
+        subgraph aead ["AEAD/Defs.lean"]
+            aenc(["AEADScheme.encrypt"]):::spec
+            adec(["AEADScheme.decrypt"]):::spec
+            akg(["AEADScheme.keygen"]):::spec
+        end
+        subgraph se ["SymEnc/Defs.lean"]
+            senc(["DetSEAlg.encrypt"]):::spec
+            sdec(["DetSEAlg.decrypt"]):::spec
+            skg(["DetSEAlg.keygen"]):::spec
+        end
+    end
+    subgraph impl ["libsignal (Rust, deployed, unverified)"]
+        subgraph sc ["signal-crypto · aes_cbc"]
+            aesE(["aes_256_cbc_encrypt"]):::prov
+            aesD(["aes_256_cbc_decrypt"]):::prov
+        end
+        subgraph lp1 ["libsignal-protocol · session_cipher.rs"]
+            msgE(["message_encrypt"]):::prov
+            msgD(["decrypt_message_with_state"]):::prov
+        end
+        subgraph lp2 ["libsignal-protocol · protocol.rs"]
+            mac(["compute_mac"]):::prov
+            vmac(["verify_mac"]):::prov
+        end
+        subgraph lp3 ["libsignal-protocol · ratchet/keys.rs"]
+            dk(["derive_keys"]):::prov
+        end
+        subgraph lp4 ["libsignal-protocol · crypto.rs"]
+            hmac(["hmac_sha256"]):::prov
+        end
+    end
+    senc -. manual .-> aesE
+    sdec -. manual .-> aesD
+    skg  -. manual .-> hmac
+    akg  -. manual .-> dk
+    aenc -. "manual (EtM)" .-> msgE
+    aenc -. "manual (EtM)" .-> mac
+    adec -. "manual (EtM)" .-> msgD
+    adec -. "manual (EtM)" .-> vmac
+    classDef spec fill:#fff,color:#333,stroke:#999
+    classDef prov fill:#fff,color:#1B5E20,stroke:#1B5E20,stroke-width:4px
