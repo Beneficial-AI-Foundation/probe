@@ -1,24 +1,16 @@
 flowchart TD
-    subgraph ffi ["FFI opaques — trust boundary"]
-        f1[/"zlibInflate"/]:::purple
-        f2[/"zlibDeflate"/]:::purple
+    subgraph ffi ["FFI, trusted — Zip/Basic.lean"]
+        zlib[/"Zlib.decompress"/]:::purple
     end
-    subgraph native ["Native implementations — Zip/Native/"]
-        n1(["inflate"]):::darkGreen
-        n2(["deflateRaw"]):::darkGreen
-        n3(["Adler32.update"]):::grey
+    subgraph native ["Native impl — Zip/Native/Inflate.lean"]
+        inflate(["inflate"]):::white
+        inflateRaw(["inflateRaw"]):::white
     end
-    subgraph spec ["Specs and proofs — Zip/Spec/"]
-        s1[["inflate_correct"]]:::darkGreen
-        s2[["deflateRaw_correct"]]:::darkGreen
-        s3[["decodeBits"]]:::darkGreen
+    subgraph spec ["Proof — Zip/Spec/InflateLoopBounds.lean"]
+        thm[["inflateRaw_complete"]]:::darkGreen
     end
-    n1 -->|calls| f1
-    n2 -->|calls| f2
-    n1 -->|spec| s1
-    n2 -->|spec| s2
-    n1 --> n3
-    s1 --> s3
+    inflate -.-> inflateRaw
+    thm --> inflateRaw
     classDef purple fill:#7C3AED,color:#fff
+    classDef white fill:#fff,color:#333,stroke:#999
     classDef darkGreen fill:#1B5E20,color:#fff
-    classDef grey fill:#808080,color:#fff
