@@ -310,6 +310,18 @@ Colours for statuses, shapes for roles:
 - can be def/thm like in verso-blueprint; not sure if it makes sense for verus...
 - can be impl/spec/proof; could make sense for Verus; not much for Lean spec-theorems; maybe just impl/spec? just have a shape for specs?
 
+What we have in the jsons:
+- kinds: def/abbrev/thm/... for lean; exec/spec/proof for verus
+
+---
+
+## Arrows
+
+The following fields in the jsons from the probes can allow us to have different arrows:
+- `translation-name`
+- `primary-spec`
+- `dependencies`
+
 ---
 
 ## Lean projects formalizing security protocols
@@ -342,6 +354,14 @@ Colours for statuses, shapes for roles:
 
 - Do we want to display pure Rust projects on VeriLib?
   - if yes, what colour should those atoms have?
+
+- When is a project "done"?
+  - for verification: when rust functions are green? 
+  - when theorems are green?
+  - the issue is that without a notion of tracking any "intermediate" state of a given project is "done"
+
+- Axioms should be distinguished by colour (purple) or shape?
+  - i'd have prefered to use colour, to me, it's about the status of a theorem/function: it's trusted; and by using colours, we can quantify how much we trust; if we use shapes, it's harder to quantify how big is trusted
 
 ---
 

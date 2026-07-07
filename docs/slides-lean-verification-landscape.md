@@ -1,27 +1,4 @@
----
-marp: true
-theme: default
-paginate: true
----
-
 # Lean Verification Landscape
-
-**Specs as First-Class Citizens**
-
-How probe-lean could discover specifications across different Lean project types
-
----
-
-## The problem
-
-In **Verus**, specs are syntactically explicit: `requires`, `ensures`, `proof fn`.
-
-In **Lean 4**, specs hide in **types**, **attributes**, **naming**, and **module structure** — no single syntax marks "this is a spec".
-
-**How could probe-lean find them?**
-
-
----
 
 ## Colour key
 
@@ -140,12 +117,12 @@ probe-lean can identify what *is* specified (`specs` field non-empty), but deter
 
 `probe merge` of probe-rust on libsignal with probe-lean on secure-messaging, joined by a manual `probe/mappings` file. Grounded in `secure-messaging/.verilib`.
 
-![w:520](img/joint-libsignal-secure-messaging.png)
+![w:560](img/joint-libsignal-secure-messaging.png)
 
-- Left: secure-messaging's proved-secure model (Lean). Right: libsignal's deployed Rust, grouped by crate and file.
-- Dashed **manual** arrows are the mapping (tool `manual`): a human claim that this Rust code realizes the abstract primitive, not a proof.
-- The green **halo** (outline, not fill) means model-backed but not itself verified, distinct from a solid-green proved node.
-- The `encrypt` and `decrypt` fans to two Rust functions each reveal Encrypt-then-MAC inside libsignal.
+- Solid chain (Lean, proved): the theorems `etmAEAD_correct`/`etmAEAD_security` rest on the construction `etmAEAD`, which is an `AEADScheme` and `uses` `DetSEAlg`. Each scheme's fields (`encrypt`/`decrypt`/`keygen`) are the mapping's source.
+- Dashed **manual** arrows are the mapping (tool `manual`): a human claim that a Rust function realizes the abstract field, not a proof.
+- Rust targets are grouped by crate (`signal-crypto`, `libsignal-protocol`) with the file under each; the green **halo** (outline, not fill) means model-backed but not itself verified.
+- The `encrypt`/`decrypt` fans to two Rust functions each reveal Encrypt-then-MAC inside libsignal.
 
 ---
 
