@@ -94,8 +94,9 @@ Grounded in `baif/secure-messaging`. The construction and the property definitio
 
 ![w:700](img/vcvio.png)
 
-- `AEADScheme` (a structure), the construction `etmAEAD` that instantiates it, and the properties `Correct` and `guessAdvantage` are all definitions: White, nothing to prove on their own.
-- `etmAEAD_correct` and `etmAEAD_security` are <span style="color:#1B5E20">transitively verified</span> theorems that prove the construction meets `Correct` and bounds `guessAdvantage`.
+- Nodes: `AEADScheme` (a structure), the construction `etmAEAD` that instantiates it, and the properties `Correct` and `distAdvantage` are definitions (White); `etmAEAD_correct` and `etmAEAD_security` are <span style="color:#1B5E20">transitively verified</span> theorems.
+- Edges are only what the probe actually records: a **solid** arrow is a reference in the atom's type/statement (`type-dependencies`), a **dotted** arrow is a reference in its body/proof (`term-dependencies`). So `etmAEAD : AEADScheme` and each theorem's statement mentioning `etmAEAD` are solid; `etmAEAD`'s body calling `DetSEAlg` is dotted.
+- The probe does **not** label an edge "proves" or "bounds" — that is human interpretation, not extracted data.
 - Every node's subgraph names the file (all under `SecureMessaging/`) where the atom lives.
 
 ---

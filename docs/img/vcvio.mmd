@@ -1,22 +1,26 @@
 flowchart TD
-    subgraph con ["AEAD/FromEtM/Construction.lean"]
-        etm(["etmAEAD"]):::white
-    end
-    subgraph defs ["AEAD/Defs.lean"]
-        scheme(["AEADScheme"]):::white
-        correct(["Correct"]):::white
-        adv(["guessAdvantage"]):::white
-    end
     subgraph corf ["AEAD/FromEtM/Correctness.lean"]
         tcor[["etmAEAD_correct"]]:::darkGreen
     end
     subgraph secf ["AEAD/FromEtM/Security.lean"]
         tsec[["etmAEAD_security"]]:::darkGreen
     end
-    etm -.->|": AEADScheme"| scheme
-    tcor -->|proves| etm
-    tcor -.->|uses| correct
-    tsec -->|proves| etm
-    tsec -.->|bounds| adv
+    subgraph con ["AEAD/FromEtM/Construction.lean"]
+        etm(["etmAEAD"]):::white
+    end
+    subgraph defs ["AEAD/Defs.lean"]
+        scheme(["AEADScheme"]):::white
+        correct(["Correct"]):::white
+        distadv(["distAdvantage"]):::white
+    end
+    subgraph sym ["SymEnc/Defs.lean"]
+        detse(["DetSEAlg"]):::white
+    end
+    tcor --> etm
+    tcor --> correct
+    tsec --> etm
+    tsec --> distadv
+    etm -->|": AEADScheme"| scheme
+    etm -.-> detse
     classDef white fill:#fff,color:#333,stroke:#999
     classDef darkGreen fill:#1B5E20,color:#fff
