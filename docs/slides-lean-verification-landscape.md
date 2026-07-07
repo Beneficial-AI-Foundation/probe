@@ -94,7 +94,7 @@ Grounded in `baif/secure-messaging`. The construction and the property definitio
 
 ![w:700](img/vcvio.png)
 
-- `etmAEAD`, `Correct`, `guessAdvantage` are definitions: White, nothing to prove on their own.
+- `AEADScheme` (a structure), the construction `etmAEAD` that instantiates it, and the properties `Correct` and `guessAdvantage` are all definitions: White, nothing to prove on their own.
 - `etmAEAD_correct` and `etmAEAD_security` are <span style="color:#1B5E20">transitively verified</span> theorems that prove the construction meets `Correct` and bounds `guessAdvantage`.
 - Every node's subgraph names the file (all under `SecureMessaging/`) where the atom lives.
 

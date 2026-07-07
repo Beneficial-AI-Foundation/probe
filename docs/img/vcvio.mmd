@@ -3,6 +3,7 @@ flowchart TD
         etm(["etmAEAD"]):::white
     end
     subgraph defs ["AEAD/Defs.lean"]
+        scheme(["AEADScheme"]):::white
         correct(["Correct"]):::white
         adv(["guessAdvantage"]):::white
     end
@@ -12,6 +13,7 @@ flowchart TD
     subgraph secf ["AEAD/FromEtM/Security.lean"]
         tsec[["etmAEAD_security"]]:::darkGreen
     end
+    etm -.->|": AEADScheme"| scheme
     tcor -->|proves| etm
     tcor -.->|uses| correct
     tsec -->|proves| etm
