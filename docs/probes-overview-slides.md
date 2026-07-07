@@ -308,8 +308,20 @@ fn is_negative(&amp;self) -&gt; (result: Choice)
 
 Colours for statuses, shapes for roles:
 - can be def/thm like in verso-blueprint; not sure if it makes sense for verus...
+- can be impl/spec/proof; could make sense for Verus; not much for Lean spec-theorems; maybe just impl/spec? just have a shape for specs?
 
 ---
+
+## Lean projects formalizing security protocols
+
+- currently, the ones we have are based on VCVio
+- typically, the specs are either correctness or security theorems; these can be coloured <span style="color:#E8710A; font-weight:700">orange</span>/<span style="color:#D32F2F; font-weight:700">red</span>/<span style="color:#2E7D32; font-weight:700">green</span>/<span style="color:#7C3AED; font-weight:700">purple</span>
+- i wouldn't colour something more
+- maybe i'd use a shape to distinguish schemes/constructions??
+- [Jin has already implemented a PoC](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/classification-security-protocol.md):
+  - probe-lean detects if we deal with a vcvio project (from lakefile.toml)
+  - it generates additional data such as scheme -> construction -> correctness prop/security prop (for schemes, it relies on a naming convention with `scheme` as a suffix; we need annotations like Alessandro suggested to not miss schemes not following this convention)
+  - with this new info, VeriLib could have an option "show me scheme <x>" where the user gives the name of the scheme; then VeriLib would show scheme <x> together with its construction and its correctness/security props. 
 
 ## Questions
 
@@ -317,10 +329,12 @@ Colours for statuses, shapes for roles:
   - if we want to read green as "this function satisfies its spec" or "this theorem is proved", then:
       - arbitrary Lean defs shouldn't have a verification colour
       - aeneas generated Lean defs should have one of the following colours <span style="color:#C99A00; font-weight:700">yellow</span>/<span style="color:#E8710A; font-weight:700">orange</span>/<span style="color:#D32F2F; font-weight:700">red</span>/<span style="color:#2E7D32; font-weight:700">green</span>/<span style="color:#7C3AED; font-weight:700">purple</span>
+      - note that an aeneas generated def being <span style="color:#C99A00; font-weight:700">yellow</span> means it doesn't have a spec; once it has a spec, it will have the same status/colour as the spec, one of <span style="color:#E8710A; font-weight:700">orange</span>/<span style="color:#D32F2F; font-weight:700">red</span>/<span style="color:#2E7D32; font-weight:700">green</span>/<span style="color:#7C3AED; font-weight:700">purple</span>  (note to myself: need to update probe-aeneas to reflect this)
   - the above proposal is described [here](https://github.com/Beneficial-AI-Foundation/probe/blob/78d069ebc7c7856ab116387dba333f85bf1156c0/docs/verification-statuses.md)
 
-- Do we want blue?
+- Do we want to see <span style="color:#2563EB">blue</span> for specs (not for a function being specified)?
   - Verus specs are easy to detect (syntax `spec fn`); Lean defs that correspond to specs aren't (unless user annotated); the simplest solution in order to have a consistent framework would be to not colour specs; (though it bothers me somehow to not be able to identify visually the specs in a verification project)
+  - note also that having blue for specs is a deviation from colours map to statuses in that a spec is a role, not a status (so maybe we could we should distinguish specs not by colour but by shape)
 
 - Do we want tracked to be by default any rust function?
   - If yes, in order to have a finished verification project with no tracked functions which aren't specified, we'd need to use an annotation like `outside_verif_scope` (projects not using such an annotation will appear as incomplete on VeriLib)
