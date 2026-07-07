@@ -1,27 +1,20 @@
 flowchart TD
-    subgraph scheme ["Scheme layer"]
-        s1(["AEADScheme"]):::darkGreen
-        s2(["CKAScheme"]):::darkGreen
+    subgraph con ["AEAD/FromEtM/Construction.lean"]
+        etm(["etmAEAD"]):::white
     end
-    subgraph correctness ["Correctness layer"]
-        c1[["AEADScheme.Correct"]]:::darkGreen
-        c2[["correctnessExp"]]:::darkGreen
+    subgraph defs ["AEAD/Defs.lean"]
+        correct(["Correct"]):::white
+        adv(["guessAdvantage"]):::white
     end
-    subgraph security ["Security layer"]
-        sec1[["securityExp"]]:::darkGreen
-        sec2[["securityAdvantage"]]:::white
+    subgraph corf ["AEAD/FromEtM/Correctness.lean"]
+        tcor[["etmAEAD_correct"]]:::darkGreen
     end
-    subgraph invariants ["Invariants"]
-        i1[["epochCounterInv"]]:::lightGreen
-        i2[["stateShapeInv"]]:::lightGreen
+    subgraph secf ["AEAD/FromEtM/Security.lean"]
+        tsec[["etmAEAD_security"]]:::darkGreen
     end
-    s1 -->|spec| c1
-    s2 -->|spec| c2
-    s2 -->|spec| sec1
-    sec1 -.->|bounds| sec2
-    c2 -.->|uses| i1
-    c2 -.->|uses| i2
-    sec1 -.->|uses| i1
+    tcor -->|proves| etm
+    tcor -.->|uses| correct
+    tsec -->|proves| etm
+    tsec -.->|bounds| adv
     classDef white fill:#fff,color:#333,stroke:#999
     classDef darkGreen fill:#1B5E20,color:#fff
-    classDef lightGreen fill:#43A047,color:#fff

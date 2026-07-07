@@ -88,13 +88,15 @@ White nodes like `intOrErr` — should they have theorems? This is the **denomin
 
 ---
 
-## Spec pattern: VCVio / secure-messaging
+## Spec pattern: secure-messaging (AEAD from Encrypt-then-MAC)
 
-Layered: **scheme** → **correctness** → **security** → **invariants**.
+Grounded in `baif/secure-messaging`. The construction and the property definitions are `def`s; the correctness and security claims are theorems.
 
 ![w:700](img/vcvio.png)
 
-White = WIP, <span style="color:#43A047">Light Green</span> = locally verified invariants that don't yet compose transitively.
+- `etmAEAD`, `Correct`, `guessAdvantage` are definitions: White, nothing to prove on their own.
+- `etmAEAD_correct` and `etmAEAD_security` are <span style="color:#1B5E20">transitively verified</span> theorems that prove the construction meets `Correct` and bounds `guessAdvantage`.
+- Every node's subgraph names the file (all under `SecureMessaging/`) where the atom lives.
 
 ---
 
