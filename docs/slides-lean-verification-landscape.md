@@ -56,15 +56,15 @@ One colour per atom, from its verification status (the convention proposed in th
 
 ## Spec pattern: Aeneas
 
-Extrinsic specs via **`@[progress]`** theorems on Aeneas-generated Lean translations.
+Extrinsic specs via spec theorems on Aeneas-generated Lean translations. Grounded in `baif/curve25519-dalek-lean-verify`, three `FieldElement51` methods from `src/backend/serial/u64/field.rs`.
 
 ![w:1100](img/aeneas.png)
 
 Color flows right-to-left: a Rust function is <span style="color:#1B5E20">Dark Green</span> only when its translation has a proved spec.
 
-- `fe_mul` is <span style="color:#1B5E20">Dark Green</span>: its translation carries the proved `fe_mul_spec`.
-- `scalar_mul` is <span style="color:#C99A00">Yellow</span>: it is translated but has no spec, so there is nothing yet to verify against.
-- `fe_square` is <span style="color:#808080">Grey</span>: no translation at all, so it is outside the verification effort.
+- `mul` is <span style="color:#1B5E20">Dark Green</span>: its translation carries the proved `mul_spec` (`Specs/.../FieldElement51/Mul.lean`).
+- `conditional_swap` is <span style="color:#C99A00">Yellow</span>: it is translated but has no spec, so there is nothing yet to verify against.
+- `zeroize` is <span style="color:#808080">Grey</span>: no translation at all, so it is outside the verification effort.
 
 ---
 
