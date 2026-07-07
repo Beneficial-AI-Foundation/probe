@@ -78,13 +78,15 @@ Module paths (`Zip/Native/` vs `Zip/Spec/`) cleanly separate the layers.
 
 ---
 
-## Spec pattern: Cedar
+## Spec pattern: cedar-lean
 
-**Spec-as-implementation** — the Lean `def`s ARE the specification.
+Grounded in `Beneficial-AI-Foundation/cedar-lean`. Spec-as-implementation: the Lean `def`s in `Cedar/Spec` ARE the authorization specification.
 
 ![w:700](img/cedar.png)
 
-White nodes like `intOrErr` — should they have theorems? This is the **denominator problem**.
+- `isAuthorized` and `evaluate` are definitions (White): the spec itself, with nothing proved on them directly.
+- `verifyIsAuthorized_is_sound` and `well_typed_is_sound` are <span style="color:#1B5E20">transitively verified</span> theorems in `Cedar/Thm` that prove properties about those defs.
+- Which `Cedar/Spec` defs *should* carry a theorem is the denominator problem: the probe reports what is proved, not what ought to be.
 
 ---
 

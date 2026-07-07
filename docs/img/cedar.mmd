@@ -1,27 +1,17 @@
 flowchart TD
-    subgraph spec ["Cedar/Spec/ — definitional spec"]
-        d1(["isAuthorized"]):::blue
-        d2(["evaluate"]):::blue
-        d3(["satisfied"]):::blue
-        d4(["intOrErr"]):::white
+    subgraph t1 ["Cedar/Thm/.../VerifyIsAuthorized.lean"]
+        tauth[["verifyIsAuthorized_is_sound"]]:::darkGreen
     end
-    subgraph thm ["Cedar/Thm/ — properties"]
-        t1[["forbid_trumps_permit"]]:::darkGreen
-        t2[["default_deny"]]:::darkGreen
-        t3[["order_and_dup_independent"]]:::darkGreen
+    subgraph t2 ["Cedar/Thm/WellTyped/Expr.lean"]
+        teval[["well_typed_is_sound"]]:::darkGreen
     end
-    subgraph validation ["Cedar/Validation/"]
-        v1(["typecheck"]):::blue
-        v2[["soundness"]]:::darkGreen
+    subgraph s1 ["Cedar/Spec/Authorizer.lean"]
+        auth(["isAuthorized"]):::white
     end
-    d1 -->|spec| t1
-    d1 -->|spec| t2
-    d1 -->|spec| t3
-    d1 --> d2
-    d2 --> d3
-    d2 --> d4
-    v1 -->|spec| v2
-    v2 -.->|uses| d1
+    subgraph s2 ["Cedar/Spec/Evaluator.lean"]
+        eval(["evaluate"]):::white
+    end
+    tauth --> auth
+    teval --> eval
     classDef white fill:#fff,color:#333,stroke:#999
-    classDef blue fill:#2563EB,color:#fff
     classDef darkGreen fill:#1B5E20,color:#fff
