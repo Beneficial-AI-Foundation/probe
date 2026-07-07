@@ -62,6 +62,10 @@ Extrinsic specs via **`@[progress]`** theorems on Aeneas-generated Lean translat
 
 Color flows right-to-left: a Rust function is <span style="color:#1B5E20">Dark Green</span> only when its translation has a proved spec.
 
+- `fe_mul` is <span style="color:#1B5E20">Dark Green</span>: its translation carries the proved `fe_mul_spec`.
+- `scalar_mul` is <span style="color:#C99A00">Yellow</span>: it is translated but has no spec, so there is nothing yet to verify against.
+- `fe_square` is <span style="color:#808080">Grey</span>: no translation at all, so it is outside the verification effort.
+
 ---
 
 ## Spec pattern: lean-zip
