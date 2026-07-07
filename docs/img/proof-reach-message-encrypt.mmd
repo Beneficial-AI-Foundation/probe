@@ -1,0 +1,16 @@
+flowchart LR
+    subgraph cor ["AEAD/FromEtM/Correctness.lean"]
+        tcor[["etmAEAD_correct"]]:::darkGreen
+    end
+    subgraph sec ["AEAD/FromEtM/Security.lean"]
+        g0[["game0_eq_real"]]:::darkGreen
+        g3[["game3_eq_rand"]]:::darkGreen
+    end
+    subgraph lp ["libsignal-protocol · session_cipher.rs"]
+        me(["message_encrypt"]):::prov
+    end
+    tcor -. via mapping .-> me
+    g0  -. via mapping .-> me
+    g3  -. via mapping .-> me
+    classDef darkGreen fill:#1B5E20,color:#fff
+    classDef prov fill:#fff,color:#1B5E20,stroke:#1B5E20,stroke-width:4px

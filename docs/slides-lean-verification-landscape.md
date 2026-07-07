@@ -135,3 +135,26 @@ probe-lean can identify what *is* specified (`specs` field non-empty), but deter
 **Complement: Verso Blueprint** — project management layer (roadmap, dependencies, progress). Code-level attributes and blueprint are complementary, not alternatives.
 
 ---
+
+## Joint project: a proof meets deployed code
+
+`probe merge` of probe-rust on libsignal with probe-lean on secure-messaging, joined by a manual `probe/mappings` file. Grounded in `secure-messaging/.verilib`.
+
+![w:520](img/joint-libsignal-secure-messaging.png)
+
+- Left: secure-messaging's proved-secure model (Lean). Right: libsignal's deployed Rust, grouped by crate and file.
+- Dashed **manual** arrows are the mapping (tool `manual`): a human claim that this Rust code realizes the abstract primitive, not a proof.
+- The green **halo** (outline, not fill) means model-backed but not itself verified, distinct from a solid-green proved node.
+- The `encrypt` and `decrypt` fans to two Rust functions each reveal Encrypt-then-MAC inside libsignal.
+
+---
+
+## Proof reach: what rests on one function
+
+![w:620](img/proof-reach-message-encrypt.png)
+
+- Reversing the mapping: `message_encrypt` participates in three proved claims: `etmAEAD_correct` (correctness), and `game0_eq_real` and `game3_eq_rand` (security).
+- If the mapping is faithful, that libsignal function inherits those guarantees; if the Rust changes, these are the proofs to recheck.
+- Computed from the cross-language edges the merge flattened through the proof graph.
+
+---
