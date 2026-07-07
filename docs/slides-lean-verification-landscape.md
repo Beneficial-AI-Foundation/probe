@@ -103,16 +103,6 @@ Grounded in `baif/secure-messaging`. The construction and the property definitio
 
 ---
 
-## Spec pattern: Loom/Velvet
-
-Specs are **inline** — `requires`/`ensures` are part of the method declaration.
-
-![w:550](img/loom.png)
-
-`loom_solve` generates and discharges VCs automatically, so verified methods go straight to <span style="color:#1B5E20">Dark Green</span>. Unspecified helpers (<span style="color:#808080">Grey</span>) are the only nodes without inline annotations.
-
----
-
 ## The denominator problem
 
 **What is the "base set" for measuring verification progress?**
