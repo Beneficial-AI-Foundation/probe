@@ -166,7 +166,7 @@ With that separation in mind, we can talk about colours as a VeriLib concern, on
 
 ## Currently
 
-The current design VeriLib offers fits functional verification projects. 
+In VeriLib we see:
 
 Statuses:
 ![alt text](image-1.png)
@@ -342,7 +342,7 @@ The following fields in the jsons from the probes can allow us to have different
       - arbitrary Lean defs shouldn't have a verification colour
       - aeneas generated Lean defs should have one of the following colours <span style="color:#C99A00; font-weight:700">yellow</span>/<span style="color:#E8710A; font-weight:700">orange</span>/<span style="color:#D32F2F; font-weight:700">red</span>/<span style="color:#2E7D32; font-weight:700">green</span>/<span style="color:#7C3AED; font-weight:700">purple</span>
       - note that an aeneas generated def being <span style="color:#C99A00; font-weight:700">yellow</span> means it doesn't have a spec; once it has a spec, it will have the same status/colour as the spec, one of <span style="color:#E8710A; font-weight:700">orange</span>/<span style="color:#D32F2F; font-weight:700">red</span>/<span style="color:#2E7D32; font-weight:700">green</span>/<span style="color:#7C3AED; font-weight:700">purple</span>  (note to myself: need to update probe-aeneas to reflect this)
-  - the above proposal is described [here](https://github.com/Beneficial-AI-Foundation/probe/blob/78d069ebc7c7856ab116387dba333f85bf1156c0/docs/verification-statuses.md)
+  - the above proposal is described [here](https://github.com/Beneficial-AI-Foundation/probe/blob/78d069ebc7c7856ab116387dba333f85bf1156c0/docs/verification-statuses.md) and Jin prepared some slides [here](https://docs.google.com/presentation/d/11aggG1_p-0jDlaM8lJQfSbBrFUs6HCbiIJ9_Vi3WtQM/edit?slide=id.gc6f73a04f_0_0#slide=id.gc6f73a04f_0_0)
 
 - Do we want to see <span style="color:#2563EB">blue</span> for specs (not for a function being specified)?
   - Verus specs are easy to detect (syntax `spec fn`); Lean defs that correspond to specs aren't (unless user annotated); the simplest solution in order to have a consistent framework would be to not colour specs; (though it bothers me somehow to not be able to identify visually the specs in a verification project)
