@@ -140,6 +140,8 @@ For probe-verus, Verus verification output maps to `verification-status` as:
 | `sorries` | `"unverified"` |
 | `warning` | `"unverified"` |
 
+This mapping applies only to **spec-bearing** functions. A spec-less in-scope function receives **no** `verification-status`.
+
 For probe-lean, verification status is determined by sorry detection and trust-base classification:
 
 | Condition | `verification-status` |
@@ -221,7 +223,7 @@ The `probe enrich` command (and the `enrich_verification_status` library functio
 The algorithm uses **reverse-BFS contamination**: build a reverse dependency index, seed contamination from atoms with explicit `"unverified"` or `"failed"` status, and propagate backwards through callers. This correctly handles cycles (all cycle members receive the same scope) without requiring SCC computation.
 
 Key rules:
-- **Only explicit `"unverified"` / `"failed"` contaminates** — atoms with missing `verification-status` (untracked/Grey, e.g. plain Rust functions or Verus spec functions) are transparent and do not affect transitive scope.
+- **Only explicit `"unverified"` / `"failed"` contaminates** — atoms with missing `verification-status` are transparent and do not affect transitive scope. This covers both out-of-scope atoms (`is-disabled: true`, [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) and the in-scope backlog (spec-less, `is-disabled: false`) — e.g. plain Rust functions or Verus spec functions.
 - **`trusted` does not block transitive** — trusted atoms are intentional axioms, not incomplete work.
 - **Missing deps are treated as trusted** — dependencies not present in the atom map (e.g., external stdlib functions) do not block transitive status. A warning is logged for each.
 - **Non-verified atoms are untouched** — only atoms with `verification-status: "verified"` are candidates for upgrade.
@@ -232,16 +234,49 @@ Key rules:
 
 **Implemented in**: `probe/src/commands/propagate.rs`
 
-## P24. A specified atom is in analysis scope
+## P24. A status-bearing atom is in analysis scope
 
-If an atom has a spec, it is not disabled: `has-spec ⟹ ¬is-disabled`. Equivalently, every disabled atom is spec-less.
+If an atom carries a `verification-status`, it is in verification scope: `has-verification-status ⟹ ¬is-disabled`. **`is-disabled: true` means out of verification scope** — the atom is not compiled/checked by Verus in this build (see [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) — *not* "unspecified backlog". Verus only assigns a status to a function it actually processes, so a status implies in-scope.
 
-- **probe-aeneas** — guaranteed structurally. `has-spec` requires a `translation-name` (sourced from functions.json `lean_name`) whose translation carries a `primary-spec`; `is-disabled` means the atom's RQN is absent from functions.json. A spec therefore implies the RQN is in functions.json, which implies relevant (not disabled).
-- **probe-verus / probe-lean** — guaranteed by the specify step, which only attaches specs to in-scope atoms. The schema fields are independent, so this is a tooling convention rather than a structural consequence.
+Statuses and what each requires:
 
-**Why it matters**: the verification-color partition (Grey, White, Yellow, Dark Blue, Purple) relies on this. `Grey` selects all disabled atoms and `Dark Blue` selects specified-non-trusted atoms *without* a disabled guard; were the invariant violated, such an atom would be counted in both, breaking `grey + white + yellow + dark_blue + purple_impl == total`.
+- `verified` / `transitively-verified` — proved against a spec. **Never** appears without a spec: verification is *against a spec*, and a spec-less exec function has none. (Verus discharges only body-safety obligations — no overflow, in-bounds indexing, callee `requires` — against a defaulted `ensures true`; that is a vacuous claim, not a `verified` status.)
+- `unverified` / `failed` — spec-bearing, not yet proved (sorries/warnings) or errored.
+- `trusted` — a trusted axiom: `#[verifier::external_body]` or `admit()` in Verus. Axioms in Lean. In scope.
 
-**Validation**: `scripts/count-colors.sh` emits a partition warning if its color buckets do not sum to the total — the backstop that would surface any violation. See [docs/verification-statuses.md](../../docs/verification-statuses.md#colors).
+Scope, spec, and status align as:
+
+| atom | `is-disabled` | `verification-status` |
+|---|---|---|
+| specified + proved | false | `verified` / `transitively-verified` |
+| specified, not proved | false | `unverified` / `failed` |
+| `#[verifier::external_body]` / `admit()` | false | `trusted` |
+| **backlog** — compiled, non-external, unspecified | false | *(none)* |
+| out of scope (cfg-inactive / `#[verifier::external]` / external-crate stub) | true | *(none)* |
+
+The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `is-disabled: false`, no status.
+
+- **probe-verus** — `is-disabled` is derived from scope (P26); a status is attached only to in-scope atoms, so `has-verification-status ⟹ ¬is-disabled` holds by construction.
+
+**Why it matters**: consumers must not read `is-disabled: true` as "unverified work to do" — it marks code deliberately outside the verification effort. The backlog is `is-disabled: false` with no status.
+
+## P25. Atoms not in the verification build are out of scope
+
+For Verus projects, an atom is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when Verus does not compile and check it in this build. Formally: `is-disabled: true ⟺ cfg-inactive ∨ #[verifier::external] ∨ external-crate stub`:
+
+1. **cfg-inactive** — the governing `#[cfg(...)]` predicate is false under the active configuration, so the item is not compiled.
+2. **`#[verifier::external]`** — Verus ignores the item entirely (no body check, no spec).
+3. **external-crate stub** — referenced from another crate, not part of this crate's source (empty `code-path`).
+
+`#[verifier::external_body]` is **not** out of scope: it declares a spec Verus trusts without checking the body, so it is `trusted` / `is-disabled: false` (P25). External-*ness* alone does not decide scope — whether the function carries a trusted spec does.
+
+- The **active configuration** = the analyzer/verifier cfg (`verus_keep_ghost = true` for Verus) + the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`) + target defaults. **Inclusion gates do not make an atom out of scope**: `verus_keep_ghost` and active features (e.g. `alloc`, `precomputed-tables`, `zeroize`, `digest`) gate code that *is* compiled and *must* be verified.
+- Only **item-gating** `#[cfg(...)]` counts. `#[cfg_attr(..., doc = …)]`, `cfg_attr(..., derive(…))`, `cfg_attr(..., allow(…))` conditionally add an attribute but still compile the item, so they are not scope gates.
+- **Conservative**: if a predicate references a flag/feature the tool cannot resolve, the atom is kept in scope (backlog) rather than marked disabled. The tool MUST NEVER silently drop a real backlog item by guessing a predicate is false.
+
+**Why it matters**: cfg-gatedness alone is *not* a scope signal — many cfg-gated `exec` functions are in scope and verified (compiled behind active gates like `verus_keep_ghost` and default features). Scope is decided by whether the predicate holds in the verification build, not by the mere presence of a gate. Marking out-of-build code (inactive features, non-selected backends, `not(verus_keep_ghost)` fallbacks, `#[cfg(test)]`) `is-disabled: true` keeps it out of the backlog, which is reserved for in-scope, compiled, unspecified functions.
+
+For Aeneas projects, an rust function is **out of verification scope** if its lean translation has an attribute "out-of-verification-scope".
 
 ## Known bugs and edge cases
 
