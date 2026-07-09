@@ -207,7 +207,22 @@ The following fields in the jsons from the probes can allow us to have different
 - If yes, **arbitrary Lean `def`s get no verification colour** ("this def compiles" is diff from "this function meets its spec").
 - Aeneas-generated defs still get a colour: <span class="translated">translated</span> until specified, then the colour of their spec.
 - for vcvio based projects, we can leverage info like [Jin implemented](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/classification-security-protocol.md)
-- for verso-blueprint projects, we have a probe wrapping around verso-blueprint to get all that the user annotated 
+- for verso-blueprint projects, we have a probe wrapping around verso-blueprint to get all that the user annotated
+
+---
+
+## Open question 1 — resolution
+
+**Separate verification of Rust functions from checking of artifacts — two visual channels:**
+
+- **Rust exec → colour *bar* only** — the bar carries the *verification* status of the function (does the implementation meet its spec).
+- **Verus spec, Verus proof, Lean def, Lean type declaration, Lean axiom, Lean theorem → colour *dot* only** — the dot carries the *checking* status of the artifact (does it go through).
+
+The dot colour reflects whether the tool accepts the artifact:
+- Lean atoms → `lake build` succeeds or not.
+- Verus atoms → `cargo-verus verify` succeeds or not.
+
+This keeps "the function meets its spec" (bar) distinct from "the artifact checks / goes through" (dot).
 
 ---
 
@@ -222,6 +237,21 @@ Or we could see a spec as a **role** → maybe distinguish specs by **shape**, n
 
 ---
 
+## Open question 2 — resolution
+
+**No colour for specs.** A spec is a **role**, read off the atom's `kind` in the JSON, and shown by **shape** — colour stays reserved for status.
+
+![w:1050](assets/shapes-roles.png)
+
+| Shape | Kinds |
+|-------|-------|
+| `fn` | Rust `exec` |
+| `def/spec` | Verus `spec`; Lean `def`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `opaque`, `quot` |
+| `axiom` | Lean `axiom` |
+| `thm/prf` | Verus `proof`; Lean `theorem` |
+
+---
+
 ## Open question 3 — tracking
 
 <span class="q">Is every Rust function "tracked" by default?</span>
@@ -231,12 +261,34 @@ Or we could see a spec as a **role** → maybe distinguish specs by **shape**, n
 
 ---
 
+## Open question 3 — resolution
+
+**Yes — every Rust function is tracked by default.** Being outside verification scope is stated explicitly in the code, and the probes read it:
+
+- **Verus** → `#[verifier::external]` marks a function as outside verification scope → status <span class="disabled">disabled</span>.
+- **Aeneas** → by default every Rust function is translated, hence tracked. A Lean annotation on the translation ("this translation won't be verified") flips that function to <span class="disabled">disabled</span>.
+
+So the upper bound is well-defined: all functions count, minus the ones explicitly annotated as out of scope.
+
+---
+
 ## Open question 4 — pure Rust projects
 
 <span class="q">Should VeriLib display pure Rust (unverified) projects at all?</span>
 
 - If yes, what colour are those atoms?
 - white (as neutral) conveys "not for verification" — but today white is *also* used for tracked functions, which is inconsistent.
+
+---
+
+## Open question 4 — resolution
+
+**Yes — display them, in white.** The earlier inconsistency disappears once verification lives on the **colour bar** (Open question 1):
+
+- Pure Rust functions → white, no bar.
+- Verified Rust functions → the **bar** carries their status.
+
+So white is no longer overloaded: a verified function is told apart from a pure-Rust-project function by its colour bar, not by its fill.
 
 ---
 
@@ -250,6 +302,15 @@ Or we could see a spec as a **role** → maybe distinguish specs by **shape**, n
 
 ---
 
+## Open question 5 — resolution
+
+**Solved by Open question 3's default.** Since every Rust function is to-be-verified by default (minus the explicitly out-of-scope ones), the denominator is fixed up front:
+
+- **Done** = all tracked functions are <span class="verified">green</span>.
+- Intermediate states no longer look "done": untouched functions still count against the upper bound, so the progress chart only reaches 100% when the whole tracked set is verified.
+
+---
+
 ## Open question 6 — trusted / axioms
 
 <span class="q">Distinguish axioms by colour (<span class="trusted">purple</span>) or by shape?</span>
@@ -257,5 +318,9 @@ Or we could see a spec as a **role** → maybe distinguish specs by **shape**, n
 - Colour lets us **quantify** how much is trusted (how much purple).
 - Shape does not quantify as easily.
 
+---
 
+## Open question 6 — resolution
+
+**Colour: <span class="trusted">purple</span> for trusted atoms.** Since trust is a status, it goes on the colour channel — letting us quantify how much of a project rests on axioms / assumptions (how much purple), which shape alone wouldn't give us.
 
