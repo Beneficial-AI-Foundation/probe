@@ -1,0 +1,41 @@
+flowchart LR
+    tcor[["etmAEAD_correct"]]:::green
+    tsec[["etmAEAD_security"]]:::green
+    etm(["etmAEAD"]):::white
+    subgraph aeadS ["AEADScheme · AEAD/Defs.lean"]
+        ae(["encrypt"]):::white
+        ad(["decrypt"]):::white
+        ak(["keygen"]):::white
+    end
+    subgraph seS ["DetSEAlg · SymEnc/Defs.lean"]
+        se(["encrypt"]):::white
+        sd(["decrypt"]):::white
+        sk(["keygen"]):::white
+    end
+    subgraph cr1 ["crate signal-crypto"]
+        aesE(["aes_256_cbc_encrypt<br/><small>aes_cbc</small>"]):::prov
+        aesD(["aes_256_cbc_decrypt<br/><small>aes_cbc</small>"]):::prov
+    end
+    subgraph cr2 ["crate libsignal-protocol"]
+        msgE(["message_encrypt<br/><small>session_cipher.rs</small>"]):::prov
+        msgD(["decrypt_message_with_state<br/><small>session_cipher.rs</small>"]):::prov
+        mac(["compute_mac<br/><small>protocol.rs</small>"]):::prov
+        vmac(["verify_mac<br/><small>protocol.rs</small>"]):::prov
+        dk(["derive_keys<br/><small>ratchet/keys.rs</small>"]):::prov
+        hmac(["hmac_sha256<br/><small>crypto.rs</small>"]):::prov
+    end
+    tcor --> etm
+    tsec --> etm
+    etm -->|": AEADScheme"| aeadS
+    etm -->|"uses"| seS
+    ae -. manual .-> msgE
+    ae -. manual .-> mac
+    ad -. manual .-> msgD
+    ad -. manual .-> vmac
+    ak -. manual .-> dk
+    se -. manual .-> aesE
+    sd -. manual .-> aesD
+    sk -. manual .-> hmac
+    classDef green fill:#1B5E20,color:#fff
+    classDef white fill:#fff,color:#333,stroke:#999
+    classDef prov fill:#fff,color:#1B5E20,stroke:#1B5E20,stroke-width:4px

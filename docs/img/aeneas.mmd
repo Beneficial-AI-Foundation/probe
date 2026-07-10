@@ -1,22 +1,19 @@
 flowchart LR
-    subgraph rust [Rust source]
-        r_scalar(["scalar_mul"]):::lightCyan
-        r_fe_mul(["fe_mul"]):::darkBlue
-        r_fe_square(["fe_square"]):::white
+    subgraph rust ["Rust — src/backend/serial/u64/field.rs"]
+        r_mul(["mul"]):::darkGreen
+        r_cswap(["conditional_swap"]):::yellow
+        r_zero(["zeroize"]):::grey
     end
-    subgraph lean [Lean translations]
-        l_scalar(["scalar_mul"]):::lightCyan
-        l_fe_mul(["fe_mul"]):::lightCyan
+    subgraph lean ["Lean translations — Curve25519Dalek/Funs.lean"]
+        l_mul(["mul"]):::darkGreen
+        l_cswap(["conditional_swap"]):::yellow
     end
-    subgraph specs ["@[progress] theorems"]
-        s_fe_mul[["fe_mul_spec"]]:::darkGreen
+    subgraph spec ["Spec — Specs/.../FieldElement51/Mul.lean"]
+        s_mul[["mul_spec"]]:::darkGreen
     end
-    r_scalar -.->|translation| l_scalar
-    r_fe_mul -.->|translation| l_fe_mul
-    l_fe_mul -->|spec| s_fe_mul
-    r_scalar --> r_fe_mul
-    l_scalar --> l_fe_mul
-    classDef white fill:#fff,color:#333,stroke:#999
-    classDef lightCyan fill:#b3e5fc,color:#0277bd
-    classDef darkBlue fill:#1565c0,color:#fff
-    classDef darkGreen fill:#2e7d32,color:#fff
+    r_mul -.->|translation| l_mul
+    r_cswap -.->|translation| l_cswap
+    l_mul -->|spec| s_mul
+    classDef grey fill:#808080,color:#fff
+    classDef yellow fill:#C99A00,color:#fff
+    classDef darkGreen fill:#1B5E20,color:#fff

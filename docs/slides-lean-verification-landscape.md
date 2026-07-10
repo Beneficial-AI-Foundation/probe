@@ -1,26 +1,20 @@
----
-marp: true
-theme: default
-paginate: true
----
-
 # Lean Verification Landscape
 
-**Specs as First-Class Citizens**
+## Colour key
 
-How probe-lean could discover specifications across different Lean project types
+One colour per atom, from its verification status (the convention proposed in the probes deck):
 
----
+- <span style="color:#808080">Grey</span> — in scope but not yet specified
+- <span style="color:#C99A00">Yellow</span> — translated or generated, but unspecified
+- <span style="color:#2563EB">Blue</span> — a stated spec, a condition that is not itself proved
+- <span style="color:#E8710A">Orange</span> — incomplete proof (a `sorry` or `assume`)
+- <span style="color:#43A047">Light Green</span> — verified locally, some dependency still open
+- <span style="color:#1B5E20">Dark Green</span> — transitively verified: it and everything it depends on
+- <span style="color:#7C3AED">Purple</span> — trusted (an axiom or an assumed spec)
+- <span style="color:#D32F2F">Red</span> — error: does not compile, or verification fails
+- White — nothing to grade: a definition, or outside the verification scope
 
-## The problem
-
-In **Verus**, specs are syntactically explicit: `requires`, `ensures`, `proof fn`.
-
-In **Lean 4**, specs hide in **types**, **attributes**, **naming**, and **module structure** — no single syntax marks "this is a spec".
-
-**How could probe-lean find them?**
-
-![w:1100](img/legend.png)
+<!-- The diagram images follow this key. They are generated from the .mmd sources in img/ with mermaid-cli: `mmdc -i img/<name>.mmd -o img/<name>.png -b white`. -->
 
 ---
 
@@ -39,11 +33,15 @@ In **Lean 4**, specs hide in **types**, **attributes**, **naming**, and **module
 
 ## Spec pattern: Aeneas
 
-Extrinsic specs via **`@[progress]`** theorems on Aeneas-generated Lean translations.
+Extrinsic specs via spec theorems on Aeneas-generated Lean translations. Grounded in `baif/curve25519-dalek-lean-verify`, three `FieldElement51` methods from `src/backend/serial/u64/field.rs`.
 
 ![w:1100](img/aeneas.png)
 
-Color flows right-to-left: a Rust function is Dark Blue only when its translation has a spec.
+Color flows right-to-left: a Rust function is <span style="color:#1B5E20">Dark Green</span> only when its translation has a proved spec.
+
+- `mul` is <span style="color:#1B5E20">Dark Green</span>: its translation carries the proved `mul_spec` (`Specs/.../FieldElement51/Mul.lean`).
+- `conditional_swap` is <span style="color:#C99A00">Yellow</span>: it is translated but has no spec, so there is nothing yet to verify against.
+- `zeroize` is <span style="color:#808080">Grey</span>: no translation at all, so it is outside the verification effort.
 
 ---
 
@@ -57,33 +55,28 @@ Module paths (`Zip/Native/` vs `Zip/Spec/`) cleanly separate the layers.
 
 ---
 
-## Spec pattern: Cedar
+## Spec pattern: cedar-lean
 
-**Spec-as-implementation** — the Lean `def`s ARE the specification.
+Grounded in `Beneficial-AI-Foundation/cedar-lean`. Spec-as-implementation: the Lean `def`s in `Cedar/Spec` ARE the authorization specification.
 
 ![w:700](img/cedar.png)
 
-White nodes like `intOrErr` — should they have theorems? This is the **denominator problem**.
+- `isAuthorized` and `evaluate` are definitions (White): the spec itself, with nothing proved on them directly.
+- `verifyIsAuthorized_is_sound` and `well_typed_is_sound` are <span style="color:#1B5E20">transitively verified</span> theorems in `Cedar/Thm` that prove properties about those defs.
+- Which `Cedar/Spec` defs *should* carry a theorem is the denominator problem: the probe reports what is proved, not what ought to be.
 
 ---
 
-## Spec pattern: VCVio / secure-messaging
+## Spec pattern: secure-messaging (AEAD from Encrypt-then-MAC)
 
-Layered: **scheme** → **correctness** → **security** → **invariants**.
+Grounded in `baif/secure-messaging`. The construction and the property definitions are `def`s; the correctness and security claims are theorems.
 
 ![w:700](img/vcvio.png)
 
-White = WIP, Light Green = locally verified invariants that don't yet compose transitively.
-
----
-
-## Spec pattern: Loom/Velvet
-
-Specs are **inline** — `requires`/`ensures` are part of the method declaration.
-
-![w:550](img/loom.png)
-
-`loom_solve` generates and discharges VCs automatically — verified methods go straight to Dark Green. Unspecified helpers (White) are the only nodes without inline annotations.
+- Nodes: `AEADScheme` (a structure), the construction `etmAEAD` that instantiates it, and the properties `Correct` and `distAdvantage` are definitions (White); `etmAEAD_correct` and `etmAEAD_security` are <span style="color:#1B5E20">transitively verified</span> theorems.
+- Edges are only what the probe actually records: a **solid** arrow is a reference in the atom's type/statement (`type-dependencies`), a **dotted** arrow is a reference in its body/proof (`term-dependencies`). So `etmAEAD : AEADScheme` and each theorem's statement mentioning `etmAEAD` are solid; `etmAEAD`'s body calling `DetSEAlg` is dotted.
+- The probe does **not** label an edge "proves" or "bounds" — that is human interpretation, not extracted data.
+- Every node's subgraph names the file (all under `SecureMessaging/`) where the atom lives.
 
 ---
 
@@ -117,5 +110,28 @@ probe-lean can identify what *is* specified (`specs` field non-empty), but deter
 - Already partially used by probe-lean for `primary-spec` inference
 
 **Complement: Verso Blueprint** — project management layer (roadmap, dependencies, progress). Code-level attributes and blueprint are complementary, not alternatives.
+
+---
+
+## Joint project: a proof meets deployed code
+
+`probe merge` of probe-rust on libsignal with probe-lean on secure-messaging, joined by a manual `probe/mappings` file. Grounded in `secure-messaging/.verilib`.
+
+![w:560](img/joint-libsignal-secure-messaging.png)
+
+- Solid chain (Lean, proved): the theorems `etmAEAD_correct`/`etmAEAD_security` rest on the construction `etmAEAD`, which is an `AEADScheme` and `uses` `DetSEAlg`. Each scheme's fields (`encrypt`/`decrypt`/`keygen`) are the mapping's source.
+- Dashed **manual** arrows are the mapping (tool `manual`): a human claim that a Rust function realizes the abstract field, not a proof.
+- Rust targets are grouped by crate (`signal-crypto`, `libsignal-protocol`) with the file under each; the green **halo** (outline, not fill) means model-backed but not itself verified.
+- The `encrypt`/`decrypt` fans to two Rust functions each reveal Encrypt-then-MAC inside libsignal.
+
+---
+
+## Proof reach: what rests on one function
+
+![w:620](img/proof-reach-message-encrypt.png)
+
+- Reversing the mapping: `message_encrypt` participates in three proved claims: `etmAEAD_correct` (correctness), and `game0_eq_real` and `game3_eq_rand` (security).
+- If the mapping is faithful, that libsignal function inherits those guarantees; if the Rust changes, these are the proofs to recheck.
+- Computed from the cross-language edges the merge flattened through the proof graph.
 
 ---
