@@ -18,7 +18,7 @@
       "code-path": "src/lib.rs",
       "code-text": { "lines-start": 5, "lines-end": 7 },
       "kind": "spec",
-      "language": "rust",
+      "language": "verus",
       "verification-status": "verified"
     },
     "probe:verus-micro/0.1.0/lib/positive_sum()": {
@@ -31,7 +31,7 @@
       "code-path": "src/lib.rs",
       "code-text": { "lines-start": 9, "lines-end": 17 },
       "kind": "proof",
-      "language": "rust",
+      "language": "verus",
       "is-disabled": false,
       "verification-status": "verified"
     },

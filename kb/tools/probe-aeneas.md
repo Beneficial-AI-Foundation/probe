@@ -107,7 +107,7 @@ After merge, probe-aeneas adds Aeneas-specific fields. Translation-specific fiel
 
 | Field | Source | Description |
 |-------|--------|-------------|
-| `is-disabled` | functions.json | `true` if the function's RQN is not in functions.json |
+| `is-disabled` | functions.json, translation | `true` if the function's RQN is not in functions.json, or its Lean translation carries the `@[out_of_scope]` attribute (see [P25](../engineering/properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope)) |
 | `is-relevant` | functions.json | `true` if the function's RQN appears in functions.json |
 | `is-public` | probe-rust (Charon) or default | `true` if declared `pub` per Charon; `false` if private or visibility data unavailable |
 

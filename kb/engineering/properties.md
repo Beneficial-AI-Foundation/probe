@@ -252,7 +252,7 @@ Scope, spec, and status align as:
 | specified, not proved | false | `unverified` / `failed` |
 | `#[verifier::external_body]` / `admit()` | false | `trusted` |
 | **backlog** — compiled, non-external, unspecified | false | *(none)* |
-| out of scope (cfg-inactive / `#[verifier::external]` / external-crate stub) | true | *(none)* |
+| out of scope — Verus: cfg-inactive / `#[verifier::external]` / external-crate stub; Aeneas: untranslated / `@[out_of_scope]` translation | true | *(none)* |
 
 The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `is-disabled: false`, no status.
 
@@ -276,7 +276,10 @@ For Verus projects, an atom is **out of verification scope** — `is-disabled: t
 
 **Why it matters**: cfg-gatedness alone is *not* a scope signal — many cfg-gated `exec` functions are in scope and verified (compiled behind active gates like `verus_keep_ghost` and default features). Scope is decided by whether the predicate holds in the verification build, not by the mere presence of a gate. Marking out-of-build code (inactive features, non-selected backends, `not(verus_keep_ghost)` fallbacks, `#[cfg(test)]`) `is-disabled: true` keeps it out of the backlog, which is reserved for in-scope, compiled, unspecified functions.
 
-For Aeneas projects, an rust function is **out of verification scope** if its lean translation has an attribute "out-of-verification-scope".
+For Aeneas projects, a Rust function is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when it is not translated to Lean, or its Lean translation is explicitly annotated out of scope. Formally: `is-disabled: true ⟺ RQN absent from functions.json ∨ translation carries @[out_of_scope]`:
+
+1. **not translated** — the function's Charon RQN does not appear in `functions.json` (not compiled, behind an inactive gate, or otherwise excluded from Aeneas translation).
+2. **`@[out_of_scope]`** — the generated Lean translation carries an out-of-scope attribute, declaring "this translation will not be verified". Every Rust function is translated (hence tracked) by default; this attribute is the explicit opt-out.
 
 ## Known bugs and edge cases
 
