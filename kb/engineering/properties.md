@@ -278,10 +278,15 @@ For Verus projects, an atom is **out of verification scope** — `is-disabled: t
 
 **Why it matters**: cfg-gatedness alone is *not* a scope signal — many cfg-gated `exec` functions are in scope and verified (compiled behind active gates like `verus_keep_ghost` and default features). Scope is decided by whether the predicate holds in the verification build, not by the mere presence of a gate. Marking out-of-build code (inactive features, non-selected backends, `not(verus_keep_ghost)` fallbacks, `#[cfg(test)]`) `is-disabled: true` keeps it out of the backlog, which is reserved for in-scope, compiled, unspecified functions.
 
-For Aeneas projects, a Rust function is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when it is not translated to Lean, or its Lean translation is explicitly annotated out of scope. Formally: `is-disabled: true ⟺ RQN absent from functions.json ∨ translation carries @[out_of_scope]`:
+For Aeneas projects, a Rust function is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when it is not compiled in the Aeneas build, or its Lean translation is explicitly annotated out of scope. Formally: `is-disabled: true ⟺ cfg-inactive ∨ translation carries @[out_of_scope]`:
 
-1. **not translated** — the function's Charon RQN does not appear in `functions.json` (not compiled, behind an inactive gate, or otherwise excluded from Aeneas translation).
-2. **`@[out_of_scope]`** — the generated Lean translation carries an out-of-scope attribute, declaring "this translation will not be verified". Every Rust function is translated (hence tracked) by default; this attribute is the explicit opt-out.
+1. **cfg-inactive** — the function's combined item-gating `#[cfg(...)]` predicate (own gate plus enclosing `impl`/`mod`/`trait` gates, emitted by probe-rust as the `cfg` field) is false under the Aeneas build configuration, so the item is not compiled and cannot be translated or verified.
+2. **`@[out_of_scope]`** — the generated Lean translation carries an out-of-scope attribute, declaring "this translation will not be verified". This attribute is the explicit opt-out.
+
+**Every extracted (compiled) Rust function is tracked backlog by default** (`is-disabled: false`, no `verification-status`), whether or not Aeneas produced a Lean translation for it. Absence from `functions.json` alone does **not** imply out-of-scope: a compiled function that Aeneas has not yet translated is unverified backlog, not out of scope. `functions.json` is the translation-matching bridge (which Lean def a Rust function maps to), not the scope oracle.
+
+- The **active configuration** for the Aeneas build = the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`), overlaid by any `--features` / `--no-default-features` / `--all-features` in the project's `charon.cargo_args`. cfg evaluation mirrors the Verus rules above: only item-gating `#[cfg(...)]` counts (not cosmetic `#[cfg_attr(...)]`), and evaluation is **conservative** — a predicate referencing a flag/feature the tool cannot resolve keeps the atom in scope (backlog), never silently dropping a real backlog item.
+- As with Verus, a status-bearing atom is never disabled (P24): the cfg/`@[out_of_scope]` reclassification applies only to atoms that would otherwise be backlog.
 
 ## Known bugs and edge cases
 
