@@ -252,7 +252,7 @@ Scope, spec, and status align as:
 | specified, not proved | false | `unverified` / `failed` |
 | `#[verifier::external_body]` / `admit()` | false | `trusted` |
 | **backlog** — compiled, non-external, unspecified | false | *(none)* |
-| out of scope — Verus: cfg-inactive / `#[verifier::external]` / external-crate stub; Aeneas: untranslated / `@[out_of_scope]` translation | true | *(none)* |
+| out of scope — Verus: cfg-inactive / `#[verifier::external]` / external-crate stub / bodiless declaration / non-library target; Aeneas: untranslated / `@[out_of_scope]` translation | true | *(none)* |
 
 The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `is-disabled: false`, no status.
 
@@ -262,11 +262,13 @@ The **backlog** a Verus project still owes specs for is exactly the in-scope/tra
 
 ## P25. Atoms not in the verification build are out of scope
 
-For Verus projects, an atom is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when Verus does not compile and check it in this build. Formally: `is-disabled: true ⟺ cfg-inactive ∨ #[verifier::external] ∨ external-crate stub`:
+For Verus projects, an atom is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when Verus does not compile and check it in this build. Formally: `is-disabled: true ⟺ cfg-inactive ∨ #[verifier::external] ∨ external-crate stub ∨ bodiless-declaration ∨ non-library-target`:
 
 1. **cfg-inactive** — the governing `#[cfg(...)]` predicate is false under the active configuration, so the item is not compiled.
 2. **`#[verifier::external]`** — Verus ignores the item entirely (no body check, no spec).
 3. **external-crate stub** — referenced from another crate, not part of this crate's source (empty `code-path`).
+4. **bodiless declaration** — a function with no body (`has-body: false`), e.g. a trait-method signature. There is no implementation to verify; the implementations carry the proof.
+5. **non-library target** — code outside the verified library/binary target: a build script (`build.rs`), integration tests (`tests/`), `examples/`, or `benches/`. Verus verifies the crate's `src/` tree, not these. (`#[cfg(test)]` code *inside* `src/` is covered by cfg-inactivity, not this case.)
 
 `#[verifier::external_body]` is **not** out of scope: it declares a spec Verus trusts without checking the body, so it is `trusted` / `is-disabled: false` (P25). External-*ness* alone does not decide scope — whether the function carries a trusted spec does.
 
