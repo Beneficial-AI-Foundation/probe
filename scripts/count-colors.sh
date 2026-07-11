@@ -93,6 +93,7 @@ jq -r '
   (.dot_red + .dot_yellow + .dot_green) as $dot_cover |
   (.exec_total - .grey) as $tracked |
   (.light_green + .dark_green) as $verified |
+  (.light_green + .dark_green + .purple) as $verified_trusted |
 
   "Pipeline: \(.pipeline)",
   "",
@@ -109,10 +110,11 @@ jq -r '
   "--|-------------|------",
   "  | Total       | \(.exec_total)",
   "",
-  "  Tracked  (total - grey):        \($tracked)",
-  "  Verified (light + dark green):  \($verified)",
+  "  Tracked  (total - grey):            \($tracked)",
+  "  Verified (light + dark green):      \($verified)",
+  "  Verified + trusted (+ purple):      \($verified_trusted)",
   (if $tracked > 0 then
-    "  Verified / tracked:             \($verified) / \($tracked)"
+    "  (Verified + trusted) / tracked:     \($verified_trusted) / \($tracked)"
   else empty end),
   "",
   "Colour DOT — verification artifacts (checking status)",
