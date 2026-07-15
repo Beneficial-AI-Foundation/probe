@@ -1,19 +1,37 @@
 #!/usr/bin/env bash
-# Count Rust project functions per verification color.
+# Count atoms per colour, split by the two visual channels of the scheme.
 #
-# Works with probe-aeneas/extract and probe-verus/extract JSON. Auto-detects
-# the pipeline from the schema field.
+# Works with probe-aeneas/extract, probe-verus/extract, and probe-lean/extract
+# JSON. Auto-detects the pipeline from the schema field.
 #
-# Scopes to project functions only (code-path != ""), excluding external crate
-# stubs. Grey count includes test functions.
+# See docs/atoms_roles_statuses.md for the scheme. Two channels:
 #
-# Grey, White, Yellow, Dark Blue, and Purple form a partition of the total.
-# Dark Blue is cumulative: all specified non-trusted functions (superset of Green).
-# Sanity check: grey + white + yellow + blue + purple = total. Dark Blue carries
-# no disabled guard; the partition relies on has-spec => not-disabled (P24).
-# @kb: kb/engineering/properties.md#p24-a-specified-atom-is-in-analysis-scope
+#   Colour BAR  — Rust `exec` atoms (language "rust", kind "exec").
+#     Verification status: does the implementation meet its spec?
+#     Pure function of (is-disabled, verification-status):
+#       Grey        is-disabled: true              (out of verification scope)
+#       White       no verification-status         (tracked, no spec yet)
+#       Red         "failed"
+#       Yellow      "unverified"                   (sorry / assume)
+#       Light Green "verified"
+#       Dark Green  "transitively-verified"
+#       Purple      "trusted"                      (Rust atoms only)
+#     These seven partition the exec total (relies on P24: status => not-disabled).
 #
-# See docs/verification-statuses.md for color definitions.
+#   Colour DOT  — verification artifacts: Verus "spec"/"proof" (language
+#     "verus" per KB P20) and every Lean atom (language "lean"). Selected by
+#     kind (spec/proof) or language (lean).
+#     Checking status: does the tool (lake build / cargo verus verify) accept it?
+#     Pure function of verification-status:
+#       Red    "failed"        (does not check)
+#       Yellow "unverified"    (checks with a sorry / assume warning)
+#       Green  otherwise       (verified / transitively-verified / trusted /
+#                               none — accepted by the tool)
+#
+# Excluded from both channels: external-crate stubs (code-path == "") and
+# editorial/auto-generated exclusions (is-hidden / is-ignored /
+# is-extraction-artifact).
+# @kb: kb/engineering/properties.md#p24-a-status-bearing-atom-is-in-analysis-scope
 #
 # Usage: scripts/count-colors.sh <input.json>
 
@@ -33,80 +51,89 @@ fi
 
 jq -r '
   .schema as $schema |
-  .data as $d |
   ($schema | if startswith("probe-aeneas") then "aeneas"
              elif startswith("probe-verus") then "verus"
+             elif startswith("probe-lean")  then "lean"
              else "unknown" end) as $pipeline |
 
-  # Rust project atoms (base set for implementation colors)
-  [.data | to_entries[] | select(
-    .value.language == "rust" and .value["code-path"] != ""
-  )] |
+  [.data[] | select(.["code-path"] != "")
+           | select((.["is-hidden"] // false) | not)
+           | select((.["is-ignored"] // false) | not)
+           | select((.["is-extraction-artifact"] // false) | not)] as $atoms |
 
-  # Precompute derived flags per atom
-  map(. + {
-    _disabled: (.value["is-disabled"] == true),
-    _trusted:  ((.value["verification-status"] // null) == "trusted"),
-    _has_translation: (.value["translation-name"] != null),
-    _has_spec: (
-      if $pipeline == "aeneas" then
-        .value["translation-name"] as $tn |
-        ($tn != null) and (($d[$tn]["primary-spec"] // null) != null)
-      else
-        ((.value["primary-spec"] // null) as $ps | $ps != null and $ps != "")
-      end
-    )
-  }) |
+  # --- Colour BAR: Rust exec atoms -------------------------------------------
+  ([$atoms[] | select(.language == "rust" and .kind == "exec") | {
+     disabled: (.["is-disabled"] == true),
+     status:   (.["verification-status"] // null)
+   }]) as $exec |
 
-  # Non-Rust trusted project atoms (axioms, proof fns)
-  ([$d | to_entries[] | select(
-    .value.language != "rust" and .value["code-path"] != "" and
-    ((.value["verification-status"] // null) == "trusted")
-  )] | length) as $axioms |
+  # --- Colour DOT: verification artifacts ------------------------------------
+  # Verus spec/proof and every Lean atom. Keyed on kind, not language: per KB
+  # P20 a Verus spec/proof has language "verus" (only exec is "rust"), so we
+  # select spec/proof by kind and thus stay correct regardless of that tag.
+  ([$atoms[] | select(
+     (.kind == "spec" or .kind == "proof") or
+     (.language == "lean")
+   ) | (.["verification-status"] // null)]) as $art |
 
   {
     pipeline:    $pipeline,
-    grey:        [.[] | select(._disabled == true)] | length,
-    white:       [.[] | select(._disabled == false and ._has_spec == false and
-                                ._has_translation == false and ._trusted == false)] | length,
-    yellow:      [.[] | select(._disabled == false and ._has_translation == true and
-                                ._has_spec == false and ._trusted == false)] | length,
-    light_blue:  0,
-    dark_blue:   [.[] | select(._has_spec == true and ._trusted == false)] | length,
-    # Green requires both a verified status AND a spec. The _has_spec guard is
-    # redundant for Aeneas (status is spec-derived) but load-bearing for Verus
-    # (status maps the proof run, independent of spec presence). It keeps green a
-    # strict subset of dark_blue. See docs/verification-statuses.md (Colors).
-    light_green: [.[] | select(.value["verification-status"] == "verified" and
-                                ._has_spec == true)] | length,
-    dark_green:  [.[] | select(.value["verification-status"] == "transitively-verified" and
-                                ._has_spec == true)] | length,
-    purple_impl: [.[] | select(._disabled == false and ._trusted == true)] | length,
-    axioms:      $axioms,
-    total:       length
-  } |
-  . + { purple: (.purple_impl + .axioms) } |
 
-  (.grey + .white + .yellow + .dark_blue + .purple_impl) as $cover |
+    grey:        [$exec[] | select(.disabled)] | length,
+    white:       [$exec[] | select(.disabled | not) | select(.status == null)] | length,
+    red:         [$exec[] | select(.disabled | not) | select(.status == "failed")] | length,
+    yellow:      [$exec[] | select(.disabled | not) | select(.status == "unverified")] | length,
+    light_green: [$exec[] | select(.disabled | not) | select(.status == "verified")] | length,
+    dark_green:  [$exec[] | select(.disabled | not) | select(.status == "transitively-verified")] | length,
+    purple:      [$exec[] | select(.disabled | not) | select(.status == "trusted")] | length,
+    exec_total:  ($exec | length),
+
+    dot_red:     [$art[] | select(. == "failed")] | length,
+    dot_yellow:  [$art[] | select(. == "unverified")] | length,
+    dot_green:   [$art[] | select(. != "failed" and . != "unverified")] | length,
+    art_total:   ($art | length)
+  } |
+
+  (.grey + .white + .red + .yellow + .light_green + .dark_green + .purple) as $bar_cover |
+  (.dot_red + .dot_yellow + .dot_green) as $dot_cover |
+  (.exec_total - .grey) as $tracked |
   (.light_green + .dark_green) as $verified |
+  (.light_green + .dark_green + .purple) as $verified_trusted |
+
   "Pipeline: \(.pipeline)",
   "",
+  "Colour BAR — Rust exec atoms (verification status)",
   "# | Color       | Count",
   "--|-------------|------",
   "1 | Grey        | \(.grey)",
   "2 | White       | \(.white)",
-  "3 | Yellow      | \(.yellow)",
-  "4 | Light Blue  | \(.light_blue)",
-  "5 | Dark Blue   | \(.dark_blue)",
-  "6 | Light Green | \(.light_green)",
-  "7 | Dark Green  | \(.dark_green)",
-  "- | Purple      | \(.purple)  (\(.purple_impl) impl + \(.axioms) axioms)",
+  "3 | Red         | \(.red)",
+  "4 | Yellow      | \(.yellow)",
+  "5 | Light Green | \(.light_green)",
+  "6 | Dark Green  | \(.dark_green)",
+  "7 | Purple      | \(.purple)",
   "--|-------------|------",
-  "  | Total       | \(.total)",
-  (if $cover != .total then
-    "  WARNING: grey+white+yellow+blue+purple_impl (\($cover)) != total (\(.total))"
+  "  | Total       | \(.exec_total)",
+  "",
+  "  Tracked  (total - grey):            \($tracked)",
+  "  Verified (light + dark green):      \($verified)",
+  "  Verified + trusted (+ purple):      \($verified_trusted)",
+  (if $tracked > 0 then
+    "  (Verified + trusted) / tracked:     \($verified_trusted) / \($tracked)"
   else empty end),
-  (if $verified > .dark_blue then
-    "  WARNING: green (\($verified)) > dark_blue (\(.dark_blue))"
+  "",
+  "Colour DOT — verification artifacts (checking status)",
+  "# | Color  | Count",
+  "--|--------|------",
+  "1 | Red    | \(.dot_red)",
+  "2 | Yellow | \(.dot_yellow)",
+  "3 | Green  | \(.dot_green)",
+  "--|--------|------",
+  "  | Total  | \(.art_total)",
+  (if $bar_cover != .exec_total then
+    "  WARNING: bar colours (\($bar_cover)) != exec total (\(.exec_total))"
+  else empty end),
+  (if $dot_cover != .art_total then
+    "  WARNING: dot colours (\($dot_cover)) != artifact total (\(.art_total))"
   else empty end)
 ' "$INPUT"

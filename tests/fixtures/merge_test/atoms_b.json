@@ -27,7 +27,7 @@
         "lines-end": 15
       },
       "kind": "spec",
-      "language": "rust"
+      "language": "verus"
     },
     "probe:crate-b/1.0/helpers/validate()": {
       "display-name": "validate",
@@ -39,7 +39,7 @@
         "lines-end": 30
       },
       "kind": "proof",
-      "language": "rust"
+      "language": "verus"
     },
     "probe:crate-b/1.0/helpers/internal()": {
       "display-name": "internal",

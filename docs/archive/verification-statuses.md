@@ -1,5 +1,13 @@
 # Verification Statuses
 
+> **⚠️ Deprecated.** Superseded by
+> [`atoms_roles_statuses.md`](atoms_roles_statuses.md), the current colouring
+> scheme (two channels: a colour *bar* for Rust `exec` verification status, a
+> colour *dot* for artifact checking status). This document describes the older
+> scheme (blue for specs, yellow for translated-but-unspecified, purple counting
+> non-Rust axioms) that [`scripts/count-colors.sh`](../scripts/count-colors.sh)
+> no longer implements. Kept for history; do not treat as normative.
+
 Defines the per-atom status fields (from the tool schemas) and the color scheme derived from them. Color counts are produced by [`scripts/count-colors.sh`](../scripts/count-colors.sh), which this document and the script must agree on — the script is currently out of date with the scheme below and will be reconciled in a follow-up PR (see [Counting](#counting)).
 
 ## Proved vs verified
