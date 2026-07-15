@@ -34,7 +34,7 @@ The label at the top-left corner is exactly the atom's `kind` field from the
 JSON, verbatim. Possible values:
 
 - **Rust (Verus / Aeneas):** `exec`, `spec`, `proof`
-- **Lean:** `def`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `opaque`, `quot`, `axiom`, `theorem`
+- **Lean:** `def`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `opaque`, `quot`, `projection`, `axiom`, `theorem`
 
 ## Colour bar — Rust `exec` (Verus and Aeneas projects)
 
@@ -94,7 +94,7 @@ except grey. Every Rust function is tracked by default; one leaves the tracked
 set only when the code explicitly marks it out of scope (Verus
 `#[verifier::external]`; Aeneas untranslated or `@[out_of_scope]`). Progress is
 `#verified / #tracked`, and a project is **done** when every tracked function is
-green.
+green or purple (verified/transitively-verified, or trusted).
 
 ## Tracking and the denominator
 
@@ -103,15 +103,23 @@ explicitly in the code and read by the probes:
 
 - **Verus** — `#[verifier::external]`, cfg-inactive code, or an external-crate
   stub → `is-disabled: true` → **grey**.
-- **Aeneas** — a Rust function whose Charon RQN is absent from `functions.json`
-  (not translated / not compiled / behind a gate), or a Lean-side
-  `@[out_of_scope]` annotation on its translation → `is-disabled: true` → **grey**.
+- **Aeneas** — cfg-inactive code, a non-library target (`build.rs`, `tests/`,
+  `examples/`, `benches/`), a Lean-side `@[out_of_scope]` annotation on the
+  translation, or a curated config `out-of-scope` entry → `is-disabled: true`
+  → **grey**. Absence from `functions.json` alone is **not** out of scope: a
+  compiled function Aeneas has not yet translated is **white** backlog, not
+  grey (P25).
 
 This gives a well-defined denominator, so we can report
 
 ```
 #verified / #tracked      where #tracked = all exec atoms − grey (is-disabled)
 ```
+
+Excluded from every count (both channels), before any colouring: external-crate
+stubs (empty `code-path`) and editorial/auto-generated exclusions
+(`is-hidden` / `is-ignored` / `is-extraction-artifact`). These are not atoms the
+project owes work on, so they never enter the bar or dot totals.
 
 ## Lean projects
 

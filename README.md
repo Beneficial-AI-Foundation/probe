@@ -16,7 +16,7 @@ This repository contains:
 - [docs/schema-validation.md](docs/schema-validation.md) -- Validating probe output against the JSON Schema (Rust, Lean, CI)
 - [docs/ui-views.md](docs/ui-views.md) -- How a UI should implement language toggles, call graph / file map / crate map views
 - [docs/atoms_roles_statuses.md](docs/atoms_roles_statuses.md) -- Per-atom roles and the colour scheme (bar + dot) derived from status fields
-- [docs/verification-statuses.md](docs/verification-statuses.md) -- _Deprecated_; older colour scheme, superseded by the above
+- [docs/archive/verification-statuses.md](docs/archive/verification-statuses.md) -- _Deprecated_; older colour scheme, superseded by the above
 - [docs/testing-guide.md](docs/testing-guide.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
 - [docs/merge-algorithm.md](docs/merge-algorithm.md) -- Merge algorithm specification

@@ -256,7 +256,7 @@ Scope, spec, and status align as:
 
 The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `is-disabled: false`, no status.
 
-- **probe-verus** — `is-disabled` is derived from scope (P26); a status is attached only to in-scope atoms, so `has-verification-status ⟹ ¬is-disabled` holds by construction.
+- **probe-verus** — `is-disabled` is derived from scope (P25); a status is attached only to in-scope atoms, so `has-verification-status ⟹ ¬is-disabled` holds by construction.
 
 **Why it matters**: consumers must not read `is-disabled: true` as "unverified work to do" — it marks code deliberately outside the verification effort. The backlog is `is-disabled: false` with no status.
 
@@ -270,7 +270,7 @@ For Verus projects, an atom is **out of verification scope** — `is-disabled: t
 4. **bodiless declaration** — a function with no body (`has-body: false`), e.g. a trait-method signature. There is no implementation to verify; the implementations carry the proof.
 5. **non-library target** — code outside the verified library/binary target: a build script (`build.rs`), integration tests (`tests/`), `examples/`, or `benches/`. Verus verifies the crate's `src/` tree, not these. (`#[cfg(test)]` code *inside* `src/` is covered by cfg-inactivity, not this case.)
 
-`#[verifier::external_body]` is **not** out of scope: it declares a spec Verus trusts without checking the body, so it is `trusted` / `is-disabled: false` (P25). External-*ness* alone does not decide scope — whether the function carries a trusted spec does.
+`#[verifier::external_body]` is **not** out of scope: it declares a spec Verus trusts without checking the body, so it is `trusted` / `is-disabled: false` (P24). External-*ness* alone does not decide scope — whether the function carries a trusted spec does.
 
 - The **active configuration** = the analyzer/verifier cfg (`verus_keep_ghost = true` for Verus) + the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`) + target defaults. **Inclusion gates do not make an atom out of scope**: `verus_keep_ghost` and active features (e.g. `alloc`, `precomputed-tables`, `zeroize`, `digest`) gate code that *is* compiled and *must* be verified.
 - Only **item-gating** `#[cfg(...)]` counts. `#[cfg_attr(..., doc = …)]`, `cfg_attr(..., derive(…))`, `cfg_attr(..., allow(…))` conditionally add an attribute but still compile the item, so they are not scope gates.

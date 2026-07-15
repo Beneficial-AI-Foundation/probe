@@ -28,7 +28,9 @@
 #       Green  otherwise       (verified / transitively-verified / trusted /
 #                               none — accepted by the tool)
 #
-# External-crate stubs (code-path == "") are excluded from both channels.
+# Excluded from both channels: external-crate stubs (code-path == "") and
+# editorial/auto-generated exclusions (is-hidden / is-ignored /
+# is-extraction-artifact).
 # @kb: kb/engineering/properties.md#p24-a-status-bearing-atom-is-in-analysis-scope
 #
 # Usage: scripts/count-colors.sh <input.json>
@@ -54,7 +56,10 @@ jq -r '
              elif startswith("probe-lean")  then "lean"
              else "unknown" end) as $pipeline |
 
-  [.data[] | select(.["code-path"] != "")] as $atoms |
+  [.data[] | select(.["code-path"] != "")
+           | select((.["is-hidden"] // false) | not)
+           | select((.["is-ignored"] // false) | not)
+           | select((.["is-extraction-artifact"] // false) | not)] as $atoms |
 
   # --- Colour BAR: Rust exec atoms -------------------------------------------
   ([$atoms[] | select(.language == "rust" and .kind == "exec") | {

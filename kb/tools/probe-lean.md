@@ -133,7 +133,7 @@ Output goes to `.verilib/views/`.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `kind` | string | `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot` |
+| `kind` | string | `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot`, `projection` |
 | `type-dependencies` | array | From declaration's type signature |
 | `term-dependencies` | array | From body/proof term |
 | `is-in-package` | bool | Always `true` for atoms emitted by probe-lean |
