@@ -29,11 +29,11 @@ inputs → parallel extraction → load functions.json → translate → merge �
 ```
 
 1. **Resolve project** — if positional `PROJECT` given, parse `aeneas-config.yml` to derive Rust/Lean paths, optional functions.json, and Charon config
-2. **Pre-generate Charon LLBC** — if `aeneas-config.yml` has a `charon` section, run `charon` with the full project-specific settings (cargo args, start-from, exclude, opaque) and cache at `<rust_project>/data/charon.llbc`. This ensures `probe-rust --with-charon` finds a pre-built LLBC with the correct compilation flags.
+2. **Pre-generate Charon LLBC (legacy/no-manifest path only)** — when there is **no** `translation.json`, and `aeneas-config.yml` has a `charon` section, run `charon` with the full project-specific settings (cargo args, start-from, exclude, opaque) and cache at `<rust_project>/data/charon.llbc`, so `probe-rust --with-charon` finds a pre-built LLBC with the correct compilation flags. **When a `translation.json` is present this step is skipped entirely**: charon already ran once inside Aeneas to produce the manifest, so probe-rust is invoked with `--translation <path>` instead of `--with-charon` and reads charon `def_id`s directly from the manifest (no second charon run).
 3. **Validate inputs** — exactly one Rust source + one Lean source + functions.json
 4. **Resolve inputs** — if project paths given, run extractors; if JSON given, use directly
 5. **Parallel extraction** — when both project paths given, run probe-rust and probe-lean in parallel via scoped threads
-6. **Generate mappings** — three-strategy translation matching against functions.json (see below)
+6. **Generate mappings** — priority-ordered matching against functions.json: the charon-`def_id` join (Strategy 0) followed by three name/location strategies (see below)
 7. **Merge** — call `merge_atom_maps()` from probe crate with mappings
 8. **Enrich** — add Aeneas-specific metadata to merged atoms
 9. **Wrap** — Schema 2.0 envelope with `probe-aeneas/extract` schema
@@ -56,11 +56,15 @@ probe-aeneas extract --rust atoms_rust.json --lean-project ./dalek-lean --functi
 
 The positional `PROJECT` argument parses `aeneas-config.yml` to derive `crate.dir` (Rust crate path) and uses the project root as the Lean project. If `functions.json` exists at the project root, it is reused. This aligns with the `probe-<tool> extract <project_path>` convention used by all other probes.
 
-## Three-strategy mapping generation
+## Mapping generation
 
 Implemented in `src/translate.rs`. Strict priority order — see [P12](../engineering/properties.md#p12-mapping-strategy-priority).
 
-### Strategy 1: Rust-qualified-name (highest priority)
+### Strategy 0: charon-`def_id` (highest priority)
+
+Integer join on the charon `FunDeclId`: a Rust atom's `charon-def-id` extension equals Aeneas's `translation.json` `def_id`, binding to the family's primary (non-loop) Lean def with no name normalization (confidence: `exact`, method `charon-def-id`). Runs first, but is **provenance-gated** — it fires only when the atom's `charon-version` matches the manifest's `charon_version` (best-effort provenance; version equality is not proof of an identical run). Only the manifest's `functions` array feeds the join, since `globals`/`trait_impls` are numbered in charon's separate id spaces. A no-op for atoms that do not carry `charon-def-id`, which fall through to the name/location strategies below.
+
+### Strategy 1: Rust-qualified-name
 
 Uses Charon-derived fully qualified names from functions.json.
 
@@ -140,7 +144,7 @@ Run `lake exe listfuns` to generate functions.json from an Aeneas-transpiled Lea
 | File | Purpose |
 |------|---------|
 | `src/extract.rs` | Pipeline orchestration, parallel extraction |
-| `src/translate.rs` | Three-strategy mapping generation, name normalization |
+| `src/translate.rs` | Mapping generation (charon-`def_id` join + three name/location strategies), name normalization |
 | `src/extract_runner.rs` | Auto-download and run probe-rust/probe-lean |
 | `src/listfuns.rs` | Wrapper for `lake exe listfuns` |
 | `src/gen_functions.rs` | Parse Aeneas-generated Lean files for name mappings |
@@ -170,7 +174,7 @@ Parsed from `"L<start>-L<end>"` format.
 |------|----------|-------------|-------|
 | probe-rust | yes (if `--rust-project`) | yes (cargo install) | |
 | probe-lean | yes (if `--lean-project`) | yes (pre-built binary or source build) | |
-| charon | yes (if `charon` section in `aeneas-config.yml`) | no (managed by probe-rust `--auto-install`) | Pre-generates LLBC with full project config |
+| charon | yes on the legacy path (no `translation.json`, with a `charon` section) | no (managed by probe-rust `--auto-install`) | Pre-generates LLBC with full project config; not run when a `translation.json` is present (probe-rust reads `def_id`s via `--translation`) |
 | lake | yes (for listfuns) | no | Lean toolchain |
 
 ## Dependency on probe crate

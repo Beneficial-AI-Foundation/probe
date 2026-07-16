@@ -25,7 +25,7 @@ Steps (in `src/commands/extract.rs`):
 4. **Gather metadata** — git info, package name/version from Cargo.toml
 5. **Convert to atoms** — accurate line numbers via syn AST visitor
 6. **Detect duplicates** — error unless `--allow-duplicates` (keeps first)
-7. **Enrich with Charon** (optional, `--with-charon`) — add `rust-qualified-name` and `is-public` (from Charon LLBC `attr_info.public`) for Aeneas compatibility
+7. **Enrich with Charon** (optional) — add `rust-qualified-name`, `is-public` (from Charon LLBC `attr_info.public`), and the `charon-def-id`/`charon-version` provenance pair for Aeneas compatibility. Two sources: `--with-charon` reads a Charon LLBC (running charon if needed); `--translation <path>` reads an Aeneas `translation.json` instead (charon `def_id`s come from the manifest's `functions[]` entries, no charon run — implies enrichment and takes precedence over `--with-charon`). The manifest path fails **closed**: a `charon-def-id` is stamped only when a single span-validated candidate matches, so a bad id never feeds the downstream integer join.
 8. **Add external stubs** — referenced but unanalyzed dependencies
 9. **Wrap and write** — Schema 2.0 envelope to `.verilib/probes/`
 
@@ -63,7 +63,8 @@ Primary command. Produces Schema 2.0 envelope with atoms.
 | `--with-locations` | false | Include `dependencies-with-locations` |
 | `--allow-duplicates` | false | Don't error on duplicate code-names |
 | `--auto-install` | false | Auto-download scip CLI |
-| `--with-charon` | false | Add `rust-qualified-name` via Charon |
+| `--with-charon` | false | Add `rust-qualified-name` (+ `is-public`, `charon-def-id`/`charon-version`) via a Charon LLBC |
+| `--translation <PATH>` | — | Add the same Charon-derived fields from an Aeneas `translation.json` instead of running charon; implies enrichment and takes precedence over `--with-charon` |
 
 ### `callee-crates`
 BFS traversal from a function through its call graph, grouping callees by crate. No envelope (raw JSON).
@@ -99,15 +100,16 @@ Enumerate all functions via syn AST parsing. No envelope (raw JSON).
 |------|----------|-------------|-------|
 | rust-analyzer | yes | no | `rustup component add rust-analyzer` |
 | scip CLI | yes | yes (`--auto-install`) | Downloads from GitHub |
-| charon | no | no | Only with `--with-charon` |
+| charon | no | no | Only with `--with-charon`; not needed with `--translation` (reads an existing Aeneas manifest) |
 
 ## Schema differences from probe-verus
 
-probe-rust outputs `schema-version: "2.1"`, a minor version bump from the base 2.0 spec. The 2.1 additions are new optional fields (`rust-qualified-name`, `is-disabled`). Consumers validate that `schema-version` starts with `"2."`, so 2.1 is fully compatible with 2.0 consumers.
+probe-rust outputs `schema-version: "2.1"`, a minor version bump from the base 2.0 spec. The 2.1 additions are new optional fields (`rust-qualified-name`, `is-disabled`, and the Charon provenance pair `charon-def-id`/`charon-version`). Consumers validate that `schema-version` starts with `"2."`, so 2.1 is fully compatible with 2.0 consumers.
 
 Other differences from probe-verus:
 - `kind` is always `"exec"` (no proof/spec distinction in standard Rust)
 - `dependencies-with-locations` `location` is always `"inner"` (no precondition/postcondition)
-- `rust-qualified-name` is optional (only with `--with-charon`)
+- `rust-qualified-name` is optional (only with Charon enrichment: `--with-charon` or `--translation`)
 - `is-public` is optional (only with `--with-charon`; `true` if item is declared `pub`, `false` if private, absent when Charon not used or match failed)
+- `charon-def-id`/`charon-version` are optional (only with Charon enrichment; emitted **together or not at all** — a `FunDeclId` and the charon version that produced it, enabling a precise integer join to Aeneas's `translation.json` `def_id`)
 - `is-disabled` is always `false` (no disable concept in standard Rust extraction)
