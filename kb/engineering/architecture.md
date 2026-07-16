@@ -96,7 +96,7 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean mappings
 1. If positional project path given, parse `aeneas-config.yml` to resolve Rust crate (`crate.dir`) and Lean project (project root); otherwise use explicit `--rust-project` / `--lean-project` flags
 2. Auto-run probe-rust and probe-lean in parallel (scoped threads)
 3. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
-4. Generate mappings via three-strategy translation matching (see [properties.md](properties.md#p12-mapping-strategy-priority))
+4. Generate mappings via priority-ordered matching — the charon-`def_id` join (Strategy 0) then three name/location strategies (see [properties.md](properties.md#p12-mapping-strategy-priority))
 5. Call `probe::merge::merge_atom_maps` with mappings
 6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `is-disabled`, `is-relevant`, `is-public`)
 

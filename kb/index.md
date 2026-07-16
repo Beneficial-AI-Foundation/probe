@@ -40,7 +40,7 @@ Per-tool specifics — what each tool does differently from the common patterns.
 - **[probe-rust.md](tools/probe-rust.md)** — Rust extraction: SCIP pipeline, trait disambiguation, syn spans
 - **[probe-verus.md](tools/probe-verus.md)** — Verus extraction: dual AST parsing, spec taxonomy, verification status
 - **[probe-lean.md](tools/probe-lean.md)** — Lean extraction: environment walking, sorry detection, lake build
-- **[probe-aeneas.md](tools/probe-aeneas.md)** — Cross-language bridge: three-strategy mapping generation, parallel extraction
+- **[probe-aeneas.md](tools/probe-aeneas.md)** — Cross-language bridge: priority-ordered mapping generation (charon-`def_id` join + name/location strategies), parallel extraction
 
 ### [Decisions](decisions/index.md)
 Architectural Decision Records — why we chose this approach over alternatives.

@@ -176,8 +176,10 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `is-public` — Rust item visibility: `true` if declared `pub` per Charon, `false` if private or visibility data unavailable (set on all Rust atoms; preserved from probe-rust when present, defaulted to `false` when absent)
 
 **probe-rust extensions**:
-- `rust-qualified-name` — Charon-derived fully qualified name (optional, with `--with-charon`)
+- `rust-qualified-name` — Charon-derived fully qualified name (optional, with Charon enrichment: `--with-charon` or `--translation`)
 - `is-public` — whether the Rust item is declared `pub` per Charon LLBC (optional, with `--with-charon`; absent when Charon not used or match failed)
+- `charon-def-id` — the charon `FunDeclId` for this function; equals Aeneas's `translation.json` `def_id`, enabling a precise integer Rust↔Lean join (optional, with Charon enrichment; always emitted together with `charon-version`)
+- `charon-version` — the charon version that produced `charon-def-id`; provenance-gates the def-id join (optional; emitted together with `charon-def-id`, both or neither)
 
 ## Code-name URI format
 

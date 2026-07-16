@@ -30,14 +30,15 @@ Mapping generation requires domain knowledge (Aeneas name conventions, functions
 - probe merge owns composition (applies mappings generically)
 - Adding a new cross-language bridge (e.g. Rust↔Haskell) requires only a new mapping generator — no changes to merge
 
-### Three-strategy matching is pragmatic (probe-aeneas)
+### Name/location matching is pragmatic (probe-aeneas)
 
-Aeneas doesn't always produce clean name mappings. The three strategies (see [probe-aeneas.md](../tools/probe-aeneas.md#three-strategy-mapping-generation)) handle the spectrum:
+Aeneas doesn't always produce clean name mappings. When a precise charon-`def_id`
+join is unavailable (Strategy 0 — see [probe-aeneas.md](../tools/probe-aeneas.md#mapping-generation)), three name/location strategies handle the spectrum:
 1. **Rust-qualified-name** — when Charon provides exact names (best case)
 2. **File + display-name** — when names match but no qualified name available
 3. **File + line-overlap** — when names don't match but source locations overlap (fallback)
 
-Priority order ensures the most confident match wins.
+Priority order ensures the most confident match wins (the `def_id` integer join first, then these).
 
 ### 1-to-1 generation, 1-to-many application
 
