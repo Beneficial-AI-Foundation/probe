@@ -206,7 +206,7 @@ def _spec_details_block(spec_text: str, lang: str = "rust") -> str:
     (which can span many lines) rather than a named spec theorem.
     """
     fence = f"```{lang}\n{spec_text}\n```"
-    indented = "\n".join(("  " + ln) if ln else "" for ln in fence.splitlines())
+    indented = "\n".join("  " + ln for ln in fence.splitlines())
     return f"  <details><summary>spec</summary>\n\n{indented}\n\n  </details>"
 
 
