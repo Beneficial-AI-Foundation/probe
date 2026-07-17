@@ -199,6 +199,40 @@ def trust_label(reason: str | None) -> str:
     return TRUST_LABELS.get(reason, reason)
 
 
+def _spec_details_block(spec_text: str, lang: str = "rust") -> str:
+    """Collapsible block holding a spec's full text, indented under a bullet.
+
+    Used for Verus, where `primary-spec` is the inline requires/ensures text
+    (which can span many lines) rather than a named spec theorem.
+    """
+    fence = f"```{lang}\n{spec_text}\n```"
+    indented = "\n".join(("  " + ln) if ln else "" for ln in fence.splitlines())
+    return f"  <details><summary>spec</summary>\n\n{indented}\n\n  </details>"
+
+
+def render_verified_with_specs(ids: list[str], data: dict, tool: str) -> str:
+    """Render verified atoms together with the spec they were proved against.
+
+    - Verus: `primary-spec` is inline text -> a collapsible block per function.
+    - Lean/Aeneas: `primary-spec` is a spec-theorem code-name -> inline
+      annotation, resolved through `translation-name` for Aeneas.
+    - Other tools (no specs): plain bullets.
+    """
+    if not ids:
+        return "None\n"
+    lines = []
+    for pid in ids:
+        spec = resolve_primary_spec(data, data[pid])
+        if tool == "verus" and spec:
+            lines.append(f"- `{pid}`")
+            lines.append(_spec_details_block(spec))
+        elif tool in ("lean", "aeneas") and spec:
+            lines.append(f"- `{pid}` (spec: `{spec}`)")
+        else:
+            lines.append(f"- `{pid}`")
+    return "\n".join(lines) + "\n"
+
+
 # ---------------------------------------------------------------------------
 # Shared report sections (used by both Lean and non-Lean reports)
 # ---------------------------------------------------------------------------
@@ -385,10 +419,7 @@ def _generate_non_lean_report(out, data, cfg, tool):
         and get_val(a, "verification-status") in VERIFIED_STATUSES,
     )
     out.append(f"## 1. Verified public API functions ({len(verified_pub)})\n")
-    out.append(bullet_list(
-        verified_pub,
-        annotation_fn=spec_annotation if show_specs else None,
-    ))
+    out.append(render_verified_with_specs(verified_pub, data, tool))
 
     # --- 2. Trusted public API ---
     trusted_pub = filtered_ids(
@@ -424,10 +455,7 @@ def _generate_non_lean_report(out, data, cfg, tool):
     out.append(
         f"## 5. Verified remaining {remaining_label} functions ({len(verified_remaining)})\n"
     )
-    out.append(bullet_list(
-        verified_remaining,
-        annotation_fn=spec_annotation if show_specs else None,
-    ))
+    out.append(render_verified_with_specs(verified_remaining, data, tool))
 
     # --- 6. Lemmas (shared) ---
     _lemmas_section(out, data, cfg)
