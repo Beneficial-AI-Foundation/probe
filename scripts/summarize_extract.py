@@ -222,12 +222,16 @@ def render_verified_with_specs(ids: list[str], data: dict, tool: str) -> str:
         return "None\n"
     lines = []
     for pid in ids:
-        spec = resolve_primary_spec(data, data[pid])
-        if tool == "verus" and spec:
-            lines.append(f"- `{pid}`")
-            lines.append(_spec_details_block(spec))
-        elif tool in ("lean", "aeneas") and spec:
-            lines.append(f"- `{pid}` (spec: `{spec}`)")
+        if tool == "verus":
+            spec = resolve_primary_spec(data, data[pid])
+            if spec:
+                lines.append(f"- `{pid}`")
+                lines.append(_spec_details_block(spec))
+            else:
+                lines.append(f"- `{pid}`")
+        elif tool in ("lean", "aeneas"):
+            spec = resolve_primary_spec(data, data[pid])
+            lines.append(f"- `{pid}` (spec: `{spec}`)" if spec else f"- `{pid}`")
         else:
             lines.append(f"- `{pid}`")
     return "\n".join(lines) + "\n"
