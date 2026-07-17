@@ -30,6 +30,15 @@ import json
 import sys
 from pathlib import Path
 
+# Verification statuses that count as "verified". After enrichment (P23), a
+# locally-verified atom whose entire transitive closure is clean is relabeled
+# "transitively-verified"; both mean the atom's own proof succeeded.
+# @kb: kb/engineering/schema.md#common-optional-fields
+VERIFIED_STATUSES = ("verified", "transitively-verified")
+
+# Verification statuses that count as backlog (spec-bearing, not yet proved).
+UNVERIFIED_STATUSES = ("unverified", "failed")
+
 # Maps tool-specific trusted-reason values to common display labels.
 TRUST_LABELS = {
     "admit": "axiom",
@@ -39,16 +48,43 @@ TRUST_LABELS = {
     "external": "external",
 }
 
+# Maps `kind` values to human-readable labels. An atom is not always a "rust
+# function" — Verus `proof` atoms are lemmas, Lean has theorems/defs/etc. — so
+# reports annotate entries with the underlying declaration kind for clarity.
+KIND_LABELS = {
+    "exec": "function",
+    "proof": "lemma",
+    "spec": "spec",
+    "theorem": "theorem",
+    "def": "definition",
+    "abbrev": "abbreviation",
+    "opaque": "opaque def",
+    "instance": "instance",
+    "structure": "structure",
+    "inductive": "inductive",
+    "class": "class",
+    "projection": "projection",
+    "axiom": "axiom",
+    "quot": "quotient",
+}
+
+
+def kind_label(kind: str | None) -> str:
+    if kind is None:
+        return "unknown"
+    return KIND_LABELS.get(kind, kind)
+
 # Tool-specific configuration keyed by detected tool family.
 TOOL_CONFIG = {
     "verus": {
         "verifier_name": "Verus",
         "axiom_reasons": ("admit",),
         "external_reasons": ("external-body", "assume-specification"),
-        "axiom_description": "Functions using `admit()` — the solver accepts the proof without checking.",
+        "axiom_description": "Axioms — lemmas using `admit()`.",
         "lemma_kinds": ("proof",),
         "remaining_kinds": ("exec",),
         "remaining_label": "Rust",
+        "backlog_label": "functions and lemmas",
     },
     "lean": {
         "verifier_name": "Lean",
@@ -58,6 +94,7 @@ TOOL_CONFIG = {
         "lemma_kinds": ("theorem",),
         "remaining_kinds": ("def", "abbrev", "projection", "opaque", "instance", "class", "structure", "inductive"),
         "remaining_label": "Lean",
+        "backlog_label": "declarations",
     },
     "aeneas": {
         "verifier_name": "Lean (via Aeneas)",
@@ -67,6 +104,7 @@ TOOL_CONFIG = {
         "lemma_kinds": ("theorem",),
         "remaining_kinds": ("def", "abbrev", "projection", "opaque", "instance"),
         "remaining_label": "Lean",
+        "backlog_label": "functions and lemmas",
     },
     "rust": {
         "verifier_name": "probe-rust",
@@ -76,6 +114,7 @@ TOOL_CONFIG = {
         "lemma_kinds": (),
         "remaining_kinds": ("exec",),
         "remaining_label": "Rust",
+        "backlog_label": "functions",
     },
 }
 
@@ -92,6 +131,28 @@ def detect_tool(extract: dict) -> str:
 def load_extract(path: str) -> dict:
     with open(path) as f:
         return json.load(f)
+
+
+def resolve_source(extract: dict) -> dict:
+    """Resolve the source metadata for the report header.
+
+    Single-tool extracts carry a top-level `source`. Merged-style envelopes
+    (e.g. probe-aeneas/extract) set `source` to null and record provenance
+    under `inputs[]` instead. In that case prefer the Rust input (the public
+    API is Rust-centric), falling back to the first available input source.
+    """
+    source = extract.get("source")
+    if source:
+        return source
+
+    inputs = extract.get("inputs") or []
+    input_sources = [i.get("source") for i in inputs if i.get("source")]
+    for src in input_sources:
+        if src.get("language") == "rust":
+            return src
+    if input_sources:
+        return input_sources[0]
+    return {}
 
 
 def get_val(atom: dict, key: str, default=None):
@@ -175,8 +236,18 @@ def _trust_base_section(out, data, cfg):
     )
 
 
-def _unverified_section(out, data):
-    """Section 4: Unverified and failed functions (separate subsections)."""
+def _unverified_section(out, data, cfg):
+    """Section 4: Unverified and failed atoms (separate subsections).
+
+    The collective noun is tool-specific (`backlog_label`) — Verus tracks
+    "functions and lemmas", Lean tracks "declarations" — and each entry is
+    annotated with its kind so a lemma is not mistaken for a Rust function.
+    """
+    label = cfg["backlog_label"]
+
+    def kind_annotation(pid: str) -> str:
+        return f"({kind_label(get_val(data[pid], 'kind'))})"
+
     unverified = filtered_ids(
         data, lambda a: get_val(a, "verification-status") == "unverified"
     )
@@ -184,13 +255,13 @@ def _unverified_section(out, data):
         data, lambda a: get_val(a, "verification-status") == "failed"
     )
     combined = len(unverified) + len(failed)
-    out.append(f"## 4. Unverified and failed functions ({combined})\n")
+    out.append(f"## 4. Unverified and failed {label} ({combined})\n")
 
-    out.append(f"### 4a. Unverified functions ({len(unverified)})\n")
-    out.append(bullet_list(unverified))
+    out.append(f"### 4a. Unverified {label} ({len(unverified)})\n")
+    out.append(bullet_list(unverified, annotation_fn=kind_annotation))
 
-    out.append(f"### 4b. Failed functions ({len(failed)})\n")
-    out.append(bullet_list(failed))
+    out.append(f"### 4b. Failed {label} ({len(failed)})\n")
+    out.append(bullet_list(failed, annotation_fn=kind_annotation))
 
     return combined
 
@@ -201,7 +272,7 @@ def _lemmas_section(out, data, cfg):
     lemmas = filtered_ids(
         data,
         lambda a: get_val(a, "kind") in lemma_kinds
-        and get_val(a, "verification-status") == "verified",
+        and get_val(a, "verification-status") in VERIFIED_STATUSES,
     )
     out.append(f"## 6. Verified lemmas ({len(lemmas)})\n")
     if lemmas:
@@ -237,7 +308,7 @@ def _generate_lean_report(out, data, cfg):
     verified_defs = filtered_ids(
         data,
         lambda a: get_val(a, "kind") in remaining_kinds
-        and get_val(a, "verification-status") == "verified",
+        and get_val(a, "verification-status") in VERIFIED_STATUSES,
     )
     out.append(f"## 1. Verified definitions ({len(verified_defs)})\n")
     out.append(bullet_list(verified_defs, annotation_fn=spec_annotation))
@@ -263,7 +334,7 @@ def _generate_lean_report(out, data, cfg):
     _trust_base_section(out, data, cfg)
 
     # --- 4. Unverified and failed (shared) ---
-    combined = _unverified_section(out, data)
+    combined = _unverified_section(out, data, cfg)
 
     # --- 5. Verified remaining (empty for Lean) ---
     out.append(f"## 5. Verified remaining {remaining_label} functions (0)\n")
@@ -311,7 +382,7 @@ def _generate_non_lean_report(out, data, cfg, tool):
     verified_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
-        and get_val(a, "verification-status") == "verified",
+        and get_val(a, "verification-status") in VERIFIED_STATUSES,
     )
     out.append(f"## 1. Verified public API functions ({len(verified_pub)})\n")
     out.append(bullet_list(
@@ -341,13 +412,13 @@ def _generate_non_lean_report(out, data, cfg, tool):
     _trust_base_section(out, data, cfg)
 
     # --- 4. Unverified and failed (shared) ---
-    _unverified_section(out, data)
+    _unverified_section(out, data, cfg)
 
     # --- 5. Verified remaining functions ---
     verified_remaining = filtered_ids(
         data,
         lambda a: get_val(a, "kind") in remaining_kinds
-        and get_val(a, "verification-status") == "verified"
+        and get_val(a, "verification-status") in VERIFIED_STATUSES
         and get_val(a, "is-public-api") is not True,
     )
     out.append(
@@ -361,7 +432,23 @@ def _generate_non_lean_report(out, data, cfg, tool):
     # --- 6. Lemmas (shared) ---
     _lemmas_section(out, data, cfg)
 
-    # --- 7. Out-of-scope public API ---
+    # --- 7. Unverified and failed public API ---
+    unverified_pub = filtered_ids(
+        data,
+        lambda a: get_val(a, "is-public-api") is True
+        and get_val(a, "verification-status") in UNVERIFIED_STATUSES,
+    )
+
+    def unverified_pub_reason(pid: str) -> str:
+        return f"({get_val(data[pid], 'verification-status')})"
+
+    out.append(f"## 7. Unverified and failed public API functions ({len(unverified_pub)})\n")
+    out.append(
+        "Public API functions that carry a spec but are not yet proved.\n"
+    )
+    out.append(bullet_list(unverified_pub, annotation_fn=unverified_pub_reason))
+
+    # --- 8. Out-of-scope public API ---
     oos_pub = filtered_ids(
         data,
         lambda a: get_val(a, "is-public-api") is True
@@ -370,15 +457,14 @@ def _generate_non_lean_report(out, data, cfg, tool):
 
     def oos_reason(pid: str) -> str:
         atom = data[pid]
-        if get_val(atom, "is-cfg-gated") is True:
-            return "(cfg-gated)"
-        if get_val(atom, "is-external") is True:
-            return "(external)"
-        if get_val(atom, "has-body") is False:
-            return "(bodyless)"
-        return "(other)"
+        # @kb: kb/engineering/properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope
+        if get_val(atom, "is-disabled") is True:
+            return "(disabled — out of scope)"
+        if get_val(atom, "translation-name") is None:
+            return "(no translation — backlog)"
+        return "(no verification status)"
 
-    out.append(f"## 7. Out-of-scope public API functions ({len(oos_pub)})\n")
+    out.append(f"## 8. Out-of-scope public API functions ({len(oos_pub)})\n")
     out.append(
         f"Public API functions that {verifier} did not process.\n"
     )
@@ -391,8 +477,11 @@ def _generate_non_lean_report(out, data, cfg, tool):
     out.append("|----------|------:|")
     out.append(f"| Verified public API | {len(verified_pub)} |")
     out.append(f"| Trusted public API | {len(trusted_pub)} |")
+    out.append(f"| Unverified / failed public API | {len(unverified_pub)} |")
     out.append(f"| Out-of-scope public API | {len(oos_pub)} |")
-    total_pub = len(verified_pub) + len(trusted_pub) + len(oos_pub)
+    total_pub = (
+        len(verified_pub) + len(trusted_pub) + len(unverified_pub) + len(oos_pub)
+    )
     out.append(f"| **Total public API** | **{total_pub}** |")
     out.append("")
 
@@ -402,7 +491,7 @@ def _generate_non_lean_report(out, data, cfg, tool):
 # ---------------------------------------------------------------------------
 
 def generate_report(extract: dict) -> str:
-    source = extract.get("source", {})
+    source = resolve_source(extract)
     pkg_name = source.get("package", "unknown")
     pkg_version = source.get("package-version", "unknown")
     data = extract.get("data", {})
