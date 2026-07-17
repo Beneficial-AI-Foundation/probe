@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-17
+
 ### Added
 - `probe project` subcommand: extract a focused subgraph from an atom file using cross-language mapping seeds with BFS expansion (separate `--forward-depth` and `--reverse-depth` controls)
 - `--emit-focus` flag on `probe project` to produce a companion focus-set JSON compatible with scip-callgraph `?focus=` parameter
@@ -18,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: Public types renamed: `TranslationMapping` → `Mapping`, `TranslationsFile` → `MappingsFile`, `load_translations()` → `load_mappings()`
 - `probe merge` now supports 1-to-many mappings: a single `from` key can map to multiple `to` targets
 - Terminology: generic cross-language linking concept renamed from "translation" to "mapping" across KB, docs, and code; "translation" retained for Aeneas-specific transpilation context
+- `enrich_verification_status` now distinguishes benign references to constructors/fields of extracted types (`inductive`/`structure`/`class`) from genuine orphan dependencies. Type-member references are collapsed into a single summary note instead of one "not found in atom map" warning each, so real missing dependencies stay visible. The returned `missing_deps` now lists only genuine orphans.
 
 ### Fixed
 - C8: Duplicate `from` keys in mapping files no longer silently overwrite (last-wins); all targets are now collected and applied
