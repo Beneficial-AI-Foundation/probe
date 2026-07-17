@@ -22,6 +22,26 @@ fn is_contamination_source(atom: &Atom) -> bool {
     matches!(get_verification_status(atom), Some("unverified" | "failed"))
 }
 
+/// Kinds whose members (enum constructors, struct fields/projections, class
+/// fields) are referenced as dependencies but are not emitted as standalone
+/// atoms.
+fn is_type_definition(kind: &str) -> bool {
+    matches!(kind, "inductive" | "structure" | "class")
+}
+
+/// A dependency is a benign "type member" when its parent path segment names an
+/// extracted type atom (an `inductive`/`structure`). Such references — e.g. an
+/// enum variant `Error.StateDecode` or a struct field/projection — have no
+/// verification status of their own, so treating them as trusted is correct and
+/// they should not be surfaced as missing. Anything else (a reference whose
+/// parent is absent, or whose parent is a `def`/`theorem`/etc.) is a genuine
+/// orphan worth reporting.
+fn is_extracted_type_member(dep: &str, atoms: &BTreeMap<String, Atom>) -> bool {
+    dep.rsplit_once('.')
+        .and_then(|(parent, _member)| atoms.get(parent))
+        .is_some_and(|parent| is_type_definition(&parent.kind))
+}
+
 /// Enrich verification status through the dependency graph using
 /// reverse-BFS contamination.
 ///
@@ -36,6 +56,11 @@ fn is_contamination_source(atom: &Atom) -> bool {
 /// are untouched.
 ///
 /// Returns `(transitive_count, local_count, missing_deps)` for reporting.
+/// `missing_deps` lists only *genuine orphans* — dependency code-names absent
+/// from the atom map that are not members of an extracted type. References to
+/// constructors/fields of an extracted `inductive`/`structure` are benign (the
+/// type is extracted, its members are not standalone atoms) and are excluded so
+/// real gaps are not lost in the noise.
 // @kb: kb/engineering/schema.md#verification-status-values
 pub fn enrich_verification_status(
     atoms: &mut BTreeMap<String, Atom>,
@@ -47,7 +72,8 @@ pub fn enrich_verification_status(
     //    Uses BTreeMap/BTreeSet for deterministic iteration (P14).
     let mut reverse_deps: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut verified_set: BTreeSet<String> = BTreeSet::new();
-    let mut missing_deps: Vec<String> = Vec::new();
+    // BTreeSet keeps iteration sorted + deduped for deterministic output (P14).
+    let mut all_missing: BTreeSet<String> = BTreeSet::new();
 
     for (code_name, atom) in atoms.iter() {
         if is_verified(atom) {
@@ -55,7 +81,7 @@ pub fn enrich_verification_status(
         }
         for dep in &atom.dependencies {
             if !atoms.contains_key(dep.as_str()) {
-                missing_deps.push(dep.clone());
+                all_missing.insert(dep.clone());
             }
             reverse_deps
                 .entry(dep.clone())
@@ -64,10 +90,26 @@ pub fn enrich_verification_status(
         }
     }
 
-    missing_deps.sort();
-    missing_deps.dedup();
+    // Split missing deps: benign type members (enum variants / struct fields of
+    // an extracted type) vs. genuine orphans. Only the latter are surfaced so
+    // real gaps stay visible instead of being drowned out.
+    let mut missing_type_members: usize = 0;
+    let mut missing_deps: Vec<String> = Vec::new();
+    for dep in all_missing {
+        if is_extracted_type_member(&dep, atoms) {
+            missing_type_members += 1;
+        } else {
+            missing_deps.push(dep);
+        }
+    }
+
     for missing in &missing_deps {
         eprintln!("Warning: dependency {missing:?} not found in atom map (treated as trusted)");
+    }
+    if missing_type_members > 0 {
+        eprintln!(
+            "Note: {missing_type_members} reference(s) to constructors/fields of extracted types treated as trusted"
+        );
     }
 
     // 2. Seed contamination: only atoms with explicit "unverified" or "failed" status.
@@ -362,6 +404,71 @@ mod tests {
             Some("transitively-verified")
         );
         assert_eq!(missing, vec!["nonexistent"]);
+    }
+
+    #[test]
+    fn test_type_member_dep_not_reported_missing() {
+        let mut atoms = BTreeMap::new();
+
+        // A verified function referencing an enum variant `MyEnum.VariantA`
+        // and a genuine orphan `totally_unknown`.
+        let mut a = make_atom("a");
+        set_verified(&mut a);
+        add_dep(&mut a, "MyEnum.VariantA");
+        add_dep(&mut a, "totally_unknown");
+        atoms.insert("a".to_string(), a);
+
+        // The enum type itself IS extracted (as an inductive atom); its
+        // variants are not separate atoms.
+        let mut e = make_atom("MyEnum");
+        e.kind = "inductive".to_string();
+        atoms.insert("MyEnum".to_string(), e);
+
+        let (_t, _l, missing) = enrich_verification_status(&mut atoms);
+
+        // The enum-variant reference is a benign type member -> not reported;
+        // the genuine orphan still is.
+        assert_eq!(missing, vec!["totally_unknown"]);
+        // Neither missing dep blocks transitive verification.
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
+    }
+
+    #[test]
+    fn test_struct_field_dep_not_reported_missing() {
+        let mut atoms = BTreeMap::new();
+
+        let mut a = make_atom("a");
+        set_verified(&mut a);
+        add_dep(&mut a, "MyStruct.field");
+        atoms.insert("a".to_string(), a);
+
+        let mut s = make_atom("MyStruct");
+        s.kind = "structure".to_string();
+        atoms.insert("MyStruct".to_string(), s);
+
+        let (_t, _l, missing) = enrich_verification_status(&mut atoms);
+        assert!(missing.is_empty(), "struct field ref should be suppressed");
+    }
+
+    #[test]
+    fn test_member_of_non_type_parent_still_reported() {
+        let mut atoms = BTreeMap::new();
+
+        let mut a = make_atom("a");
+        set_verified(&mut a);
+        // Parent `some_fn` is an `exec` def (make_atom default), not a type,
+        // so a missing member of it is a genuine gap worth surfacing.
+        add_dep(&mut a, "some_fn.inner");
+        atoms.insert("a".to_string(), a);
+
+        let f = make_atom("some_fn");
+        atoms.insert("some_fn".to_string(), f);
+
+        let (_t, _l, missing) = enrich_verification_status(&mut atoms);
+        assert_eq!(missing, vec!["some_fn.inner"]);
     }
 
     #[test]
