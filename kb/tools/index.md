@@ -1,6 +1,6 @@
 ---
 title: Per-Tool Knowledge
-last-updated: 2026-06-03
+last-updated: 2026-07-21
 status: draft
 ---
 
@@ -19,6 +19,7 @@ Each file covers what is **unique** to that tool — what it does differently fr
 | [probe-verus.md](probe-verus.md) | probe-verus | ~13K | Rust | Highest |
 | [probe-lean.md](probe-lean.md) | probe-lean | ~5.7K | Lean 4 | Medium-high |
 | [probe-aeneas.md](probe-aeneas.md) | probe-aeneas | ~2.3K | Rust | Medium |
+| [probe-leanblueprint.md](probe-leanblueprint.md) | probe-leanblueprint | ~1K | Rust + Python | Medium |
 
 ## When to read which file
 
@@ -29,3 +30,4 @@ Each file covers what is **unique** to that tool — what it does differently fr
 - Working on Verus verification, spec taxonomy, or dual-AST parsing → [probe-verus.md](probe-verus.md)
 - Touching Lean environment walking, sorry detection, or lake builds → [probe-lean.md](probe-lean.md)
 - Working on cross-language mapping or parallel orchestration → [probe-aeneas.md](probe-aeneas.md)
+- Working on Lean blueprint progress stats (Verso or Massot leanblueprint) → [probe-leanblueprint.md](probe-leanblueprint.md)

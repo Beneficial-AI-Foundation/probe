@@ -996,6 +996,15 @@ mod tests {
             detect_category("probe/merged-atoms"),
             Some(SchemaCategory::Atoms)
         );
+        // `*/extract` envelopes (probe-aeneas, probe-leanblueprint) are atoms.
+        assert_eq!(
+            detect_category("probe-leanblueprint/extract"),
+            Some(SchemaCategory::Atoms)
+        );
+        assert_eq!(
+            detect_category("probe-aeneas/extract"),
+            Some(SchemaCategory::Atoms)
+        );
         assert_eq!(
             detect_category("probe-verus/specs"),
             Some(SchemaCategory::Specs)

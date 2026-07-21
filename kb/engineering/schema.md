@@ -1,6 +1,6 @@
 ---
 title: Schema 2.0 Interchange Specification
-last-updated: 2026-06-03
+last-updated: 2026-07-21
 status: draft
 ---
 
@@ -77,6 +77,7 @@ When a previously merged file is used as input, its `inputs` entries are flatten
 - `probe-verus/atoms`, `probe-verus/extract`, `probe-verus/specs`, `probe-verus/proofs`, `probe-verus/stubs`, `probe-verus/verification-report`
 - `probe-lean/extract`, `probe-lean/viewify`
 - `probe-aeneas/extract`
+- `probe-leanblueprint/extract`
 
 Note: Legacy schema values `probe-lean/atoms`, `probe-lean/enriched-atoms`, `probe-lean/specs`, `probe-lean/proofs`, `probe-lean/stubs` exist from Schema 1.x and may appear in older files or as input sources in merged envelopes. Current probe-lean only produces `probe-lean/extract` and `probe-lean/viewify`.
 
@@ -85,6 +86,7 @@ Note: Legacy schema values `probe-lean/atoms`, `probe-lean/enriched-atoms`, `pro
 
 **Analysis**:
 - `probe/summary`
+- `probe-leanblueprint/summary` — node-indexed two-axis blueprint progress counts (sidecar; not an atoms/specs/proofs category, so never merged)
 
 **Special**:
 - `probe/mappings` — cross-language mappings
@@ -115,7 +117,7 @@ When `schema` identifies an atoms-category file, `data` is a dictionary keyed by
 | `code-path` | string | Relative path to source file from project root. Empty string for [stubs](glossary.md#stub). |
 | `code-text` | object | `{"lines-start": N, "lines-end": N}` (1-based, inclusive). `{0, 0}` for stubs. |
 | `kind` | string | Language-specific classification (see below) |
-| `language` | string | `"rust"`, `"verus"`, `"lean"`, `"latex"` |
+| `language` | string | `"rust"`, `"verus"`, `"lean"`, `"blueprint"`, `"latex"` |
 
 ### Kind values
 
@@ -124,6 +126,7 @@ When `schema` identifies an atoms-category file, `data` is a dictionary keyed by
 | Rust (standard) | `exec` | Always `exec` for non-Verus Rust |
 | Rust (Verus) | `exec`, `proof`, `spec` | `exec` = compiled+verified, `proof` = verified+erased, `spec` = specification+erased |
 | Lean | `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot` | Maps to Lean declaration kinds |
+| Blueprint (synthetic) | `blueprint-definition`, `blueprint-theorem` | probe-leanblueprint planned atoms — blueprint nodes with no Lean binding yet (`language: "blueprint"`) |
 
 ### Language assignment for Verus atoms
 
@@ -174,6 +177,19 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `translation-text` — line range of translation
 - `is-disabled` — computed from functions.json
 - `is-public` — Rust item visibility: `true` if declared `pub` per Charon, `false` if private or visibility data unavailable (set on all Rust atoms; preserved from probe-rust when present, defaulted to `false` when absent)
+
+**probe-leanblueprint extensions** (on enriched Lean atoms and synthetic planned atoms):
+- `blueprint-label` — blueprint node label
+- `blueprint-kind` — blueprint node kind: `definition`/`theorem` (recovers node kind on bound atoms whose `kind` is the Lean kind)
+- `blueprint-statement-status` — statement axis: `none`/`blocked`/`ready`/`formalized`
+- `blueprint-proof-status` — proof axis: `none`/`ready`/`proved`/`fully-proved`
+- `blueprint-status-source` — `code-derived` (Verso) or `declared` (Massot `\leanok`)
+- `blueprint-group`, `blueprint-chapter`, `blueprint-title`, `blueprint-discussion` — sub-construction group, chapter, display title, GitHub issue (all optional)
+- `blueprint-statement-uses`, `blueprint-proof-uses` — code-names used by the statement/proof (informal roadmap edges; never merged into `dependencies`)
+- `blueprint-status-mismatch` — set when the blueprint over-claims a proof vs the machine `verification-status` (see [P26](properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative))
+- `blueprint-decl-missing` — `true` when a bound Lean decl is absent from the atom set
+
+Blueprint fields are additive: `verification-status` remains probe-lean's machine value (P26).
 
 **probe-rust extensions**:
 - `rust-qualified-name` — Charon-derived fully qualified name (optional, with Charon enrichment: `--with-charon` or `--translation`)

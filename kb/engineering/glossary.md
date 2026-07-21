@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-06-03
+last-updated: 2026-07-21
 status: draft
 ---
 
@@ -166,3 +166,11 @@ A JSON file produced by `probe project --emit-focus`, containing an array of [co
 ## probe-extract-check
 
 A validator tool (inside `probe/probe-extract-check/`) that checks extract JSON output against actual source code. Verifies that code-paths exist, line ranges are valid, and atom metadata is consistent with source.
+
+## blueprint
+
+A human-authored roadmap for a Lean formalization project that annotates each result with its formalization progress. Two ecosystems: Patrick Massot's **`leanblueprint`** (LaTeX/plasTeX; macros `\lean`, `\leanok`, `\uses`) and **Verso Blueprint** (`versoBlueprint`; Lean-native, emits `blueprint-manifest.json`). Consumed by [probe-leanblueprint](../tools/probe-leanblueprint.md), which joins blueprint status onto [probe-lean](../tools/probe-lean.md) [atoms](#atom).
+
+## two-axis status
+
+The blueprint progress model, tracked on two independent axes: the **statement axis** (is the *statement* formalized in Lean? `none`/`blocked`/`ready`/`formalized`) and the **proof axis** (is the *proof* complete and sorry-free? `none`/`ready`/`proved`/`fully-proved`). Normalized canonically in `probe-leanblueprint/src/model.rs`. The proof axis is additive over probe-lean's machine `verification-status`, which stays authoritative (see [properties.md P26](properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative)).
