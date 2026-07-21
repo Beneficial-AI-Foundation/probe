@@ -1,6 +1,6 @@
 ---
 title: Architecture
-last-updated: 2026-06-03
+last-updated: 2026-07-21
 status: draft
 ---
 
@@ -19,6 +19,8 @@ probe-verus/     Verus/Rust analysis: call graphs + specs + verification status
 probe-lean/      Lean 4 dependency graphs + sorry detection (written in Lean)
 probe-aeneas/    Cross-language bridge: generates Rust↔Lean mappings
 ```
+
+An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress metadata onto probe-lean atoms (see its section below). Like probe-aeneas, it consumes other probes rather than extracting from source directly.
 
 ### probe (central hub)
 
@@ -106,6 +108,25 @@ probe-aeneas/    Cross-language bridge: generates Rust↔Lean mappings
 
 **External tools**: probe-rust (auto-installable), probe-lean (auto-cloned + built), lake
 
+### probe-leanblueprint
+
+**Role**: Enrich probe-lean atoms with Lean **blueprint** progress metadata — a human-authored roadmap plus a two-axis statement/proof status — so Lean projects get meaningful verification-progress stats, not just a theorem count.
+
+**Pipeline** (`extract` command, typically `probe-leanblueprint extract <project>`):
+1. Resolve the adapter: **Verso Blueprint** (`versoBlueprint`, reads `blueprint-manifest.json`) or Patrick Massot **`leanblueprint`** (LaTeX/plasTeX, via a bundled headless emitter reusing leanblueprint's parser)
+2. Load the atom base from `probe-lean extract` (single incremental compile) or `--lean`
+3. Normalize the blueprint into a `BlueprintModel` and join nodes to atoms by `probe:` + Lean declaration name
+4. Enrich matched atoms with `blueprint-*` fields; synthesize planned atoms for nodes with no Lean binding; flag `blueprint-status-mismatch` on proof-axis over-claims
+5. Emit a `probe-leanblueprint/extract` envelope + a node-indexed `probe-leanblueprint/summary` sidecar (two-axis progress counts)
+
+**Key insight**: blueprint status is *additive* — probe-lean's machine `verification-status` stays authoritative on the proof axis (see [properties.md P26](properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative)). probe-lean stays blueprint-unaware; blueprint is a complementary, doc-authoritative layer.
+
+**Subcommands**: `extract`
+
+**External tools**: probe-lean (atom base); lake (Verso docs render); python3 + plasTeX + leanblueprint (Massot path only)
+
+See [tools/probe-leanblueprint.md](../tools/probe-leanblueprint.md) and [ADR-004](../decisions/004-probe-leanblueprint.md).
+
 ## Data flow
 
 ```
@@ -120,6 +141,11 @@ Target Projects (Rust, Lean, Verus)
     │       ├─ runs probe-rust and probe-lean in parallel
     │       ├─ generates mappings from functions.json
     │       └─ calls probe merge internally
+    │
+    ├── probe-leanblueprint extract → leanblueprint_atoms.json + _summary.json
+    │       │                            (enrich probe-lean atoms with blueprint status)
+    │       ├─ runs probe-lean extract (or --lean)
+    │       └─ reads Verso manifest / Massot plasTeX
     │
     └── probe merge ─────────────→ merged_atoms.json   (generic cross-tool merge)
             │
@@ -149,6 +175,8 @@ target-project/.verilib/
     rust_<package>_<version>.json      # probe-rust output
     verus_<package>_<version>.json     # probe-verus output
     lean_<package>_<version>.json      # probe-lean output
+    leanblueprint_<package>_<version>.json          # probe-leanblueprint extract
+    leanblueprint_<package>_<version>_summary.json  # probe-leanblueprint summary
   views/
     molecule_all.json                  # Filtered projections
   mappings/

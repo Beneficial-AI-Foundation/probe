@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- KB tool spec `kb/tools/probe-leanblueprint.md`, ADR-004, and property P26 (blueprint status is additive; machine `verification-status` stays authoritative) for the new `probe-leanblueprint` enricher
+- Schema documentation for `probe-leanblueprint/extract` (atoms) and `probe-leanblueprint/summary` (sidecar), the `blueprint-*` extension fields, `language: "blueprint"`, and `blueprint-definition`/`blueprint-theorem` kinds
+- Explicit `detect_category()` test coverage for `*/extract` schemas (`probe-leanblueprint/extract`, `probe-aeneas/extract`)
+
 ## [0.3.0] - 2026-07-17
 
 ### Added

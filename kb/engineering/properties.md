@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-06-22
+last-updated: 2026-07-21
 status: draft
 ---
 
@@ -290,6 +290,17 @@ For Aeneas projects, a Rust function is **out of verification scope** — `is-di
 
 - The **active configuration** for the Aeneas build = the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`), overlaid by any `--features` / `--no-default-features` / `--all-features` in the project's `charon.cargo_args`. cfg evaluation mirrors the Verus rules above: only item-gating `#[cfg(...)]` counts (not cosmetic `#[cfg_attr(...)]`), and evaluation is **conservative** — a predicate referencing a flag/feature the tool cannot resolve keeps the atom in scope (backlog), never silently dropping a real backlog item.
 - As with Verus, a status-bearing atom is never disabled (P24): the cfg/`@[out_of_scope]` reclassification applies only to atoms that would otherwise be backlog.
+
+## P26. Blueprint status is additive; machine `verification-status` stays authoritative
+
+For blueprint-enriched atoms (probe-leanblueprint), the blueprint's two-axis status is **additive metadata** and never overrides probe-lean's machine `verification-status`.
+
+- The **statement axis** (`blueprint-statement-status`) is blueprint-exclusive — no machine signal contradicts it.
+- The **proof axis** carries two independent fields: `verification-status` remains probe-lean's machine sorry-truth (a `sorry` can never render green, consistent with every other probe), and `blueprint-proof-status` records the blueprint's declared/derived claim.
+- When the blueprint claims a proof is complete (`proved`/`fully-proved`) but the machine status is `unverified`/`failed`, `blueprint-status-mismatch` is set. probe-leanblueprint MUST NOT silently rewrite `verification-status` to match a blueprint claim.
+- Synthetic **planned** atoms (blueprint nodes with no Lean binding) carry **no** `verification-status` — they are roadmap items, not verified/unverified code. They are non-stubs (P3) via a non-empty `code-path` marker.
+
+**Why it matters**: the blueprint is doc-authoritative for *intent* (what should be formalized) but its proof claims — especially Massot's human-authored `\leanok` — are not machine-checked for sorry-freeness. Keeping the machine status authoritative preserves the ecosystem invariant that `verified` means checked, while the mismatch flag surfaces over-claims for review.
 
 ## Known bugs and edge cases
 
