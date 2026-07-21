@@ -1,0 +1,44 @@
+---
+description: Checklist for adding a new probe to the ecosystem - efficiency, infra parity, schema/KB conformance, validation. Apply whenever creating a new probe (extractor or enricher) under baif/.
+alwaysApply: false
+---
+
+# Adding a New Probe
+
+Apply this when creating a new probe directory under `baif/` (extractor like probe-rust/probe-lean, or enricher like probe-aeneas/probe-leanblueprint). A new probe is not "done" until every section below is satisfied.
+
+## 1. Efficiency by design
+
+Never do redundant expensive work. Expensive steps are compiles, analyzer runs (rust-analyzer, verus-analyzer, lake), and re-extraction.
+
+- **Compile/build once.** If the tool needs both a build artifact and another probe's atoms, share the compile. Example: probe-leanblueprint renders Verso docs (which compiles the libs) and then runs `probe-lean extract` as an incremental no-op — one full compile total, not two. Never trigger `lake build` / `cargo build` twice for the same libraries.
+- **Reuse other probes' outputs, don't re-extract.** Accept an explicit input flag (e.g. `--lean <atoms.json>`, `--rust-project`) so a caller can supply an existing extract; only run the upstream probe when no input is given.
+- **Cache slow artifacts.** Follow the SCIP-caching pattern (`<project>/data/`) and honor already-fresh outputs (e.g. an existing manifest) instead of regenerating.
+- **Parallelize independent extraction** (scoped threads), as probe-aeneas does when running probe-rust + probe-lean.
+
+## 2. Schema & KB conformance
+
+- Emit a valid **Schema 2.0** envelope (`*/extract` for atoms, sidecars for summaries). Depend on the `probe` crate for `types` — never re-implement the schema.
+- Preserve invariants in `kb/engineering/properties.md`: determinism (**P14**: BTreeMap/sorted keys), extension preservation (**P10**), structural stub detection (**P3**). Enrichers must be idempotent and keep machine `verification-status` authoritative.
+- Add `// @kb: kb/<path>#<slug>` annotations on the key types/functions; `./scripts/check-kb-links.sh` must pass.
+- Update the KB: new `kb/tools/<probe>.md`, a component section + data-flow entry in `kb/engineering/architecture.md`, the row in `kb/tools/index.md` and `kb/index.md`, and an ADR under `kb/decisions/` if it introduces a new architectural approach. Run the kb-update skill after.
+
+## 3. Infra parity with existing probes
+
+Match what shipped probes already have:
+
+- **CI** — a `.github/workflows/ci.yml` with fmt, clippy (`-D warnings`), test, and (if it has KB links) a kb-links job.
+- **Releases** — a cargo-dist `release.yml` triggered by version tags, so version bumps cut GitHub Releases with built binaries (same as the hub).
+- **Versioning** — `version` in `Cargo.toml` + a `CHANGELOG.md` with `[Unreleased]`.
+- **Output location** — write to `<project>/.verilib/probes/<tool>_<package>_<version>.json` (plus `_summary.json` for sidecars).
+- **CLAUDE.md** — add the cross-tool KB-access block pointing at `../probe/kb/` (see probe/CLAUDE.md § Cross-Tool KB Access).
+- **README** describing the subcommands, external tool dependencies, and CLI.
+
+## 4. Conditional (depends on probe type)
+
+- **Extractors that read source directly** (probe-rust / probe-verus class): validate the probe's own output with `probe-extract-check` in the test suite (structural + source-grounded + dependency + property checks). Extend the checkers if the language needs new source-grounding logic. Enrichers (probe-aeneas / probe-leanblueprint) skip the source checks — their atom spine comes from an already-checked probe; only the structural/property checks apply to their envelope.
+- **Probes that drive a downloadable external analyzer** (rust-analyzer, scip, charon, lake, …): follow the `tool_manager` pattern — resolve managed dir (`~/.probe-{tool}/tools/`) then PATH; download on demand with SHA-256 verification; version resolution env-override → GitHub-latest → compiled-in fallback. If a dependency can't/shouldn't be auto-installed, either embed it in the binary (like probe-leanblueprint's `include_str!`'d plasTeX emitter) or document it clearly as a prerequisite. Pure enrichers that only read another probe's JSON need none of this.
+
+## 5. Validation
+
+Run the Ralph Loop (the three auditor skills) until clean, then `cargo fmt --all && cargo clippy --all-targets -- -D warnings && cargo test`. Add tests before considering the probe done.
