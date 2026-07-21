@@ -77,8 +77,9 @@ Both ecosystems bind a blueprint node to Lean declarations by **user-facing full
 
 Edge-case rules (`src/enrich.rs`):
 
-- **Node binds multiple decls** — attach the node to every present atom.
-- **Same-decl collision** — if two blueprint nodes bind the same present atom, the later node wins (keep-last); a warning is logged and the case is counted in the summary `collisions` total.
+- **Ownership pass** — enrichment first computes, per present atom, the *last* blueprint node that binds it (keep-last), then resolves every node to a **primary key**: the first present atom it owns, else its synthetic `probe:blueprint:<label>` key. This makes the extract **node-complete** (every model node leaves exactly one label-bearing record) and guarantees `uses` edges resolve to a real atom key.
+- **Node binds multiple decls** — attach the node to every present atom it owns.
+- **Same-decl collision** — if two blueprint nodes bind the same present atom, the later node wins the real atom (keep-last); a warning is logged and the case is counted in the summary `collisions` total. The **losing** node is preserved as a synthetic `blueprint-shadow: true` atom (carrying its full status, plus any mismatch / missing-decls) so it is not dropped from the extract. It is still counted as bound (`with-lean-decl`), and `blueprint_stats.py` treats a shadow node as bound, keeping the sidecar and the script in exact agreement.
 - **Decl-missing authority** — probe-lean atom membership is the **sole** authority on whether a bound declaration is present. (Verso also emits its own per-decl `present` / node `missingExternalDecl` hints; these are intentionally **not** consumed — they coincide with atom membership on real data, and atom membership is the tool's premise that probe-lean is the code spine.)
   - **All bound decls absent** — emit a synthetic planned node flagged `blueprint-decl-missing: true` (counted in `decl-missing`) rather than fabricating a code atom.
   - **Some bound decls absent (partial miss)** — the node stays bound (attached to its present atoms); the absent names are recorded on the present atom(s) as `blueprint-missing-decls: [...]` and counted in the `partial-missing` total. This keeps the bound / planned-only / decl-missing partition clean.
@@ -109,6 +110,8 @@ A first-class, two-axis progress report that **aggregates over** the blueprint n
 
 `scripts/blueprint_stats.py <extract.json>` renders a readable report (headline, statement/proof tables, per-chapter breakdown, and any mismatches / missing decls) directly from a `probe-leanblueprint/extract` file. It recomputes everything from the `blueprint-*` extension fields, so it doubles as an independent cross-check of the summary sidecar and needs no Python blueprint dependencies. Pass `--json` for a machine-readable form.
 
+Because the extract is node-complete (see the ownership pass under [The join](#the-join)), the script and the summary sidecar agree exactly on node/headline/axis/bound counts, even under same-decl collisions; a `python3` parity test (`tests/stats_parity.rs`) enforces this.
+
 ## Blueprint extension fields
 
 Attached (flattened per [P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)) to enriched and synthetic atoms:
@@ -129,6 +132,7 @@ Attached (flattened per [P10](../engineering/properties.md#p10-extensions-are-pr
 | `blueprint-status-mismatch` | Set when the blueprint over-claims vs the machine status (optional) |
 | `blueprint-decl-missing` | `true` when **all** bound Lean decls are absent from the atom set (synthetic planned node; optional) |
 | `blueprint-missing-decls` | For a bound node, the subset of `\lean{...}` decls absent from the atom set (partial miss); recorded on the present atom(s) (optional) |
+| `blueprint-shadow` | `true` on the synthetic atom preserved for a node that lost a same-decl collision (its real atom was claimed by a later node). Keeps the extract node-complete; consumers should count a shadow node as bound despite its `language: "blueprint"` (optional) |
 
 ## CLI
 
@@ -140,7 +144,10 @@ probe-leanblueprint extract <PROJECT>
     [--blueprint-src <web.tex|dir>]
     [--python <interp>] [--emitter <blueprint_emit.py>]
     [-o <extract.json>] [--summary-output <summary.json>]
+    [--source-package <name>] [--source-version <ver>]
 ```
+
+The `--lean` input must be a `probe-lean/extract` (or a merged spine); passing probe-leanblueprint's own `probe-leanblueprint/extract` is rejected (self-ingestion). `--source-package`/`--source-version` override the atom base's identity and, when both are given, disambiguate a spine with multiple probe-lean inputs.
 
 Defaults write to `<project>/.verilib/probes/leanblueprint_<package>[_<version>].json` and `..._summary.json`.
 
@@ -172,4 +179,4 @@ probe-leanblueprint depends on the `probe` hub crate. Uses:
 - `probe::types::{Atom, AtomEnvelope, Source, Tool, CodeText, load_atom_file}`
 - `probe::commands::propagate::enrich_verification_status`
 
-Rationale and alternatives considered: [ADR-004](../decisions/004-probe-leanblueprint.md). Broader Lean stats context: `probe/docs/lean-stats-brainstorm.md` (non-normative).
+Rationale and alternatives considered: [ADR-004](../decisions/004-probe-leanblueprint.md). Broader Lean stats context: `docs/lean-stats-brainstorm.md` (non-normative).

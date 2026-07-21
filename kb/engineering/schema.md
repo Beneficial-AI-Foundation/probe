@@ -86,7 +86,7 @@ Note: Legacy schema values `probe-lean/atoms`, `probe-lean/enriched-atoms`, `pro
 
 **Analysis**:
 - `probe/summary`
-- `probe-leanblueprint/summary` — node-indexed two-axis blueprint progress counts (sidecar; not an atoms/specs/proofs category, so never merged)
+- `probe-leanblueprint/summary` — node-aggregated two-axis blueprint progress counts (aggregated over blueprint nodes, not keyed per node; sidecar; not an atoms/specs/proofs category, so never merged)
 
 **Special**:
 - `probe/mappings` — cross-language mappings
@@ -187,7 +187,8 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `blueprint-group`, `blueprint-chapter`, `blueprint-title`, `blueprint-discussion` — sub-construction group, chapter, display title, GitHub issue (all optional)
 - `blueprint-statement-uses`, `blueprint-proof-uses` — code-names used by the statement/proof (informal roadmap edges; never merged into `dependencies`)
 - `blueprint-status-mismatch` — set when the blueprint over-claims a proof vs the machine `verification-status` (see [P26](properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative))
-- `blueprint-decl-missing` — `true` when a bound Lean decl is absent from the atom set
+- `blueprint-decl-missing` — `true` when **all** bound Lean decls are absent from the atom set (synthetic planned node)
+- `blueprint-missing-decls` — for a bound node, the subset of `\lean{...}` decls absent from the atom set (partial miss; recorded on the present atom(s))
 
 Blueprint fields are additive: `verification-status` remains probe-lean's machine value (P26).
 

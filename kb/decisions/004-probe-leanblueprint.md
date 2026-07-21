@@ -26,7 +26,7 @@ Sub-decisions:
 1. **Support both ecosystems** behind a common enrichment core fed by two adapters. Verso: parse the manifest JSON directly. Massot: a small bundled plasTeX emitter that reuses leanblueprint's own parser — we do **not** write a TeX parser.
 2. **probe-leanblueprint owns build orchestration; probe-lean stays blueprint-unaware.** Because lake builds are incremental and code libs are shared with the docs target, total cost is one full compile (see [probe-leanblueprint.md § single-build guarantee](../tools/probe-leanblueprint.md#single-build-guarantee)).
 3. **Machine-authoritative `verification-status` + additive blueprint fields + a mismatch flag.** The statement axis is blueprint-exclusive; on the proof axis, `verification-status` remains probe-lean's machine sorry-truth, the blueprint's claim lives in `blueprint-proof-status`, and disagreement raises `blueprint-status-mismatch`. See [P26](../engineering/properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative).
-4. **Node-indexed summary is a first-class output.** A blueprint node is not 1:1 with an atom (one node → many decls; planned nodes with no decl). Enriched atoms are the spine for merge/downstream; the two-axis stats live in the `probe-leanblueprint/summary` sidecar.
+4. **Node-aggregated summary is a first-class output.** A blueprint node is not 1:1 with an atom (one node → many decls; planned nodes with no decl). Enriched atoms are the spine for merge/downstream; the two-axis stats live in the `probe-leanblueprint/summary` sidecar, which aggregates over the blueprint nodes rather than keying per node.
 
 ## Alternatives considered
 
