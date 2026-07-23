@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Progress-tracking scheme in `docs/atoms_roles_statuses.md`: a snapshot summary partition (`tracked = unspecified + failed + in-progress + verified + trusted`) and a burn-up chart of cumulative frontiers (`tracked ≥ translated ≥ verified`, with `verified + trusted` as the completion frontier)
+- `scripts/count-colors.sh` now reports the progress summary/chart numbers, a `translated` count (non-disabled `exec` atoms with a `translation-name`, Aeneas-only), and a self-check warning when the `tracked ≥ translated ≥ verified` invariant is violated
 - KB tool spec `kb/tools/probe-leanblueprint.md`, ADR-004, and property P26 (blueprint status is additive; machine `verification-status` stays authoritative) for the new `probe-leanblueprint` enricher
 - Schema documentation for `probe-leanblueprint/extract` (atoms) and `probe-leanblueprint/summary` (sidecar), the `blueprint-*` extension fields, `language: "blueprint"`, and `blueprint-definition`/`blueprint-theorem` kinds
 - Explicit `detect_category()` test coverage for `*/extract` schemas (`probe-leanblueprint/extract`, `probe-aeneas/extract`)

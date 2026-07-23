@@ -121,6 +121,57 @@ stubs (empty `code-path`) and editorial/auto-generated exclusions
 (`is-hidden` / `is-ignored` / `is-extraction-artifact`). These are not atoms the
 project owes work on, so they never enter the bar or dot totals.
 
+## Progress tracking — summary stats and chart
+
+Two artifacts, computed only for projects with a bar channel (Verus / Aeneas);
+Lean has no `tracked` denominator (see below). Both derive purely from the seven
+bar colours that [`scripts/count-colors.sh`](../scripts/count-colors.sh) counts.
+
+Throughout, `#exec` means the Rust `exec` atoms that survive the exclusions above
+(empty `code-path`, `is-hidden` / `is-ignored` / `is-extraction-artifact`).
+
+### Summary (snapshot partition)
+
+The five buckets are disjoint and sum to `tracked`:
+
+| Stat | Definition | Colour |
+|------|------------|--------|
+| **tracked** | `#exec − #is-disabled` = `unspecified + failed + in-progress + verified + trusted` | all bars − grey |
+| **unspecified** | no `verification-status` | white |
+| **failed** | `verification-status: "failed"` | red |
+| **in-progress** | `verification-status: "unverified"` — a `sorry` / `assume` | yellow |
+| **verified** | `verification-status: "verified"` + `"transitively-verified"` | light + dark green |
+| **trusted** | `verification-status: "trusted"` | purple |
+| **translated** | non-disabled `exec` atoms with a non-null `translation-name` (Aeneas only) | — |
+
+`translated` is **not** part of the partition — it is a milestone that cuts
+across it (a verified Aeneas function is also translated).
+
+### Progress chart (burn-up over time)
+
+Cumulative, nested curves — not a stack-to-100%:
+
+```
+tracked ≥ translated ≥ verified          (translated line: Aeneas only)
+```
+
+- **tracked** — the upper bound (ceiling).
+- **verified** — the proved frontier.
+- **verified + trusted** — the *completion frontier*; this is what reaches the
+  ceiling at "done" (done = every tracked function green or purple). `trusted` is
+  drawn as its own band on top of `verified`, so the purple gap — how much rests
+  on axioms — stays visible rather than folded into `verified`.
+- **translated** (Aeneas) — the intermediate milestone between "in scope" and
+  "verified".
+
+`in-progress` is deliberately **not** a curve here: it is a transient state (a
+function leaves it the moment its `sorry` / `assume` is removed and it becomes
+verified), so on a burn-up it would only ever shrink. It already shows up as the
+gap between the completion frontier and the ceiling. It stays a summary slice.
+
+Invariant to hold: `tracked ≥ translated ≥ verified` for Aeneas; for Verus the
+translated line is N/A (`tracked ≥ verified` only).
+
 ## Lean projects
 
 Lean has no notion of "tracked" (no exec side to be the denominator), so:
