@@ -63,8 +63,9 @@ jq -r '
 
   # --- Colour BAR: Rust exec atoms -------------------------------------------
   ([$atoms[] | select(.language == "rust" and .kind == "exec") | {
-     disabled: (.["is-disabled"] == true),
-     status:   (.["verification-status"] // null)
+     disabled:   (.["is-disabled"] == true),
+     status:     (.["verification-status"] // null),
+     translated: ((.["translation-name"] // null) != null)
    }]) as $exec |
 
   # --- Colour DOT: verification artifacts ------------------------------------
@@ -99,6 +100,9 @@ jq -r '
   (.exec_total - .grey) as $tracked |
   (.light_green + .dark_green) as $verified |
   (.light_green + .dark_green + .purple) as $verified_trusted |
+  # Translated: non-disabled exec atoms with a translation-name (Aeneas only).
+  # Counted within tracked so the invariant tracked >= translated >= verified holds.
+  ([$exec[] | select(.disabled | not) | select(.translated)] | length) as $translated |
 
   "Pipeline: \(.pipeline)",
   "",
@@ -115,11 +119,24 @@ jq -r '
   "--|-------------|------",
   "  | Total       | \(.exec_total)",
   "",
-  "  Tracked  (total - grey):            \($tracked)",
-  "  Verified (light + dark green):      \($verified)",
-  "  Verified + trusted (+ purple):      \($verified_trusted)",
+  "Progress tracking (see docs/atoms_roles_statuses.md)",
+  "",
+  "  Summary (snapshot partition; sums to tracked):",
+  "    unspecified (white):              \(.white)",
+  "    failed      (red):                \(.red)",
+  "    in-progress (yellow):             \(.yellow)",
+  "    verified    (light + dark green): \($verified)",
+  "    trusted     (purple):             \(.purple)",
+  "    ----------------------------------",
+  "    tracked     (total - grey):       \($tracked)",
+  "",
+  "  Chart (cumulative frontiers; tracked >= translated >= verified):",
+  "    tracked            (upper bound): \($tracked)",
+  "    translated         (Aeneas only): \($translated)",
+  "    verified                        : \($verified)",
+  "    verified + trusted   (frontier) : \($verified_trusted)",
   (if $tracked > 0 then
-    "  (Verified + trusted) / tracked:     \($verified_trusted) / \($tracked)"
+    "    (verified + trusted) / tracked  : \($verified_trusted) / \($tracked)"
   else empty end),
   "",
   "Colour DOT — verification artifacts (checking status)",
@@ -135,5 +152,12 @@ jq -r '
   else empty end),
   (if $dot_cover != .art_total then
     "  WARNING: dot colours (\($dot_cover)) != artifact total (\(.art_total))"
+  else empty end),
+  # Invariant tracked >= translated >= verified (Aeneas only; for Verus
+  # translated is always 0 while verified may be > 0, so the check is scoped
+  # to the Aeneas pipeline). A verified Aeneas function should carry a
+  # translation-name; a violation means malformed input.
+  (if .pipeline == "aeneas" and $translated < $verified then
+    "  WARNING: translated (\($translated)) < verified (\($verified)) — a verified Aeneas atom is missing translation-name"
   else empty end)
 ' "$INPUT"
