@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Moved `docs/atoms_roles_statuses.md` and `scripts/count-colors.sh` to the VeriLib engineering docs ([Atom statuses and colours](https://docs.verilib.org/components/processor/atom-statuses-and-colours/)). The colouring scheme is VeriLib-specific (how VeriLib presents atom statuses), not a probe concern; the script is reproduced there as the reference implementation.
+- Untracked the remaining VeriLib-specific colour/stats docs (`docs/probes_statuses_colours.md`/`.pdf`, `docs/archive/verification-statuses.md`, `docs/VeriLib_Atom_Proposal.pdf`) and dropped their README links. Colour/stats are orthogonal to the probes; the files are kept locally (gitignored), with the canonical home in Beneficial-AI-Foundation/engineering-docs.
 
 ## [0.3.0] - 2026-07-17
 
