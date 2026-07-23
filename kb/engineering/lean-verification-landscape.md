@@ -159,7 +159,7 @@ probe-lean can identify what IS specified (via the `specs` field — non-empty m
 
 ## Visualization: what graphs look like per project type
 
-The diagrams below illustrate the characteristic graph topology for each Lean project category. Colors follow the [verification status palette](../../docs/atoms_roles_statuses.md). Node shapes encode roles: rounded rectangles for implementations, double-bordered rectangles for specs and theorems, and parallelograms for trusted/axiomatic declarations. Edge styles: solid arrows for calls and spec edges, dashed arrows for cross-language translations.
+The diagrams below illustrate the characteristic graph topology for each Lean project category. Colors follow the [verification status palette](https://docs.verilib.org/components/processor/atom-statuses-and-colours/). Node shapes encode roles: rounded rectangles for implementations, double-bordered rectangles for specs and theorems, and parallelograms for trusted/axiomatic declarations. Edge styles: solid arrows for calls and spec edges, dashed arrows for cross-language translations.
 
 ### Color legend
 

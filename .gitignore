@@ -1,1 +1,8 @@
 /target
+
+# Colour/stats docs — VeriLib-specific, kept locally but not tracked here.
+# Canonical home: Beneficial-AI-Foundation/engineering-docs.
+docs/probes_statuses_colours.md
+docs/probes_statuses_colours.pdf
+docs/archive/verification-statuses.md
+docs/VeriLib_Atom_Proposal.pdf
