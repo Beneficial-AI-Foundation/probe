@@ -124,8 +124,9 @@ project owes work on, so they never enter the bar or dot totals.
 ## Progress tracking — summary stats and chart
 
 Two artifacts, computed only for projects with a bar channel (Verus / Aeneas);
-Lean has no `tracked` denominator (see below). Both derive purely from the seven
-bar colours that [`scripts/count-colors.sh`](../scripts/count-colors.sh) counts.
+Lean has no `tracked` denominator (see below). The partition stats derive from the
+seven bar colours that [`scripts/count-colors.sh`](../scripts/count-colors.sh) counts;
+`translated` additionally uses the Aeneas `translation-name` field.
 
 Throughout, `#exec` means the Rust `exec` atoms that survive the exclusions above
 (empty `code-path`, `is-hidden` / `is-ignored` / `is-extraction-artifact`).
