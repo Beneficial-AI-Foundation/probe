@@ -1,6 +1,6 @@
 # Brainstorm: Meaningful Stats for Lean Projects
 
-**Status:** brainstorming, non-normative. Captures the reasoning behind what stats probe-lean *could* report. Not a spec — `atoms_roles_statuses.md` remains the normative doc.
+**Status:** brainstorming, non-normative. Captures the reasoning behind what stats probe-lean *could* report. Not a spec — the [Atom statuses and colours doc](https://docs.verilib.org/components/processor/atom-statuses-and-colours/) (VeriLib engineering docs) remains the normative doc.
 
 ## The problem
 

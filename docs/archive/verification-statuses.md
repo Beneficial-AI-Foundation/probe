@@ -1,14 +1,15 @@
 # Verification Statuses
 
 > **⚠️ Deprecated.** Superseded by
-> [`atoms_roles_statuses.md`](atoms_roles_statuses.md), the current colouring
-> scheme (two channels: a colour *bar* for Rust `exec` verification status, a
-> colour *dot* for artifact checking status). This document describes the older
-> scheme (blue for specs, yellow for translated-but-unspecified, purple counting
-> non-Rust axioms) that [`scripts/count-colors.sh`](../scripts/count-colors.sh)
+> [Atom statuses and colours](https://docs.verilib.org/components/processor/atom-statuses-and-colours/),
+> the current colouring scheme (two channels: a colour *bar* for Rust `exec`
+> verification status, a colour *dot* for artifact checking status), now kept in
+> the VeriLib engineering docs. This document describes the older scheme (blue
+> for specs, yellow for translated-but-unspecified, purple counting non-Rust
+> axioms) that [`count-colors.sh`](https://docs.verilib.org/components/processor/atom-statuses-and-colours/#counting-count-colorssh)
 > no longer implements. Kept for history; do not treat as normative.
 
-Defines the per-atom status fields (from the tool schemas) and the color scheme derived from them. Color counts are produced by [`scripts/count-colors.sh`](../scripts/count-colors.sh), which this document and the script must agree on — the script is currently out of date with the scheme below and will be reconciled in a follow-up PR (see [Counting](#counting)).
+Defines the per-atom status fields (from the tool schemas) and the color scheme derived from them. Color counts are produced by [`count-colors.sh`](https://docs.verilib.org/components/processor/atom-statuses-and-colours/#counting-count-colorssh), which this document and the current scheme must agree on — this archived document encodes the older partition and is not normative (see [Counting](#counting)).
 
 ## Proved vs verified
 
