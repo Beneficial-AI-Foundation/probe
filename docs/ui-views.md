@@ -225,7 +225,7 @@ Stubs (`code-path == ""`) are external dependencies without source
 code. The UI should offer an option to hide them (showing only atoms
 with local source) or show them dimmed.
 
-### Excluding disabled atoms
+### Excluding untracked atoms
 
 When `untracked` is `true`, the atom is out of scope. These can be
 hidden by default and shown on request.

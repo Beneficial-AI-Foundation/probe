@@ -27,7 +27,7 @@ Each step can be skipped: `--skip-specify`, `--skip-verify`. Each can also be ru
 Output atoms are enriched with optional fields:
 - `primary-spec` — specification text (from specify step)
 - `verification-status` — `"verified"`, `"failed"`, `"unverified"` (from run-verus step)
-- `untracked` — whether in analysis scope (from specify step)
+- `untracked` — whether the atom is out of verification scope: `true` = out of scope (KB P25), `false` = in scope / tracked backlog (from specify step)
 - `requires-dependencies`, `ensures-dependencies`, `body-dependencies` — categorized dependency subsets
 
 See [P15](../engineering/properties.md#p15-dependency-completeness) and [P16](../engineering/properties.md#p16-verification-status-mapping).

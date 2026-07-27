@@ -275,7 +275,7 @@ For Verus projects, an atom is **out of verification scope** — `untracked: tru
 
 - The **active configuration** = the analyzer/verifier cfg (`verus_keep_ghost = true` for Verus) + the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`) + target defaults. **Inclusion gates do not make an atom out of scope**: `verus_keep_ghost` and active features (e.g. `alloc`, `precomputed-tables`, `zeroize`, `digest`) gate code that *is* compiled and *must* be verified.
 - Only **item-gating** `#[cfg(...)]` counts. `#[cfg_attr(..., doc = …)]`, `cfg_attr(..., derive(…))`, `cfg_attr(..., allow(…))` conditionally add an attribute but still compile the item, so they are not scope gates.
-- **Conservative**: if a predicate references a flag/feature the tool cannot resolve, the atom is kept in scope (backlog) rather than marked disabled. The tool MUST NEVER silently drop a real backlog item by guessing a predicate is false.
+- **Conservative**: if a predicate references a flag/feature the tool cannot resolve, the atom is kept in scope (backlog) rather than marked untracked. The tool MUST NEVER silently drop a real backlog item by guessing a predicate is false.
 
 **Why it matters**: cfg-gatedness alone is *not* a scope signal — many cfg-gated `exec` functions are in scope and verified (compiled behind active gates like `verus_keep_ghost` and default features). Scope is decided by whether the predicate holds in the verification build, not by the mere presence of a gate. Marking out-of-build code (inactive features, non-selected backends, `not(verus_keep_ghost)` fallbacks, `#[cfg(test)]`) `untracked: true` keeps it out of the backlog, which is reserved for in-scope, compiled, unspecified functions.
 
@@ -289,7 +289,7 @@ For Aeneas projects, a Rust function is **out of verification scope** — `untra
 **Every extracted (compiled) Rust function is tracked backlog by default** (`untracked: false`, no `verification-status`), whether or not Aeneas produced a Lean translation for it. Absence from `functions.json` alone does **not** imply out-of-scope: a compiled function that Aeneas has not yet translated is unverified backlog, not out of scope. `functions.json` is the translation-matching bridge (which Lean def a Rust function maps to), not the scope oracle.
 
 - The **active configuration** for the Aeneas build = the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`), overlaid by any `--features` / `--no-default-features` / `--all-features` in the project's `charon.cargo_args`. cfg evaluation mirrors the Verus rules above: only item-gating `#[cfg(...)]` counts (not cosmetic `#[cfg_attr(...)]`), and evaluation is **conservative** — a predicate referencing a flag/feature the tool cannot resolve keeps the atom in scope (backlog), never silently dropping a real backlog item.
-- As with Verus, a status-bearing atom is never disabled (P24): the cfg/`@[out_of_scope]` reclassification applies only to atoms that would otherwise be backlog.
+- As with Verus, a status-bearing atom is never untracked (P24): the cfg/`@[out_of_scope]` reclassification applies only to atoms that would otherwise be backlog.
 
 ## P26. Blueprint status is additive; machine `verification-status` stays authoritative
 
