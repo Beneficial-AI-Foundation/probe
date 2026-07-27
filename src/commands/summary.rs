@@ -127,7 +127,7 @@ pub fn cmd_summary(input: &Path, output: Option<&Path>) {
 
     let envelope = SummaryEnvelope {
         schema: "probe/summary",
-        schema_version: "2.0",
+        schema_version: "3.0",
         tool: Tool {
             name: "probe".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),

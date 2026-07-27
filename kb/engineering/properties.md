@@ -12,7 +12,7 @@ Correctness constraints that all probe tool implementations must preserve. Every
 
 Every probe output file MUST be wrapped in a valid [Schema 2.0 envelope](schema.md#envelope). No bare JSON dictionaries as output from any tool's primary commands.
 
-**Validation**: `schema-version` starts with `"2."`. All required envelope fields present and non-empty.
+**Validation**: `schema-version` starts with `"3."`. All required envelope fields present and non-empty.
 
 ## P2. Atom identity via code-name
 

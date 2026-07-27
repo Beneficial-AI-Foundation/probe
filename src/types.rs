@@ -200,9 +200,9 @@ pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
         .get("schema-version")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    if !schema_version.starts_with("2.") {
+    if !schema_version.starts_with("3.") {
         return Err(format!(
-            "{}: incompatible schema-version \"{schema_version}\" (expected 2.x)",
+            "{}: incompatible schema-version \"{schema_version}\" (expected 3.x)",
             path.display()
         ));
     }

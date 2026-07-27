@@ -184,9 +184,9 @@ pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
         .get("schema-version")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    if !schema_version.starts_with("2.") {
+    if !schema_version.starts_with("3.") {
         eprintln!(
-            "Error: {}: incompatible schema-version \"{schema_version}\" (expected 2.x)",
+            "Error: {}: incompatible schema-version \"{schema_version}\" (expected 3.x)",
             input.display()
         );
         std::process::exit(1);

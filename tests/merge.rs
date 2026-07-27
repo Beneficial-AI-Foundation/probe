@@ -73,7 +73,7 @@ fn test_atoms_merge_fixtures_match_expected() {
     let merged = &envelope.data;
 
     assert_eq!(envelope.schema, "probe/merged-atoms");
-    assert_eq!(envelope.schema_version, "2.0");
+    assert_eq!(envelope.schema_version, "3.0");
     assert_eq!(envelope.tool.name, "probe");
     assert_eq!(envelope.tool.command, "merge");
     assert_eq!(envelope.inputs.len(), 2);
@@ -201,7 +201,7 @@ fn test_specs_merge_last_wins_on_conflict() {
     let envelope = load_merged_generic_envelope(output_path.to_str().unwrap());
 
     assert_eq!(envelope.schema, "probe/merged-specs");
-    assert_eq!(envelope.schema_version, "2.0");
+    assert_eq!(envelope.schema_version, "3.0");
     assert_eq!(envelope.tool.name, "probe");
     assert_eq!(envelope.tool.command, "merge");
 
@@ -286,7 +286,7 @@ fn test_proofs_merge_last_wins_overrides_failure() {
     let envelope = load_merged_generic_envelope(output_path.to_str().unwrap());
 
     assert_eq!(envelope.schema, "probe/merged-proofs");
-    assert_eq!(envelope.schema_version, "2.0");
+    assert_eq!(envelope.schema_version, "3.0");
     assert_eq!(envelope.tool.name, "probe");
     assert_eq!(envelope.tool.command, "merge");
 

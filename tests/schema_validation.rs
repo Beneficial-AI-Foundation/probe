@@ -14,7 +14,7 @@ fn single_tool_verus_envelope_is_valid() {
 
     let doc = json!({
         "schema": "probe-verus/atoms",
-        "schema-version": "2.0",
+        "schema-version": "3.0",
         "tool": { "name": "probe-verus", "version": "2.0.0", "command": "atomize" },
         "source": {
             "repo": "https://github.com/org/project",
@@ -48,7 +48,7 @@ fn single_tool_lean_envelope_is_valid() {
 
     let doc = json!({
         "schema": "probe-lean/atoms",
-        "schema-version": "2.0",
+        "schema-version": "3.0",
         "tool": { "name": "probe-lean", "version": "1.0.0", "command": "atomize" },
         "source": {
             "repo": "https://github.com/org/arklib",
@@ -82,7 +82,7 @@ fn merged_atoms_envelope_is_valid() {
 
     let doc = json!({
         "schema": "probe/merged-atoms",
-        "schema-version": "2.0",
+        "schema-version": "3.0",
         "tool": { "name": "probe", "version": "0.1.0", "command": "merge" },
         "inputs": [
             {
@@ -143,7 +143,7 @@ fn atom_with_extensions_is_valid() {
 
     let doc = json!({
         "schema": "probe-verus/atoms",
-        "schema-version": "2.0",
+        "schema-version": "3.0",
         "tool": { "name": "probe-verus", "version": "2.0.0", "command": "atomize" },
         "source": {
             "repo": "https://github.com/org/project",
@@ -183,7 +183,7 @@ fn single_tool_rust_extract_envelope_is_valid() {
 
     let doc = json!({
         "schema": "probe-rust/extract",
-        "schema-version": "2.1",
+        "schema-version": "3.0",
         "tool": { "name": "probe-rust", "version": "0.1.0", "command": "extract" },
         "source": {
             "repo": "https://github.com/org/my-crate",
@@ -220,7 +220,7 @@ fn single_tool_aeneas_extract_envelope_is_valid() {
 
     let doc = json!({
         "schema": "probe-aeneas/extract",
-        "schema-version": "2.0",
+        "schema-version": "3.0",
         "tool": { "name": "probe-aeneas", "version": "0.1.0", "command": "extract" },
         "source": {
             "repo": "https://github.com/org/my-project",
@@ -257,7 +257,7 @@ fn missing_required_field_is_rejected() {
 
     let doc = json!({
         "schema": "probe-verus/atoms",
-        "schema-version": "2.0",
+        "schema-version": "3.0",
         "tool": { "name": "probe-verus", "version": "2.0.0", "command": "atomize" },
         "source": {
             "repo": "https://github.com/org/project",

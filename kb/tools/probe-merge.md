@@ -29,7 +29,7 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 ### Phase 1: Load and validate
 
 1. Parse each input file's envelope
-2. Validate `schema-version` starts with `"2."`
+2. Validate `schema-version` starts with `"3."`
 3. Detect [schema category](../engineering/glossary.md#schema-category) from `schema` field
 4. Validate all inputs belong to the same category
 5. Flatten provenance from all inputs

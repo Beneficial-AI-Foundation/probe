@@ -104,7 +104,7 @@ Enumerate all functions via syn AST parsing. No envelope (raw JSON).
 
 ## Schema differences from probe-verus
 
-probe-rust outputs `schema-version: "2.1"`, a minor version bump from the base 2.0 spec. The 2.1 additions are new optional fields (`rust-qualified-name`, `untracked`, and the Charon provenance pair `charon-def-id`/`charon-version`). Consumers validate that `schema-version` starts with `"2."`, so 2.1 is fully compatible with 2.0 consumers.
+probe-rust outputs `schema-version: "3.0"`. Consumers validate that `schema-version` starts with `"3."`. The optional Rust fields (`rust-qualified-name`, `untracked`, and the Charon provenance pair `charon-def-id`/`charon-version`) are carried in the 3.0 envelope; the 3.0 major reflects the breaking `is-disabled`→`untracked` atom-field rename adopted across the ecosystem.
 
 Other differences from probe-verus:
 - `kind` is always `"exec"` (no proof/spec distinction in standard Rust)
