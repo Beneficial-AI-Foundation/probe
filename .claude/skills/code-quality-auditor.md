@@ -11,7 +11,7 @@ Check the implementation against KB-defined properties and architectural constra
 
 ### Property checks
 
-- **P1 (Envelope completeness)**: Verify all primary commands produce Schema 2.0 envelopes
+- **P1 (Envelope completeness)**: Verify all primary commands produce Schema 3.0 envelopes
 - **P2 (Atom identity)**: Check code-name uniqueness within output files
 - **P3 (Stub detection)**: Verify `is_stub()` matches the structural definition
 - **P4-P5 (Merge laws)**: Check merge tests cover associativity and identity

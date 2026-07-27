@@ -6,7 +6,7 @@ status: draft
 
 # Architecture
 
-The probe ecosystem is a multi-language code analysis pipeline. Each tool targets a specific language, extracts structured data (call graphs, specs, verification status), and outputs JSON conforming to the [Schema 2.0](schema.md) envelope format. A central merge operator composes outputs across tools and languages.
+The probe ecosystem is a multi-language code analysis pipeline. Each tool targets a specific language, extracts structured data (call graphs, specs, verification status), and outputs JSON conforming to the [Schema 3.0](schema.md) envelope format. A central merge operator composes outputs across tools and languages.
 
 ## Components
 
@@ -24,7 +24,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 
 ### probe (central hub)
 
-**Role**: Defines the canonical [Schema 2.0](schema.md) types and the universal `merge` operator.
+**Role**: Defines the canonical [Schema 3.0](schema.md) types and the universal `merge` operator.
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
 - `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--mappings`
@@ -40,7 +40,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 
 **Role**: Extract call graph [atoms](glossary.md#atom) from standard Rust projects.
 
-**Pipeline**: rust-analyzer → SCIP index → call graph parsing → syn AST for accurate spans → Schema 2.0 envelope
+**Pipeline**: rust-analyzer → SCIP index → call graph parsing → syn AST for accurate spans → Schema 3.0 envelope
 
 **Key challenges**:
 - Trait implementation disambiguation (4 fallback strategies)
@@ -78,7 +78,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 2. Walk Lean environment, extract declarations and dependencies (type vs term)
 3. Detect sorry warnings from build output
 4. Compute specs (reverse dependency edges from theorems)
-5. Wrap in Schema 2.0 envelope
+5. Wrap in Schema 3.0 envelope
 
 **Key challenges**:
 - Written in Lean (cannot be a Cargo workspace member — primary reason for repo separation)
@@ -132,9 +132,9 @@ See [tools/probe-leanblueprint.md](../tools/probe-leanblueprint.md) and [ADR-004
 ```
 Target Projects (Rust, Lean, Verus)
     │
-    ├── probe-rust extract ──────→ rust_atoms.json     (Schema 2.0)
-    ├── probe-lean extract ──────→ lean_atoms.json     (Schema 2.0)
-    ├── probe-verus extract ─────→ verus_atoms.json    (Schema 2.0)
+    ├── probe-rust extract ──────→ rust_atoms.json     (Schema 3.0)
+    ├── probe-lean extract ──────→ lean_atoms.json     (Schema 3.0)
+    ├── probe-verus extract ─────→ verus_atoms.json    (Schema 3.0)
     │
     ├── probe-aeneas extract ────→ aeneas_atoms.json   (merge + translate Rust↔Lean)
     │       │
@@ -194,5 +194,5 @@ probe-rust and probe-verus auto-download external tools (scip CLI, verus-analyze
 ### SCIP caching
 Generated SCIP indexes cached in `<project>/data/` to avoid re-running slow analysis. Both probe-rust and probe-verus use this pattern.
 
-### Schema 2.0 envelope
+### Schema 3.0 envelope
 Every output file is wrapped in a metadata envelope containing tool info, source provenance, timestamp, and the data payload. See [schema.md](schema.md).

@@ -1,10 +1,10 @@
 ---
-title: Schema 2.0 Interchange Specification
+title: Schema 3.0 Interchange Specification
 last-updated: 2026-07-21
 status: draft
 ---
 
-# Schema 2.0 Interchange Specification
+# Schema 3.0 Interchange Specification
 
 This is the authoritative specification for the JSON interchange format shared by all probe tools. Per-tool `docs/SCHEMA.md` files document tool-specific details; this file defines the contract they all share.
 

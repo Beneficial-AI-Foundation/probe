@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 // @kb: kb/engineering/schema.md#envelope
-/// Schema 2.0 envelope for single-tool atom files.
+/// Schema 3.0 envelope for single-tool atom files.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AtomEnvelope {
     pub schema: String,
@@ -15,7 +15,7 @@ pub struct AtomEnvelope {
 }
 
 // @kb: kb/engineering/schema.md#envelope — merged variant with provenance
-/// Schema 2.0 envelope for merged files, generic over the data-entry type.
+/// Schema 3.0 envelope for merged files, generic over the data-entry type.
 ///
 /// For atoms use `MergedEnvelope<Atom>`, for specs/proofs use
 /// `MergedEnvelope<serde_json::Value>`.
@@ -185,7 +185,7 @@ pub struct EnvelopeMeta {
 
 // @kb: kb/engineering/properties.md#p1-envelope-completeness
 // @kb: kb/engineering/properties.md#p9-provenance-is-preserved
-/// Parse a Schema 2.0 envelope, extracting shared metadata.
+/// Parse a Schema 3.0 envelope, extracting shared metadata.
 ///
 /// Validates the schema-version, detects the [`SchemaCategory`], and extracts
 /// provenance (flattening `inputs` for previously merged files).
@@ -260,7 +260,7 @@ pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
 /// Result of loading an atom file: data dictionary and provenance entries.
 pub type LoadResult = (BTreeMap<String, Atom>, Vec<InputProvenance>);
 
-/// Load a Schema 2.0 atom file (convenience wrapper around [`load_envelope`]).
+/// Load a Schema 3.0 atom file (convenience wrapper around [`load_envelope`]).
 ///
 /// Returns typed `Atom` entries. Errors if the file is not an atoms-category schema.
 pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
@@ -349,7 +349,7 @@ pub fn load_mappings(
     Ok((from_to, to_from))
 }
 
-/// Load any Schema 2.0 data file as opaque JSON entries.
+/// Load any Schema 3.0 data file as opaque JSON entries.
 ///
 /// Works for atoms, specs, and proofs. Returns the data as generic JSON
 /// values along with provenance and the detected category.

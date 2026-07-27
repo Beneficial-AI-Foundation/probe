@@ -6,7 +6,7 @@ Maintain the KB as implementation progresses. The KB is the source of truth — 
 
 Run this after any change to:
 - Architecture or component boundaries
-- Schema 2.0 fields or envelope structure
+- Schema 3.0 fields or envelope structure
 - Merge algorithm behavior
 - Translation matching strategies
 - Cross-tool data flow

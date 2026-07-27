@@ -7,7 +7,7 @@ use crate::types::{load_atom_file, Atom, InputProvenance, Tool};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-/// Schema 2.0 envelope for summary output.
+/// Schema 3.0 envelope for summary output.
 #[derive(serde::Serialize)]
 struct SummaryEnvelope {
     schema: &'static str,

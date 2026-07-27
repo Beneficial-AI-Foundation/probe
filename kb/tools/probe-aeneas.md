@@ -36,7 +36,7 @@ inputs → parallel extraction → load functions.json → translate → merge �
 6. **Generate mappings** — priority-ordered matching against functions.json: the charon-`def_id` join (Strategy 0) followed by three name/location strategies (see below)
 7. **Merge** — call `merge_atom_maps()` from probe crate with mappings
 8. **Enrich** — add Aeneas-specific metadata to merged atoms
-9. **Wrap** — Schema 2.0 envelope with `probe-aeneas/extract` schema
+9. **Wrap** — Schema 3.0 envelope with `probe-aeneas/extract` schema
 
 ### Input modes
 

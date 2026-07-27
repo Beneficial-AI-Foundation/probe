@@ -23,7 +23,7 @@ where one implementation corresponds to several formal constructs.
 
 ## File Format
 
-A mappings file is a Schema 2.0 JSON document with the following envelope:
+A mappings file is a Schema 3.0 JSON document with the following envelope:
 
 ```json
 {

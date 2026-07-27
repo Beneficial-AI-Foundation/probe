@@ -19,7 +19,7 @@ We want blueprint-derived progress stats without turning probe-lean into a proje
 
 ## Decision
 
-Build a **standalone `probe-leanblueprint` tool** that treats `probe-lean/extract` output as its atom base and enriches it with blueprint metadata, re-emitting a Schema 2.0 envelope. It is a direct analogue of probe-aeneas (a Rust probe that consumes other probes and enriches atoms via the hub crate).
+Build a **standalone `probe-leanblueprint` tool** that treats `probe-lean/extract` output as its atom base and enriches it with blueprint metadata, re-emitting a Schema 3.0 envelope. It is a direct analogue of probe-aeneas (a Rust probe that consumes other probes and enriches atoms via the hub crate).
 
 Sub-decisions:
 
@@ -31,7 +31,7 @@ Sub-decisions:
 ## Alternatives considered
 
 - **Extend probe-lean with a thin blueprint wrapper.** Rejected: probe-lean is written in Lean (language mismatch for a LaTeX/JSON adapter), it would couple a complementary doc layer into the generic extractor, and it contradicts the KB positioning of blueprint as doc-authoritative.
-- **A blueprint-native tool disconnected from probe-lean.** Rejected: it would force brand-new ingestion logic in every downstream consumer (verilib, scip-callgraph) and fragment the shared atom model. Emitting Schema 2.0 with blueprint data as extensions means schema-driven consumers need zero changes.
+- **A blueprint-native tool disconnected from probe-lean.** Rejected: it would force brand-new ingestion logic in every downstream consumer (verilib, scip-callgraph) and fragment the shared atom model. Emitting Schema 3.0 with blueprint data as extensions means schema-driven consumers need zero changes.
 
 ## Consequences
 

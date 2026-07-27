@@ -54,7 +54,7 @@ The probe ecosystem extracts structured data from multi-language verification pr
 
 ### Output
 
-All tools produce JSON conforming to [Schema 2.0](../engineering/schema.md). Every output file is self-describing via its metadata envelope.
+All tools produce JSON conforming to [Schema 3.0](../engineering/schema.md). Every output file is self-describing via its metadata envelope.
 
 Primary consumers:
 - **scip-callgraph** — web UI for visualizing call graphs, verification status, and cross-language mappings
@@ -66,7 +66,7 @@ Primary consumers:
 
 2. **Project leads** tracking verification coverage across multi-language projects. They need aggregate verification status and spec coverage metrics.
 
-3. **Tool developers** building on probe data (web UIs, CI pipelines, analysis tools). They consume Schema 2.0 JSON.
+3. **Tool developers** building on probe data (web UIs, CI pipelines, analysis tools). They consume Schema 3.0 JSON.
 
 ## Non-goals
 

@@ -11,7 +11,7 @@ status: draft
 
 ## What this tool does
 
-`probe project` takes a Schema 2.0 atom file and a [mappings file](../engineering/schema.md#mappings-file-format), uses all mapping endpoints (`from` + `to` code-names) as seeds, then expands via BFS in both directions with separate depth controls. The output is a trimmed atom file containing only the projected subgraph.
+`probe project` takes a Schema 3.0 atom file and a [mappings file](../engineering/schema.md#mappings-file-format), uses all mapping endpoints (`from` + `to` code-names) as seeds, then expands via BFS in both directions with separate depth controls. The output is a trimmed atom file containing only the projected subgraph.
 
 This is the server-side complement to scip-callgraph's client-side source/sink filtering. It produces reusable, shareable JSON artifacts suitable for CI pipelines, demos, or focused analysis.
 
@@ -77,7 +77,7 @@ probe project merged.json --mappings map.json --forward-depth 3 -o focused.json 
 
 ## Properties
 
-- **Envelope completeness** ([P1](../engineering/properties.md#p1-envelope-completeness)): output is a valid `probe/merged-atoms` Schema 2.0 envelope with all required fields
+- **Envelope completeness** ([P1](../engineering/properties.md#p1-envelope-completeness)): output is a valid `probe/merged-atoms` Schema 3.0 envelope with all required fields
 - **Provenance preserved** ([P9](../engineering/properties.md#p9-provenance-is-preserved)): input `inputs` (merged) or `source` (single-tool, wrapped) carried through to output
 - **Extensions preserved** ([P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)): atoms are cloned, so language-specific extension fields survive projection
 - **Deterministic** ([P14](../engineering/properties.md#p14-deterministic-output)): BFS over BTreeMap/BTreeSet keys produces identical output for identical input

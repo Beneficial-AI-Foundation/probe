@@ -15,7 +15,7 @@ status: draft
 The `extract` command is the primary pipeline:
 
 ```
-Cargo.toml → rust-analyzer → SCIP index → call graph → syn AST spans → Schema 2.0 envelope
+Cargo.toml → rust-analyzer → SCIP index → call graph → syn AST spans → Schema 3.0 envelope
 ```
 
 Steps (in `src/commands/extract.rs`):
@@ -27,7 +27,7 @@ Steps (in `src/commands/extract.rs`):
 6. **Detect duplicates** — error unless `--allow-duplicates` (keeps first)
 7. **Enrich with Charon** (optional) — add `rust-qualified-name`, `is-public` (from Charon LLBC `attr_info.public`), and the `charon-def-id`/`charon-version` provenance pair for Aeneas compatibility. Two sources: `--with-charon` reads a Charon LLBC (running charon if needed); `--translation <path>` reads an Aeneas `translation.json` instead (charon `def_id`s come from the manifest's `functions[]` entries, no charon run — implies enrichment and takes precedence over `--with-charon`). The manifest path fails **closed**: a `charon-def-id` is stamped only when a single span-validated candidate matches, so a bad id never feeds the downstream integer join.
 8. **Add external stubs** — referenced but unanalyzed dependencies
-9. **Wrap and write** — Schema 2.0 envelope to `.verilib/probes/`
+9. **Wrap and write** — Schema 3.0 envelope to `.verilib/probes/`
 
 ## Key challenges
 
@@ -54,7 +54,7 @@ Tool downloads cached in `~/.probe-rust/tools/`.
 ## Subcommands
 
 ### `extract`
-Primary command. Produces Schema 2.0 envelope with atoms.
+Primary command. Produces Schema 3.0 envelope with atoms.
 
 | Flag | Default | Description |
 |------|---------|-------------|
