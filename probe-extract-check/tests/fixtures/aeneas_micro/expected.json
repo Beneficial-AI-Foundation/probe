@@ -1,6 +1,6 @@
 {
   "schema": "probe-aeneas/extract",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": { "name": "probe-aeneas", "version": "0.1.0", "command": "extract" },
   "source": {
     "repo": "",
@@ -20,7 +20,7 @@
       "kind": "exec",
       "language": "rust",
       "translation-name": "probe:AeneasMicro/0.1.0/AeneasMicro/AeneasMicro.clamp",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:aeneas-micro/0.1.0/lib/mask_low()": {
       "display-name": "mask_low",
@@ -31,7 +31,7 @@
       "kind": "exec",
       "language": "rust",
       "translation-name": "probe:AeneasMicro/0.1.0/AeneasMicro/AeneasMicro.mask_low",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:aeneas-micro/0.1.0/lib/process()": {
       "display-name": "process",
@@ -45,7 +45,7 @@
       "kind": "exec",
       "language": "rust",
       "translation-name": "probe:AeneasMicro/0.1.0/AeneasMicro/AeneasMicro.process",
-      "is-disabled": false
+      "untracked": false
     }
   }
 }

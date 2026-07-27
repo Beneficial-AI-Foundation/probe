@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Beneficial-AI-Foundation/probe/schemas/atom-envelope.schema.json",
   "title": "Probe Atom Envelope",
-  "description": "Schema 2.0 envelope for probe-* atom files (single-tool and merged).",
+  "description": "Schema 3.0 envelope for probe-* atom files (single-tool and merged).",
 
   "oneOf": [
     { "$ref": "#/$defs/singleToolEnvelope" },

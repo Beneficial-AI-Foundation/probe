@@ -1,10 +1,10 @@
 ---
-title: Schema 2.0 Interchange Specification
+title: Schema 3.0 Interchange Specification
 last-updated: 2026-07-21
 status: draft
 ---
 
-# Schema 2.0 Interchange Specification
+# Schema 3.0 Interchange Specification
 
 This is the authoritative specification for the JSON interchange format shared by all probe tools. Per-tool `docs/SCHEMA.md` files document tool-specific details; this file defines the contract they all share.
 
@@ -15,7 +15,7 @@ Every probe output file is wrapped in a metadata envelope:
 ```json
 {
   "schema": "probe-verus/extract",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": {
     "name": "probe-verus",
     "version": "5.0.0",
@@ -57,7 +57,7 @@ When `probe merge` produces output, `source` is replaced by `inputs`:
 ```json
 {
   "schema": "probe/merged-atoms",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": { "name": "probe", "version": "0.1.0", "command": "merge" },
   "inputs": [
     { "schema": "probe-verus/atoms", "source": { ... } },
@@ -149,7 +149,7 @@ Note: `"latex"` appears as a reserved `source.language` value in some envelope e
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification text (verus) or code-name of primary spec theorem (lean) |
 | `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment (P23): `"transitively-verified"` = all transitive deps verified/trusted; `"verified"` = locally verified only. |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
-| `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
+| `untracked` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
 | `specs` | array of strings | probe-lean | Theorem atoms referencing this atom |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data: `{code-name, location, line}` |
 
@@ -175,7 +175,7 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `translation-name` — corresponding name in other language
 - `translation-path` — file path of translation
 - `translation-text` — line range of translation
-- `is-disabled` — computed from functions.json
+- `untracked` — computed from functions.json
 - `is-public` — Rust item visibility: `true` if declared `pub` per Charon, `false` if private or visibility data unavailable (set on all Rust atoms; preserved from probe-rust when present, defaulted to `false` when absent)
 
 **probe-leanblueprint extensions** (on enriched Lean atoms and synthetic planned atoms):
@@ -272,7 +272,7 @@ Schema: `probe/mappings`. Contains bidirectional mappings between code-names acr
 ```json
 {
   "schema": "probe/mappings",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": { "name": "probe-aeneas", "version": "...", "command": "translate" },
   "timestamp": "...",
   "sources": {
@@ -313,7 +313,7 @@ This field is accommodated by `additionalProperties: true` on the merged envelop
 
 - **Major** (e.g. 2.0 → 3.0): Changes to required fields, field semantics, or field removals
 - **Minor** (e.g. 2.0 → 2.1): New optional fields, new `kind` values
-- Consumers validate `schema-version` starts with expected major version (currently `"2."`)
+- Consumers validate `schema-version` starts with expected major version (currently `"3."`)
 
 ### Version history
 
@@ -321,6 +321,7 @@ This field is accommodated by `additionalProperties: true` on the merged envelop
 |---------|------|---------|
 | 2.0 | all | Initial Schema 2.0 envelope format |
 | 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
+| 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0` (minors had drifted: probe-rust up to `2.4`, probe-aeneas `2.1`, others `2.0`). |
 
 ## Package versioning by language
 

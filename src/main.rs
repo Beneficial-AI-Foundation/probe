@@ -20,7 +20,7 @@ struct Cli {
 enum Commands {
     /// Merge data files from multiple probe tools into a single file.
     ///
-    /// Takes two or more Schema 2.0 files (atoms, specs, or proofs from
+    /// Takes two or more Schema 3.0 files (atoms, specs, or proofs from
     /// probe-verus, probe-lean, etc.) and produces a merged file. The schema
     /// category is auto-detected from the inputs; all inputs must be the same
     /// category. For atoms, stubs are replaced by real entries (first-wins on
@@ -45,7 +45,7 @@ enum Commands {
 
     /// Project a subgraph from a merged atom file using mapping seeds.
     ///
-    /// Reads a Schema 2.0 atom file and a mappings file, uses all mapping
+    /// Reads a Schema 3.0 atom file and a mappings file, uses all mapping
     /// endpoints (from + to) as seeds, then expands via BFS: forward
     /// (callees) and backward (callers) with separate depth controls.
     /// Outputs a trimmed atom file containing only the projected subgraph.
@@ -78,7 +78,7 @@ enum Commands {
 
     /// Enrich verification status through the dependency graph.
     ///
-    /// Reads a Schema 2.0 atom file, walks the dependency graph, and
+    /// Reads a Schema 3.0 atom file, walks the dependency graph, and
     /// upgrades `verification-status` from "verified" to
     /// "transitively-verified" on atoms whose entire transitive dependency
     /// closure is verified or trusted. Atoms that remain "verified" are only
@@ -87,7 +87,7 @@ enum Commands {
     /// The output preserves the input envelope structure exactly.
     // @kb: kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination
     Enrich {
-        /// Input atom file (Schema 2.0).
+        /// Input atom file (Schema 3.0).
         #[arg(required = true)]
         input: PathBuf,
 
@@ -98,7 +98,7 @@ enum Commands {
 
     /// Summarize verified atoms: entrypoints, functions, and lemmas.
     ///
-    /// Reads a Schema 2.0 atom file and partitions all atoms with
+    /// Reads a Schema 3.0 atom file and partitions all atoms with
     /// "verification-status": "verified" into three lists:
     ///
     /// Entrypoints — verified, non-stub, non-test, Rust `exec` atoms whose
@@ -108,9 +108,9 @@ enum Commands {
     ///
     /// Verified lemmas — verified Verus `proof`/`spec` atoms.
     ///
-    /// Output is a Schema 2.0 envelope with schema "probe/summary".
+    /// Output is a Schema 3.0 envelope with schema "probe/summary".
     Summary {
-        /// Input atom file (Schema 2.0).
+        /// Input atom file (Schema 3.0).
         #[arg(required = true)]
         input: PathBuf,
 

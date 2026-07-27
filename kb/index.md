@@ -26,7 +26,7 @@ What the probe ecosystem does and why it exists. User-facing behavior.
 How the system is built. Architecture, schema contract, invariants.
 
 - **[architecture.md](engineering/architecture.md)** — Five-tool separation, data flow, why separate repos, per-tool roles
-- **[schema.md](engineering/schema.md)** — Schema 2.0 interchange specification: envelope format, atom fields, code-name URIs, merge output
+- **[schema.md](engineering/schema.md)** — Schema 3.0 interchange specification: envelope format, atom fields, code-name URIs, merge output
 - **[properties.md](engineering/properties.md)** — Invariants and correctness constraints that all implementations must preserve
 - **[glossary.md](engineering/glossary.md)** — Precise definitions of domain terms used across the ecosystem
 - **[lean-verification-landscape.md](engineering/lean-verification-landscape.md)** — How specs surface in Lean verification projects; discovery strategies for probe-lean

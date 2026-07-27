@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Breaking**: bumped the interchange `schema-version` to `3.0`. The hub now accepts only `3.x` inputs (`starts_with("3.")` in `types.rs`/`propagate.rs`) and emits `3.0` for merged/summary/project output. This unifies every producer, whose emitted minors had drifted (probe-rust up to `2.4`, probe-aeneas `2.1`, others `2.0`). Consumers must update their major-version check from `2.` to `3.`.
+- Renamed the atom scope field `is-disabled` to `untracked` across the schema spec, KB (P16/P24/P25), docs, and extract-check golden fixtures (#42). Semantics are unchanged and polarity is preserved: `untracked: true` means out of verification scope, `untracked: false` means in scope (verified atoms plus the spec-less backlog). Producers (`probe-rust`, `probe-verus`, `probe-aeneas`) emit `untracked` accordingly.
+
 ### Added
 - Progress-tracking scheme in `docs/atoms_roles_statuses.md`: a snapshot summary partition (`tracked = unspecified + failed + in-progress + verified + trusted`) and a burn-up chart of cumulative frontiers (`tracked ≥ translated ≥ verified`, with `verified + trusted` as the completion frontier)
 - `scripts/count-colors.sh` now reports the progress summary/chart numbers, a `translated` count (non-disabled `exec` atoms with a `translation-name`, Aeneas-only), and a self-check warning when the `tracked ≥ translated ≥ verified` invariant is violated

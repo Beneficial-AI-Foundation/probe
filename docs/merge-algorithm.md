@@ -10,7 +10,7 @@ auto-detected from the `schema` field; all inputs must be the same category.
 
 ## Overview
 
-`probe merge` takes two or more Schema 2.0 files and produces one output file. The output
+`probe merge` takes two or more Schema 3.0 files and produces one output file. The output
 schema depends on the input category:
 
 | Input category | Output schema |
@@ -97,7 +97,7 @@ inputs, the **last** one wins. This is appropriate because re-running `specify` 
 ```json
 {
   "schema": "probe/merged-atoms",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": {
     "name": "probe",
     "version": "<probe version>",
@@ -166,8 +166,8 @@ This algorithm generalizes probe-verus's `merge-atoms` command. The key differen
 
 | Aspect | probe-verus merge-atoms | probe merge |
 |--------|------------------------|-------------|
-| Input format | Bare JSON dictionaries (no envelope) | Schema 2.0 enveloped files |
-| Output format | Bare JSON dictionary | Schema 2.0 envelope with `probe/merged-*` |
+| Input format | Bare JSON dictionaries (no envelope) | Schema 3.0 enveloped files |
+| Output format | Bare JSON dictionary | Schema 3.0 envelope with `probe/merged-*` |
 | Data categories | Atoms only | Atoms, specs, and proofs |
 | Languages | Rust only | Any language |
 | Provenance | None | `inputs` array in output envelope |

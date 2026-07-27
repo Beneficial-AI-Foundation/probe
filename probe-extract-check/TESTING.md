@@ -189,7 +189,7 @@ structurally identical (ignoring volatile fields like timestamp).
 ## Adding a new fixture
 
 1. Create a directory under `tests/fixtures/<name>/` with source files
-2. Hand-craft `expected.json` following the Schema 2.0 envelope format
+2. Hand-craft `expected.json` following the Schema 3.0 envelope format
 3. Run `cargo test -p probe-extract-check golden_<name>_source_and_deps` — fix any errors
 4. Add tests in `tests/golden_tests.rs` for the new fixture
 5. Add a `properties_<name>` test if the fixture has source files

@@ -26,7 +26,7 @@ Steps (in `ProbeLean/Extract.lean`):
 4. **Atomize** — convert declarations to [atoms](../engineering/glossary.md#atom) with filtering (`ProbeLean/Atomize.lean`)
 5. **Sorry detection** — parse build output for sorry warnings (`ProbeLean/VerifyInternal.lean`)
 6. **Compute specs** — reverse dependency edges: which theorems depend on this definition
-7. **Wrap in envelope** — Schema 2.0 output to `.verilib/probes/lean_<pkg>_<ver>.json`
+7. **Wrap in envelope** — Schema 3.0 output to `.verilib/probes/lean_<pkg>_<ver>.json`
 
 ## Key challenges
 

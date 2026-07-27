@@ -36,7 +36,7 @@ All verified Verus `proof`/`spec` atoms.
 
 ## Output format
 
-Schema 2.0 envelope ([P1](../engineering/properties.md#p1-envelope-completeness)) with `schema: "probe/summary"`. The `data` field contains:
+Schema 3.0 envelope ([P1](../engineering/properties.md#p1-envelope-completeness)) with `schema: "probe/summary"`. The `data` field contains:
 
 ```json
 {
@@ -54,7 +54,7 @@ All arrays are sorted by code-name ([P14](../engineering/properties.md#p14-deter
 probe summary <INPUT> [-o <OUTPUT>]
 ```
 
-- `INPUT` — Schema 2.0 atom file (required)
+- `INPUT` — Schema 3.0 atom file (required)
 - `-o OUTPUT` — Write envelope to file (defaults to `summary_<package>_<version>.json`)
 
 Summary statistics are always printed to stderr.

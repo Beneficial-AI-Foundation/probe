@@ -12,7 +12,7 @@ family.
 | **probe-verus** | Rust/Verus | Call graph + specs + verification status | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) |
 | **probe-aeneas** | Rust + Lean | Cross-language merged graph (Aeneas projects) | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) |
 
-All four produce JSON files conforming to the Schema 2.0 envelope format
+All four produce JSON files conforming to the Schema 3.0 envelope format
 defined in [`probe/docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md).
 
 ## Running extract
@@ -47,7 +47,7 @@ Every output file is a JSON object with this envelope:
 ```json
 {
   "schema": "probe-<tool>/extract",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": {
     "name": "probe-<tool>",
     "version": "0.1.0",
@@ -106,7 +106,7 @@ for full details):
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification (text in Verus, code-name in Lean) |
 | `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"` |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"` (e.g., `"axiom"`, `"external-body"`) |
-| `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | Whether the function is out of scope |
+| `untracked` | bool | probe-verus, probe-rust, probe-aeneas | Whether the function is out of scope |
 | `specs` | array | probe-lean | Code-names of theorems that spec this atom |
 
 ### Kind values by language

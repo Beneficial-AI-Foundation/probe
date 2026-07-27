@@ -12,7 +12,7 @@ This repository contains:
 ## Documentation
 
 - [docs/consumer-guide.md](docs/consumer-guide.md) -- **Start here**: how to use all four probe tools, examples, and working with the data
-- [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format (Schema 2.0)
+- [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format (Schema 3.0)
 - [docs/schema-validation.md](docs/schema-validation.md) -- Validating probe output against the JSON Schema (Rust, Lean, CI)
 - [docs/ui-views.md](docs/ui-views.md) -- How a UI should implement language toggles, call graph / file map / crate map views
 - [docs/testing-guide.md](docs/testing-guide.md) -- Testing that your visualization matches the probe data

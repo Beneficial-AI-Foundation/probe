@@ -18,7 +18,7 @@ Never do redundant expensive work. Expensive steps are compiles, analyzer runs (
 
 ## 2. Schema & KB conformance
 
-- Emit a valid **Schema 2.0** envelope (`*/extract` for atoms, sidecars for summaries). Depend on the `probe` crate for `types` — never re-implement the schema.
+- Emit a valid **Schema 3.0** envelope (`*/extract` for atoms, sidecars for summaries). Depend on the `probe` crate for `types` — never re-implement the schema.
 - Preserve invariants in `kb/engineering/properties.md`: determinism (**P14**: BTreeMap/sorted keys), extension preservation (**P10**), structural stub detection (**P3**). Enrichers must be idempotent and keep machine `verification-status` authoritative.
 - Add `// @kb: kb/<path>#<slug>` annotations on the key types/functions; `./scripts/check-kb-links.sh` must pass.
 - Update the KB: new `kb/tools/<probe>.md`, a component section + data-flow entry in `kb/engineering/architecture.md`, the row in `kb/tools/index.md` and `kb/index.md`, and an ADR under `kb/decisions/` if it introduces a new architectural approach. Run the kb-update skill after.

@@ -1,6 +1,6 @@
 {
   "schema": "probe-verus/extract",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": { "name": "probe-verus", "version": "3.0.0", "command": "extract" },
   "source": {
     "repo": "",
@@ -32,7 +32,7 @@
       "code-text": { "lines-start": 9, "lines-end": 17 },
       "kind": "proof",
       "language": "verus",
-      "is-disabled": false,
+      "untracked": false,
       "verification-status": "verified"
     },
     "probe:verus-micro/0.1.0/lib/checked_add()": {
@@ -46,7 +46,7 @@
       "code-text": { "lines-start": 18, "lines-end": 26 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false,
+      "untracked": false,
       "verification-status": "verified"
     },
     "probe:verus-micro/0.1.0/lib/double_checked()": {
@@ -63,7 +63,7 @@
       "code-text": { "lines-start": 28, "lines-end": 36 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false,
+      "untracked": false,
       "verification-status": "verified"
     }
   }

@@ -15,7 +15,7 @@ status: draft
 The `extract` command is the primary pipeline:
 
 ```
-Cargo.toml → rust-analyzer → SCIP index → call graph → syn AST spans → Schema 2.0 envelope
+Cargo.toml → rust-analyzer → SCIP index → call graph → syn AST spans → Schema 3.0 envelope
 ```
 
 Steps (in `src/commands/extract.rs`):
@@ -27,7 +27,7 @@ Steps (in `src/commands/extract.rs`):
 6. **Detect duplicates** — error unless `--allow-duplicates` (keeps first)
 7. **Enrich with Charon** (optional) — add `rust-qualified-name`, `is-public` (from Charon LLBC `attr_info.public`), and the `charon-def-id`/`charon-version` provenance pair for Aeneas compatibility. Two sources: `--with-charon` reads a Charon LLBC (running charon if needed); `--translation <path>` reads an Aeneas `translation.json` instead (charon `def_id`s come from the manifest's `functions[]` entries, no charon run — implies enrichment and takes precedence over `--with-charon`). The manifest path fails **closed**: a `charon-def-id` is stamped only when a single span-validated candidate matches, so a bad id never feeds the downstream integer join.
 8. **Add external stubs** — referenced but unanalyzed dependencies
-9. **Wrap and write** — Schema 2.0 envelope to `.verilib/probes/`
+9. **Wrap and write** — Schema 3.0 envelope to `.verilib/probes/`
 
 ## Key challenges
 
@@ -54,7 +54,7 @@ Tool downloads cached in `~/.probe-rust/tools/`.
 ## Subcommands
 
 ### `extract`
-Primary command. Produces Schema 2.0 envelope with atoms.
+Primary command. Produces Schema 3.0 envelope with atoms.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -104,7 +104,7 @@ Enumerate all functions via syn AST parsing. No envelope (raw JSON).
 
 ## Schema differences from probe-verus
 
-probe-rust outputs `schema-version: "2.1"`, a minor version bump from the base 2.0 spec. The 2.1 additions are new optional fields (`rust-qualified-name`, `is-disabled`, and the Charon provenance pair `charon-def-id`/`charon-version`). Consumers validate that `schema-version` starts with `"2."`, so 2.1 is fully compatible with 2.0 consumers.
+probe-rust outputs `schema-version: "3.0"`. Consumers validate that `schema-version` starts with `"3."`. The optional Rust fields (`rust-qualified-name`, `untracked`, and the Charon provenance pair `charon-def-id`/`charon-version`) are carried in the 3.0 envelope; the 3.0 major reflects the breaking `is-disabled`→`untracked` atom-field rename adopted across the ecosystem.
 
 Other differences from probe-verus:
 - `kind` is always `"exec"` (no proof/spec distinction in standard Rust)
@@ -112,4 +112,4 @@ Other differences from probe-verus:
 - `rust-qualified-name` is optional (only with Charon enrichment: `--with-charon` or `--translation`)
 - `is-public` is optional (only with `--with-charon`; `true` if item is declared `pub`, `false` if private, absent when Charon not used or match failed)
 - `charon-def-id`/`charon-version` are optional (only with Charon enrichment; emitted **together or not at all** — a `FunDeclId` and the charon version that produced it, enabling a precise integer join to Aeneas's `translation.json` `def_id`)
-- `is-disabled` is always `false` (no disable concept in standard Rust extraction)
+- `untracked` is always `false` (no disable concept in standard Rust extraction)

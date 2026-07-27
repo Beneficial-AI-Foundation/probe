@@ -365,7 +365,7 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, mappings_path: Option<Pa
 
             let envelope = MergedAtomEnvelope {
                 schema: merged_schema,
-                schema_version: "2.0".to_string(),
+                schema_version: "3.0".to_string(),
                 tool,
                 inputs: provenance,
                 timestamp,
@@ -408,7 +408,7 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, mappings_path: Option<Pa
 
             let envelope = MergedGenericEnvelope {
                 schema: merged_schema,
-                schema_version: "2.0".to_string(),
+                schema_version: "3.0".to_string(),
                 tool,
                 inputs: provenance,
                 timestamp,
@@ -694,7 +694,7 @@ mod tests {
 
         let envelope_a = serde_json::json!({
             "schema": "verus-analyzer/atoms",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe", "version": "0.1.0", "command": "extract"},
             "source": {"repo": "repo-a", "commit": "aaa", "language": "rust", "package": "pkg-a", "package-version": "1.0"},
             "timestamp": "2025-01-01T00:00:00Z",
@@ -702,7 +702,7 @@ mod tests {
         });
         let envelope_b = serde_json::json!({
             "schema": "lean-analyzer/atoms",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe", "version": "0.1.0", "command": "extract"},
             "source": {"repo": "repo-b", "commit": "bbb", "language": "lean", "package": "pkg-b", "package-version": "2.0"},
             "timestamp": "2025-01-01T00:00:00Z",
@@ -741,7 +741,7 @@ mod tests {
 
         let merged_envelope = MergedAtomEnvelope {
             schema: "probe/merged-atoms".to_string(),
-            schema_version: "2.0".to_string(),
+            schema_version: "3.0".to_string(),
             tool: Tool {
                 name: "probe".to_string(),
                 version: "0.1.0".to_string(),
@@ -769,7 +769,7 @@ mod tests {
 
         let envelope_c = serde_json::json!({
             "schema": "verus-analyzer/atoms",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe", "version": "0.1.0", "command": "extract"},
             "source": {"repo": "repo-c", "commit": "ccc", "language": "rust", "package": "pkg-c", "package-version": "3.0"},
             "timestamp": "2025-01-01T00:00:00Z",
@@ -896,7 +896,7 @@ mod tests {
 
         let envelope_a = serde_json::json!({
             "schema": "probe-verus/specs",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe-verus", "version": "2.0.0", "command": "specify"},
             "source": {"repo": "repo-a", "commit": "aaa", "language": "rust", "package": "pkg-a", "package-version": "1.0"},
             "timestamp": "2025-01-01T00:00:00Z",
@@ -906,7 +906,7 @@ mod tests {
         });
         let envelope_b = serde_json::json!({
             "schema": "probe-lean/specs",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe-lean", "version": "1.0.0", "command": "specify"},
             "source": {"repo": "repo-b", "commit": "bbb", "language": "lean", "package": "pkg-b", "package-version": "2.0"},
             "timestamp": "2025-01-01T00:00:00Z",
@@ -945,7 +945,7 @@ mod tests {
 
         let merged_envelope = MergedGenericEnvelope {
             schema: "probe/merged-specs".to_string(),
-            schema_version: "2.0".to_string(),
+            schema_version: "3.0".to_string(),
             tool: Tool {
                 name: "probe".to_string(),
                 version: "0.1.0".to_string(),
@@ -1045,7 +1045,7 @@ mod tests {
 
         let specs = serde_json::json!({
             "schema": "probe-verus/specs",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe-verus", "version": "2.0.0", "command": "specify"},
             "source": {"repo": "r", "commit": "c", "language": "rust", "package": "p", "package-version": "1.0"},
             "timestamp": "2025-01-01T00:00:00Z",
@@ -1053,7 +1053,7 @@ mod tests {
         });
         let atoms = serde_json::json!({
             "schema": "probe-verus/atoms",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe-verus", "version": "2.0.0", "command": "atomize"},
             "source": {"repo": "r", "commit": "c", "language": "rust", "package": "p", "package-version": "1.0"},
             "timestamp": "2025-01-01T00:00:00Z",
@@ -1091,7 +1091,7 @@ mod tests {
         let path = dir.path().join("mappings.json");
         let content = serde_json::json!({
             "schema": "probe/mappings",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "mappings": [
                 {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"},
                 {"from": "probe:a/1.0/f()", "to": "probe:a.lean.g", "confidence": "high"}
@@ -1114,7 +1114,7 @@ mod tests {
         let path = dir.path().join("mappings.json");
         let content = serde_json::json!({
             "schema": "probe/mappings",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "mappings": [
                 {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"},
                 {"from": "probe:a/1.0/f()", "to": "probe:a.lean.g", "confidence": "high"}
@@ -1143,7 +1143,7 @@ mod tests {
         let path = dir.path().join("legacy.json");
         let content = serde_json::json!({
             "schema": "probe/translations",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "mappings": [
                 {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"}
             ]

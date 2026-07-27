@@ -7,12 +7,12 @@ status: draft
 # probe (merge operator)
 
 **Directory**: `baif/probe/`
-**Role**: Central hub — defines [Schema 2.0](../engineering/schema.md) types and the universal merge operator.
+**Role**: Central hub — defines [Schema 3.0](../engineering/schema.md) types and the universal merge operator.
 **Subcommands**: `merge`, `project`, `enrich`, `summary`
 
 ## What this tool does
 
-`probe merge` takes two or more Schema 2.0 JSON files and produces a single merged output. It is the only composition operator in the ecosystem — all tools that need to combine data go through it.
+`probe merge` takes two or more Schema 3.0 JSON files and produces a single merged output. It is the only composition operator in the ecosystem — all tools that need to combine data go through it.
 
 See [architecture.md](../engineering/architecture.md) for how this fits into the data flow.
 
@@ -29,7 +29,7 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 ### Phase 1: Load and validate
 
 1. Parse each input file's envelope
-2. Validate `schema-version` starts with `"2."`
+2. Validate `schema-version` starts with `"3."`
 3. Detect [schema category](../engineering/glossary.md#schema-category) from `schema` field
 4. Validate all inputs belong to the same category
 5. Flatten provenance from all inputs
@@ -88,8 +88,8 @@ Used in probe-rust and probe-verus test suites.
 
 | Aspect | probe-verus merge-atoms | probe merge |
 |--------|------------------------|-------------|
-| Input | Bare JSON (no envelope) | Schema 2.0 enveloped |
-| Output | Bare JSON | Schema 2.0 envelope |
+| Input | Bare JSON (no envelope) | Schema 3.0 enveloped |
+| Output | Bare JSON | Schema 3.0 envelope |
 | Categories | Atoms only | Atoms, specs, proofs |
 | Languages | Rust only | Any |
 | Provenance | None | `inputs` array |

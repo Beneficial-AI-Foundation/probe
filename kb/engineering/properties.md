@@ -10,9 +10,9 @@ Correctness constraints that all probe tool implementations must preserve. Every
 
 ## P1. Envelope completeness
 
-Every probe output file MUST be wrapped in a valid [Schema 2.0 envelope](schema.md#envelope). No bare JSON dictionaries as output from any tool's primary commands.
+Every probe output file MUST be wrapped in a valid [Schema 3.0 envelope](schema.md#envelope). No bare JSON dictionaries as output from any tool's primary commands.
 
-**Validation**: `schema-version` starts with `"2."`. All required envelope fields present and non-empty.
+**Validation**: `schema-version` starts with `"3."`. All required envelope fields present and non-empty.
 
 ## P2. Atom identity via code-name
 
@@ -130,7 +130,7 @@ The `dependencies` field MUST always equal the union of its categorized subsets.
 
 ## P16. Verification status mapping
 
-The `verification-status` field has five possible values: `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, `"trusted"` (or absent for untracked atoms).
+The `verification-status` field has five possible values: `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, `"trusted"` (or absent for atoms with no verification status — both out-of-scope atoms (`untracked: true`) and the in-scope backlog (`untracked: false`, spec-less)).
 
 For probe-verus, Verus verification output maps to `verification-status` as:
 
@@ -224,7 +224,7 @@ The `probe enrich` command (and the `enrich_verification_status` library functio
 The algorithm uses **reverse-BFS contamination**: build a reverse dependency index, seed contamination from atoms with explicit `"unverified"` or `"failed"` status, and propagate backwards through callers. This correctly handles cycles (all cycle members receive the same scope) without requiring SCC computation.
 
 Key rules:
-- **Only explicit `"unverified"` / `"failed"` contaminates** — atoms with missing `verification-status` are transparent and do not affect transitive scope. This covers both out-of-scope atoms (`is-disabled: true`, [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) and the in-scope backlog (spec-less, `is-disabled: false`) — e.g. plain Rust functions or Verus spec functions.
+- **Only explicit `"unverified"` / `"failed"` contaminates** — atoms with missing `verification-status` are transparent and do not affect transitive scope. This covers both out-of-scope atoms (`untracked: true`, [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) and the in-scope backlog (spec-less, `untracked: false`) — e.g. plain Rust functions or Verus spec functions.
 - **`trusted` does not block transitive** — trusted atoms are intentional axioms, not incomplete work.
 - **Missing deps are treated as trusted** — dependencies not present in the atom map (e.g., external stdlib functions) do not block transitive status. A warning is logged for each.
 - **Non-verified atoms are untouched** — only atoms with `verification-status: "verified"` are candidates for upgrade.
@@ -237,7 +237,7 @@ Key rules:
 
 ## P24. A status-bearing atom is in analysis scope
 
-If an atom carries a `verification-status`, it is in verification scope: `has-verification-status ⟹ ¬is-disabled`. **`is-disabled: true` means out of verification scope** — the atom is not compiled/checked by Verus in this build (see [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) — *not* "unspecified backlog". Verus only assigns a status to a function it actually processes, so a status implies in-scope.
+If an atom carries a `verification-status`, it is in verification scope: `has-verification-status ⟹ ¬untracked`. **`untracked: true` means out of verification scope** — the atom is not compiled/checked by Verus in this build (see [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) — *not* "unspecified backlog". Verus only assigns a status to a function it actually processes, so a status implies in-scope.
 
 Statuses and what each requires:
 
@@ -247,7 +247,7 @@ Statuses and what each requires:
 
 Scope, spec, and status align as:
 
-| atom | `is-disabled` | `verification-status` |
+| atom | `untracked` | `verification-status` |
 |---|---|---|
 | specified + proved | false | `verified` / `transitively-verified` |
 | specified, not proved | false | `unverified` / `failed` |
@@ -255,15 +255,15 @@ Scope, spec, and status align as:
 | **backlog** — compiled, non-external, unspecified | false | *(none)* |
 | out of scope — Verus: cfg-inactive / `#[verifier::external]` / external-crate stub / bodiless declaration / non-library target; Aeneas: untranslated / `@[out_of_scope]` translation | true | *(none)* |
 
-The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `is-disabled: false`, no status.
+The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `untracked: false`, no status.
 
-- **probe-verus** — `is-disabled` is derived from scope (P25); a status is attached only to in-scope atoms, so `has-verification-status ⟹ ¬is-disabled` holds by construction.
+- **probe-verus** — `untracked` is derived from scope (P25); a status is attached only to in-scope atoms, so `has-verification-status ⟹ ¬untracked` holds by construction.
 
-**Why it matters**: consumers must not read `is-disabled: true` as "unverified work to do" — it marks code deliberately outside the verification effort. The backlog is `is-disabled: false` with no status.
+**Why it matters**: consumers must not read `untracked: true` as "unverified work to do" — it marks code deliberately outside the verification effort. The backlog is `untracked: false` with no status.
 
 ## P25. Atoms not in the verification build are out of scope
 
-For Verus projects, an atom is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when Verus does not compile and check it in this build. Formally: `is-disabled: true ⟺ cfg-inactive ∨ #[verifier::external] ∨ external-crate stub ∨ bodiless-declaration ∨ non-library-target`:
+For Verus projects, an atom is **out of verification scope** — `untracked: true`, no `verification-status` — exactly when Verus does not compile and check it in this build. Formally: `untracked: true ⟺ cfg-inactive ∨ #[verifier::external] ∨ external-crate stub ∨ bodiless-declaration ∨ non-library-target`:
 
 1. **cfg-inactive** — the governing `#[cfg(...)]` predicate is false under the active configuration, so the item is not compiled.
 2. **`#[verifier::external]`** — Verus ignores the item entirely (no body check, no spec).
@@ -271,25 +271,25 @@ For Verus projects, an atom is **out of verification scope** — `is-disabled: t
 4. **bodiless declaration** — a function with no body (`has-body: false`), e.g. a trait-method signature. There is no implementation to verify; the implementations carry the proof.
 5. **non-library target** — code outside the verified library/binary target: a build script (`build.rs`), integration tests (`tests/`), `examples/`, or `benches/`. Verus verifies the crate's `src/` tree, not these. (`#[cfg(test)]` code *inside* `src/` is covered by cfg-inactivity, not this case.)
 
-`#[verifier::external_body]` is **not** out of scope: it declares a spec Verus trusts without checking the body, so it is `trusted` / `is-disabled: false` (P24). External-*ness* alone does not decide scope — whether the function carries a trusted spec does.
+`#[verifier::external_body]` is **not** out of scope: it declares a spec Verus trusts without checking the body, so it is `trusted` / `untracked: false` (P24). External-*ness* alone does not decide scope — whether the function carries a trusted spec does.
 
 - The **active configuration** = the analyzer/verifier cfg (`verus_keep_ghost = true` for Verus) + the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`) + target defaults. **Inclusion gates do not make an atom out of scope**: `verus_keep_ghost` and active features (e.g. `alloc`, `precomputed-tables`, `zeroize`, `digest`) gate code that *is* compiled and *must* be verified.
 - Only **item-gating** `#[cfg(...)]` counts. `#[cfg_attr(..., doc = …)]`, `cfg_attr(..., derive(…))`, `cfg_attr(..., allow(…))` conditionally add an attribute but still compile the item, so they are not scope gates.
-- **Conservative**: if a predicate references a flag/feature the tool cannot resolve, the atom is kept in scope (backlog) rather than marked disabled. The tool MUST NEVER silently drop a real backlog item by guessing a predicate is false.
+- **Conservative**: if a predicate references a flag/feature the tool cannot resolve, the atom is kept in scope (backlog) rather than marked untracked. The tool MUST NEVER silently drop a real backlog item by guessing a predicate is false.
 
-**Why it matters**: cfg-gatedness alone is *not* a scope signal — many cfg-gated `exec` functions are in scope and verified (compiled behind active gates like `verus_keep_ghost` and default features). Scope is decided by whether the predicate holds in the verification build, not by the mere presence of a gate. Marking out-of-build code (inactive features, non-selected backends, `not(verus_keep_ghost)` fallbacks, `#[cfg(test)]`) `is-disabled: true` keeps it out of the backlog, which is reserved for in-scope, compiled, unspecified functions.
+**Why it matters**: cfg-gatedness alone is *not* a scope signal — many cfg-gated `exec` functions are in scope and verified (compiled behind active gates like `verus_keep_ghost` and default features). Scope is decided by whether the predicate holds in the verification build, not by the mere presence of a gate. Marking out-of-build code (inactive features, non-selected backends, `not(verus_keep_ghost)` fallbacks, `#[cfg(test)]`) `untracked: true` keeps it out of the backlog, which is reserved for in-scope, compiled, unspecified functions.
 
-For Aeneas projects, a Rust function is **out of verification scope** — `is-disabled: true`, no `verification-status` — exactly when it is not compiled into the verified library in the Aeneas build, its Lean translation is explicitly annotated out of scope, or it is a function Aeneas structurally cannot translate that the project has curated out. Formally: `is-disabled: true ⟺ cfg-inactive ∨ non-library-target ∨ translation carries @[out_of_scope] ∨ config out-of-scope`:
+For Aeneas projects, a Rust function is **out of verification scope** — `untracked: true`, no `verification-status` — exactly when it is not compiled into the verified library in the Aeneas build, its Lean translation is explicitly annotated out of scope, or it is a function Aeneas structurally cannot translate that the project has curated out. Formally: `untracked: true ⟺ cfg-inactive ∨ non-library-target ∨ translation carries @[out_of_scope] ∨ config out-of-scope`:
 
 1. **cfg-inactive** — the function's combined item-gating `#[cfg(...)]` predicate (own gate plus enclosing `impl`/`mod`/`trait` gates, emitted by probe-rust as the `cfg` field) is false under the Aeneas build configuration, so the item is not compiled and cannot be translated or verified.
 2. **non-library target** — code outside the verified library/binary target: a build script (`build.rs`), integration tests (`tests/`), `examples/`, or `benches/`. Aeneas translates the crate's library tree, not these separate compilation targets. Detected on `code-path` components: a path with no `src` component whose components include `build.rs`/`tests`/`examples`/`benches` (the `src` guard keeps in-`src` modules merely named `tests` in scope). This mirrors the Verus non-library-target case above.
 3. **`@[out_of_scope]`** — the generated Lean translation carries an out-of-scope attribute, declaring "this translation will not be verified". This attribute is the explicit opt-out for functions that *are* translated.
 4. **config out-of-scope** — a curated glob list (`out-of-scope` in the project's `.verilib/aeneas.json`) matched against the Rust atom's `rust-qualified-name` / `display-name`. This is the opt-out for functions Aeneas *structurally does not translate* — e.g. `Debug`/`Display` `fmt`, `Zeroize` — which therefore never appear in `functions.json` and have no Lean def to carry `@[out_of_scope]`. It is a manual, reviewable editorial decision (like `is-hidden`/`is-ignored`), not an automatic heuristic: it must never be used to bulk-exclude genuine spec backlog.
 
-**Every extracted (compiled) Rust function is tracked backlog by default** (`is-disabled: false`, no `verification-status`), whether or not Aeneas produced a Lean translation for it. Absence from `functions.json` alone does **not** imply out-of-scope: a compiled function that Aeneas has not yet translated is unverified backlog, not out of scope. `functions.json` is the translation-matching bridge (which Lean def a Rust function maps to), not the scope oracle.
+**Every extracted (compiled) Rust function is tracked backlog by default** (`untracked: false`, no `verification-status`), whether or not Aeneas produced a Lean translation for it. Absence from `functions.json` alone does **not** imply out-of-scope: a compiled function that Aeneas has not yet translated is unverified backlog, not out of scope. `functions.json` is the translation-matching bridge (which Lean def a Rust function maps to), not the scope oracle.
 
 - The **active configuration** for the Aeneas build = the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`), overlaid by any `--features` / `--no-default-features` / `--all-features` in the project's `charon.cargo_args`. cfg evaluation mirrors the Verus rules above: only item-gating `#[cfg(...)]` counts (not cosmetic `#[cfg_attr(...)]`), and evaluation is **conservative** — a predicate referencing a flag/feature the tool cannot resolve keeps the atom in scope (backlog), never silently dropping a real backlog item.
-- As with Verus, a status-bearing atom is never disabled (P24): the cfg/`@[out_of_scope]` reclassification applies only to atoms that would otherwise be backlog.
+- As with Verus, a status-bearing atom is never untracked (P24): the cfg/`@[out_of_scope]` reclassification applies only to atoms that would otherwise be backlog.
 
 ## P26. Blueprint status is additive; machine `verification-status` stays authoritative
 

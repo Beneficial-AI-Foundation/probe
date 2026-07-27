@@ -23,12 +23,12 @@ where one implementation corresponds to several formal constructs.
 
 ## File Format
 
-A mappings file is a Schema 2.0 JSON document with the following envelope:
+A mappings file is a Schema 3.0 JSON document with the following envelope:
 
 ```json
 {
   "schema": "probe/mappings",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": {
     "name": "probe-aeneas",
     "version": "0.10.0",

@@ -246,7 +246,7 @@ pub fn cmd_project(
 
     let envelope = ProjectedEnvelope {
         schema: "probe/merged-atoms".to_string(),
-        schema_version: "2.0".to_string(),
+        schema_version: "3.0".to_string(),
         tool,
         inputs: provenance,
         timestamp,
@@ -561,7 +561,7 @@ mod tests {
         let path = dir.path().join("merged.json");
         let content = serde_json::json!({
             "schema": "probe/merged-atoms",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe", "version": "0.2.0", "command": "merge"},
             "inputs": [
                 {"schema": "probe-rust/extract", "source": {"repo": "r", "commit": "c", "language": "rust", "package": "pkg-a", "package-version": "1.0"}},
@@ -594,7 +594,7 @@ mod tests {
         let path = dir.path().join("single.json");
         let content = serde_json::json!({
             "schema": "probe-rust/extract",
-            "schema-version": "2.0",
+            "schema-version": "3.0",
             "tool": {"name": "probe-rust", "version": "1.0.0", "command": "extract"},
             "source": {"repo": "r", "commit": "c", "language": "rust", "package": "mypkg", "package-version": "1.0"},
             "timestamp": "2026-01-01T00:00:00Z",

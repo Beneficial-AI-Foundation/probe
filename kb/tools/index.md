@@ -23,7 +23,7 @@ Each file covers what is **unique** to that tool — what it does differently fr
 
 ## When to read which file
 
-- Modifying the merge algorithm or Schema 2.0 types → [probe-merge.md](probe-merge.md)
+- Modifying the merge algorithm or Schema 3.0 types → [probe-merge.md](probe-merge.md)
 - Working on graph projection from mappings or focus-set emission → [probe-project.md](probe-project.md)
 - Working on entrypoint analysis or verified-dependency partitioning → [probe-summary.md](probe-summary.md)
 - Fixing Rust extraction issues (SCIP, trait disambiguation) → [probe-rust.md](probe-rust.md)

@@ -176,7 +176,7 @@ use the names and semantics defined here. All are omitted when not applicable.
 | `primary-spec` | string | probe-verus, probe-lean | The primary specification for this atom. In probe-verus: concatenated requires+ensures text (empty string = analyzed but no spec). In probe-lean: code-name of the primary specification theorem. |
 | `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment: `"transitively-verified"` = all transitive deps verified/trusted; `"verified"` = locally verified only. Absent when verification was skipped. |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
-| `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | `false` if the function is in scope for analysis; `true` otherwise. Semantics vary by tool. |
+| `untracked` | bool | probe-verus, probe-rust, probe-aeneas | `false` if the function is in scope for analysis; `true` otherwise. Semantics vary by tool. |
 | `specs` | array of strings | probe-lean | Code-names of theorem atoms that reference this atom as a dependency (reverse spec edges). Absent when empty. |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data (see below). |
 
@@ -323,7 +323,7 @@ languages. The mappings file format is specified in
 ```json
 {
   "schema": "probe-verus/atoms",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": {
     "name": "probe-verus",
     "version": "2.0.0",

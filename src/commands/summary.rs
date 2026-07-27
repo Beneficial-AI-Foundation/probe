@@ -7,7 +7,7 @@ use crate::types::{load_atom_file, Atom, InputProvenance, Tool};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-/// Schema 2.0 envelope for summary output.
+/// Schema 3.0 envelope for summary output.
 #[derive(serde::Serialize)]
 struct SummaryEnvelope {
     schema: &'static str,
@@ -127,7 +127,7 @@ pub fn cmd_summary(input: &Path, output: Option<&Path>) {
 
     let envelope = SummaryEnvelope {
         schema: "probe/summary",
-        schema_version: "2.0",
+        schema_version: "3.0",
         tool: Tool {
             name: "probe".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),

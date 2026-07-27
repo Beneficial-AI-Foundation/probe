@@ -139,7 +139,7 @@ mod tests {
     fn make_envelope(data: BTreeMap<String, Atom>) -> AtomEnvelope {
         AtomEnvelope {
             schema: "probe-rust/extract".into(),
-            schema_version: "2.0".into(),
+            schema_version: "3.0".into(),
             tool: Tool {
                 name: "probe-rust".into(),
                 version: "1.0.0".into(),

@@ -104,7 +104,7 @@ A derived projection computed from raw probe output. Views live in `.verilib/vie
 
 ## scip-callgraph
 
-A web UI application (separate from the probe tools) that visualizes call graphs, verification status, and cross-language mappings. It consumes [Schema 2.0](schema.md) JSON files produced by probe tools. Located in `baif/scip-callgraph/`.
+A web UI application (separate from the probe tools) that visualizes call graphs, verification status, and cross-language mappings. It consumes [Schema 3.0](schema.md) JSON files produced by probe tools. Located in `baif/scip-callgraph/`.
 
 ## verilib-cli
 

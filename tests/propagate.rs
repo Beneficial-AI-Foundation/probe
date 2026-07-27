@@ -154,7 +154,7 @@ fn test_envelope_structure_preserved() {
         raw.get("schema").unwrap().as_str().unwrap(),
         "probe-verus/atoms"
     );
-    assert_eq!(raw.get("schema-version").unwrap().as_str().unwrap(), "2.0");
+    assert_eq!(raw.get("schema-version").unwrap().as_str().unwrap(), "3.0");
     assert!(
         raw.get("source").is_some(),
         "source field should be preserved"

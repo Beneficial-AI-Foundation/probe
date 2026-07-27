@@ -93,7 +93,7 @@ and render it appropriately based on `schema` and `source.language`.
 ```json
 {
   "schema": "probe-lean/atoms",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": {
     "name": "probe-lean",
     "version": "1.0.0",
@@ -264,7 +264,7 @@ When `probe merge` produces a merged file, the envelope differs from single-tool
 ```json
 {
   "schema": "probe/merged-atoms",
-  "schema-version": "2.0",
+  "schema-version": "3.0",
   "tool": {
     "name": "probe",
     "version": "0.1.0",
