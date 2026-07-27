@@ -100,7 +100,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 3. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
 4. Generate mappings via priority-ordered matching — the charon-`def_id` join (Strategy 0) then three name/location strategies (see [properties.md](properties.md#p12-mapping-strategy-priority))
 5. Call `probe::merge::merge_atom_maps` with mappings
-6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `is-disabled`, `is-relevant`, `is-public`)
+6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `untracked`, `is-relevant`, `is-public`)
 
 **Key insight**: probe-aeneas is a *[functor](glossary.md#functor) factory*. It produces the [cross-language mapping](glossary.md#cross-language-mapping); `probe merge` applies it. Domain knowledge about [Aeneas](glossary.md#aeneas) lives here; generic composition lives in probe. (The algebraic structure is detailed in `probe/docs/categorical-framework.md`, a non-normative design document.)
 

@@ -490,8 +490,8 @@ def _generate_non_lean_report(out, data, cfg, tool):
     def oos_reason(pid: str) -> str:
         atom = data[pid]
         # @kb: kb/engineering/properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope
-        if get_val(atom, "is-disabled") is True:
-            return "(disabled — out of scope)"
+        if get_val(atom, "untracked") is True:
+            return "(untracked — out of scope)"
         if get_val(atom, "translation-name") is None:
             return "(no translation — backlog)"
         return "(no verification status)"

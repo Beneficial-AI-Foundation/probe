@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Renamed the atom scope field `is-disabled` to `untracked` across the schema spec, KB (P16/P24/P25), docs, and extract-check golden fixtures (#42). Semantics are unchanged and polarity is preserved: `untracked: true` means out of verification scope, `untracked: false` means in scope (verified atoms plus the spec-less backlog). Producers (`probe-rust`, `probe-verus`, `probe-aeneas`) emit `untracked` accordingly.
+
 ### Added
 - Progress-tracking scheme in `docs/atoms_roles_statuses.md`: a snapshot summary partition (`tracked = unspecified + failed + in-progress + verified + trusted`) and a burn-up chart of cumulative frontiers (`tracked ≥ translated ≥ verified`, with `verified + trusted` as the completion frontier)
 - `scripts/count-colors.sh` now reports the progress summary/chart numbers, a `translated` count (non-disabled `exec` atoms with a `translation-name`, Aeneas-only), and a self-check warning when the `tracked ≥ translated ≥ verified` invariant is violated

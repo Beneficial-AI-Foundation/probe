@@ -149,7 +149,7 @@ Note: `"latex"` appears as a reserved `source.language` value in some envelope e
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification text (verus) or code-name of primary spec theorem (lean) |
 | `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment (P23): `"transitively-verified"` = all transitive deps verified/trusted; `"verified"` = locally verified only. |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
-| `is-disabled` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
+| `untracked` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
 | `specs` | array of strings | probe-lean | Theorem atoms referencing this atom |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data: `{code-name, location, line}` |
 
@@ -175,7 +175,7 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `translation-name` — corresponding name in other language
 - `translation-path` — file path of translation
 - `translation-text` — line range of translation
-- `is-disabled` — computed from functions.json
+- `untracked` — computed from functions.json
 - `is-public` — Rust item visibility: `true` if declared `pub` per Charon, `false` if private or visibility data unavailable (set on all Rust atoms; preserved from probe-rust when present, defaulted to `false` when absent)
 
 **probe-leanblueprint extensions** (on enriched Lean atoms and synthetic planned atoms):
@@ -320,7 +320,7 @@ This field is accommodated by `additionalProperties: true` on the merged envelop
 | Version | Tool | Changes |
 |---------|------|---------|
 | 2.0 | all | Initial Schema 2.0 envelope format |
-| 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
+| 2.1 | probe-rust | Added optional `rust-qualified-name`, `untracked` (originally named `is-disabled`), and `is-public` fields to atoms |
 
 ## Package versioning by language
 

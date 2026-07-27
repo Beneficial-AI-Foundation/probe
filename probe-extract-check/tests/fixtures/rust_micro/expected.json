@@ -19,7 +19,7 @@
       "code-text": { "lines-start": 6, "lines-end": 8 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/lib/capitalize()": {
       "display-name": "capitalize",
@@ -29,7 +29,7 @@
       "code-text": { "lines-start": 10, "lines-end": 16 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/math/add()": {
       "display-name": "add",
@@ -39,7 +39,7 @@
       "code-text": { "lines-start": 1, "lines-end": 3 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/math/double()": {
       "display-name": "double",
@@ -49,7 +49,7 @@
       "code-text": { "lines-start": 5, "lines-end": 7 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/math/is_even()": {
       "display-name": "is_even",
@@ -59,7 +59,7 @@
       "code-text": { "lines-start": 9, "lines-end": 15 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/math/is_odd()": {
       "display-name": "is_odd",
@@ -69,7 +69,7 @@
       "code-text": { "lines-start": 17, "lines-end": 23 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/math/standalone()": {
       "display-name": "standalone",
@@ -79,7 +79,7 @@
       "code-text": { "lines-start": 25, "lines-end": 27 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/shapes/&Circle#impl#[Circle][Area]area()": {
       "display-name": "area",
@@ -89,7 +89,7 @@
       "code-text": { "lines-start": 10, "lines-end": 13 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/shapes/&Rect#impl#[Rect][Area]area()": {
       "display-name": "area",
@@ -99,7 +99,7 @@
       "code-text": { "lines-start": 21, "lines-end": 24 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/shapes/total_area()": {
       "display-name": "total_area",
@@ -109,7 +109,7 @@
       "code-text": { "lines-start": 26, "lines-end": 28 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/shapes/apply_transform()": {
       "display-name": "apply_transform",
@@ -119,7 +119,7 @@
       "code-text": { "lines-start": 30, "lines-end": 32 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/shapes/scale_areas()": {
       "display-name": "scale_areas",
@@ -131,7 +131,7 @@
       "code-text": { "lines-start": 34, "lines-end": 37 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/macros/to_u64()": {
       "display-name": "to_u64",
@@ -141,7 +141,7 @@
       "code-text": { "lines-start": 9, "lines-end": 9 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/macros/to_i64()": {
       "display-name": "to_i64",
@@ -151,7 +151,7 @@
       "code-text": { "lines-start": 10, "lines-end": 10 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     },
     "probe:rust-micro/0.1.0/macros/convert_both()": {
       "display-name": "convert_both",
@@ -164,7 +164,7 @@
       "code-text": { "lines-start": 12, "lines-end": 14 },
       "kind": "exec",
       "language": "rust",
-      "is-disabled": false
+      "untracked": false
     }
   }
 }

@@ -227,7 +227,7 @@ with local source) or show them dimmed.
 
 ### Excluding disabled atoms
 
-When `is-disabled` is `true`, the atom is out of scope. These can be
+When `untracked` is `true`, the atom is out of scope. These can be
 hidden by default and shown on request.
 
 ## URL-driven state
