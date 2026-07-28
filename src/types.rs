@@ -50,6 +50,12 @@ pub struct Source {
     pub package: String,
     #[serde(rename = "package-version")]
     pub package_version: String,
+    /// Any additional `source` fields the producer emitted (e.g. `class`).
+    /// Captured with `#[serde(flatten)]` so they round-trip through consumers
+    /// that only model the fields above, instead of being silently dropped on
+    /// re-emit.
+    #[serde(flatten)]
+    pub extensions: BTreeMap<String, serde_json::Value>,
 }
 
 /// One entry in the merged envelope's `inputs` array.
@@ -242,6 +248,7 @@ pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
                     |s| s.to_string_lossy().to_string(),
                 ),
                 package_version: String::new(),
+                extensions: BTreeMap::new(),
             });
         vec![InputProvenance {
             schema: schema.to_string(),
@@ -358,4 +365,37 @@ pub fn load_generic_file(path: &std::path::Path) -> Result<GenericLoadResult, St
     let data: BTreeMap<String, serde_json::Value> = serde_json::from_value(meta.data_value)
         .map_err(|e| format!("{}: failed to deserialize data: {e}", path.display()))?;
     Ok((data, meta.provenance, meta.category))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Unknown `source` fields (e.g. `class`) must survive a deserialize →
+    /// serialize round-trip instead of being dropped.
+    #[test]
+    fn source_preserves_unknown_fields() {
+        let json = r#"{
+            "repo": "r", "commit": "c", "language": "lean",
+            "package": "p", "package-version": "1.0",
+            "class": "security-protocol"
+        }"#;
+        let source: Source = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            source.extensions.get("class").and_then(|v| v.as_str()),
+            Some("security-protocol"),
+            "unknown source field captured via flatten"
+        );
+        let out = serde_json::to_value(&source).unwrap();
+        assert_eq!(
+            out.get("class").and_then(|v| v.as_str()),
+            Some("security-protocol"),
+            "unknown source field re-emitted, not dropped"
+        );
+        // Known fields still serialize under their renamed keys.
+        assert_eq!(
+            out.get("package-version").and_then(|v| v.as_str()),
+            Some("1.0")
+        );
+    }
 }
