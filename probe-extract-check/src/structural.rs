@@ -151,6 +151,7 @@ mod tests {
                 language: "rust".into(),
                 package: "test".into(),
                 package_version: "0.1.0".into(),
+                extensions: Default::default(),
             },
             timestamp: "2026-01-01T00:00:00Z".into(),
             data,
