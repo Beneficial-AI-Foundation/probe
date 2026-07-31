@@ -5,25 +5,44 @@
   "description": "Schema 3.0 envelope for probe-* atom files (single-tool and merged).",
 
   "oneOf": [
-    { "$ref": "#/$defs/singleToolEnvelope" },
+    { "$ref": "#/$defs/singleToolAtomsEnvelope" },
+    { "$ref": "#/$defs/singleToolGenericEnvelope" },
     { "$ref": "#/$defs/mergedAtomsEnvelope" },
     { "$ref": "#/$defs/mergedGenericEnvelope" }
   ],
 
   "$defs": {
-    "singleToolEnvelope": {
+    "singleToolAtomsEnvelope": {
       "type": "object",
-      "description": "Envelope for a single-tool atom file (e.g., probe-verus/atoms, probe-lean/atoms).",
+      "description": "Envelope for a single-tool atoms-category file (e.g., probe-verus/atoms, probe-lean/extract). data is a dictionary of atoms.",
       "properties": {
         "schema": {
           "type": "string",
-          "pattern": "^probe-(rust|lean|verus|aeneas|leanblueprint)/(atoms|enriched-atoms|extract|proofs|specs)$"
+          "pattern": "^probe-(rust|lean|verus|aeneas|leanblueprint)/(atoms|enriched-atoms|extract)$"
         },
         "schema-version": { "$ref": "#/$defs/schemaVersion" },
         "tool": { "$ref": "#/$defs/tool" },
         "source": { "$ref": "#/$defs/source" },
         "timestamp": { "$ref": "#/$defs/timestamp" },
         "data": { "$ref": "#/$defs/atomDictionary" }
+      },
+      "required": ["schema", "schema-version", "tool", "source", "timestamp", "data"],
+      "additionalProperties": false
+    },
+
+    "singleToolGenericEnvelope": {
+      "type": "object",
+      "description": "Envelope for a single-tool non-atoms file (specs, proofs, stubs, verification-report). data values are not full atoms, so the dictionary is unconstrained.",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^probe-(rust|lean|verus|aeneas|leanblueprint)/(specs|proofs|stubs|verification-report)$"
+        },
+        "schema-version": { "$ref": "#/$defs/schemaVersion" },
+        "tool": { "$ref": "#/$defs/tool" },
+        "source": { "$ref": "#/$defs/source" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "data": { "$ref": "#/$defs/genericDictionary" }
       },
       "required": ["schema", "schema-version", "tool", "source", "timestamp", "data"],
       "additionalProperties": false
@@ -100,11 +119,7 @@
           "minItems": 2
         },
         "timestamp": { "$ref": "#/$defs/timestamp" },
-        "data": {
-          "type": "object",
-          "description": "Dictionary keyed by code-name URI. Values are spec or proof entries.",
-          "additionalProperties": true
-        }
+        "data": { "$ref": "#/$defs/genericDictionary" }
       },
       "required": ["schema", "schema-version", "tool", "inputs", "timestamp", "data"],
       "additionalProperties": false
@@ -177,6 +192,12 @@
       "type": "object",
       "description": "Dictionary keyed by code-name URI. Each value is an atom.",
       "additionalProperties": { "$ref": "#/$defs/atom" }
+    },
+
+    "genericDictionary": {
+      "type": "object",
+      "description": "Dictionary keyed by code-name URI for non-atoms categories (specs, proofs, stubs, verification-report). Values are tool-specific entries, not full atoms.",
+      "additionalProperties": true
     },
 
     "atom": {
