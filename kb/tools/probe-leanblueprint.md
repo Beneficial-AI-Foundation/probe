@@ -29,6 +29,7 @@ two-axis `probe-leanblueprint/summary` sidecar. A direct analogue of
 | [README](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/README.md) | What it is, supported blueprint ecosystems and projects, quick start |
 | [docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/SCHEMA.md) | **Normative** output semantics: status axes, node classification, every `blueprint-*` field, both output envelopes |
 | [docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/USAGE.md) | Install (incl. the probe-lean auto-install), flags, output formats, the `blueprint_stats.py` reporter |
+| [docs/architecture.md](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/architecture.md) | Internal mechanics: extract pipeline, single-build guarantee, the atom↔blueprint join algorithm, source-file map |
 
 ## Hub contracts it must satisfy
 
