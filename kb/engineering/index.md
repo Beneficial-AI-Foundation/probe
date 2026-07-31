@@ -16,7 +16,6 @@ How the probe ecosystem is built. Start with [architecture.md](architecture.md) 
 | [schema.md](schema.md) | Schema 3.0 interchange format: envelope, atom fields, code-name URIs, merged output |
 | [properties.md](properties.md) | Invariants and correctness constraints that must hold across all tools |
 | [glossary.md](glossary.md) | Precise definitions of domain terms |
-| [lean-verification-landscape.md](lean-verification-landscape.md) | How specs surface in Lean verification projects; discovery strategies for probe-lean |
 
 ## Key relationships
 

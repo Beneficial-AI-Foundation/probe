@@ -98,7 +98,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 1. If positional project path given, parse `aeneas-config.yml` to resolve Rust crate (`crate.dir`) and Lean project (project root); otherwise use explicit `--rust-project` / `--lean-project` flags
 2. Auto-run probe-rust and probe-lean in parallel (scoped threads)
 3. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
-4. Generate mappings via priority-ordered matching — the charon-`def_id` join (Strategy 0) then three name/location strategies (see [properties.md](properties.md#p12-mapping-strategy-priority))
+4. Generate mappings via priority-ordered matching — the charon-`def_id` join (Strategy 0) then three name/location strategies (owned by probe-aeneas; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo))
 5. Call `probe::merge::merge_atom_maps` with mappings
 6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `untracked`, `is-relevant`, `is-public`)
 
@@ -119,7 +119,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 4. Enrich matched atoms with `blueprint-*` fields; synthesize planned atoms for nodes with no Lean binding; flag `blueprint-status-mismatch` on proof-axis over-claims
 5. Emit a `probe-leanblueprint/extract` envelope + a node-indexed `probe-leanblueprint/summary` sidecar (two-axis progress counts)
 
-**Key insight**: blueprint status is *additive* — probe-lean's machine `verification-status` stays authoritative on the proof axis (see [properties.md P26](properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative)). probe-lean stays blueprint-unaware; blueprint is a complementary, doc-authoritative layer.
+**Key insight**: blueprint status is *additive* — probe-lean's machine `verification-status` stays authoritative on the proof axis (owned by probe-leanblueprint; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo)). probe-lean stays blueprint-unaware; blueprint is a complementary, doc-authoritative layer.
 
 **Subcommands**: `extract`
 

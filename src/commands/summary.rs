@@ -1,7 +1,7 @@
 // @kb: kb/engineering/properties.md#p1-envelope-completeness
 // @kb: kb/engineering/properties.md#p3-stub-detection-is-structural
 // @kb: kb/engineering/properties.md#p14-deterministic-output
-// @kb: kb/engineering/properties.md#p20-language-is-derived-from-kind-not-lexical-scope
+// @kb: kb/engineering/schema.md#language-assignment-for-verus-atoms
 
 use crate::types::{load_atom_file, Atom, InputProvenance, Tool};
 use std::collections::{BTreeMap, BTreeSet};

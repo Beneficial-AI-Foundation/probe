@@ -1,170 +1,55 @@
 ---
 title: "Tool: probe-lean"
-last-updated: 2026-04-07
+last-updated: 2026-07-31
 status: draft
 ---
 
 # probe-lean
 
-**Directory**: `baif/probe-lean/`
+**Directory**: `baif/probe-lean/` · **Repo**: <https://github.com/Beneficial-AI-Foundation/probe-lean>
 **Role**: Extract dependency graphs and verification status from Lean 4 projects.
-**Language**: Written entirely in Lean 4 (not Rust — primary reason for repo separation).
-**Subcommands**: `extract`, `viewify`
+Emits `probe-lean/extract` plus a `probe-lean/viewify` view.
+**Language**: Written entirely in Lean 4 (not Rust — the primary reason for repo
+separation, [ADR-001](../decisions/001-separate-repos.md)).
+**Subcommands**: `extract`, `check-axioms`, `viewify`
 
-## Extract pipeline
+> **Catalog stub, not a mechanics reference** ([ADR-005](../decisions/005-doc-ownership-boundary.md)).
+> The tool's mechanics — the extract pipeline, lake build / Mathlib cache, sorry
+> detection, declaration filtering, the spec-precedence chain, co-importability,
+> every field, the CLI, toolchain matching, and security-protocol classification
+> — are documented normatively in the probe's own repo. This page carries its
+> role, the hub contracts it must satisfy, and where to read the rest.
 
-The `extract` command is a unified pipeline:
+## Normative docs (in the probe-lean repo)
 
-```
-lakefile.toml → lake build → walk environment → atomize → sorry detection → specs → envelope
-```
+| Doc | Covers |
+|-----|--------|
+| [README](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/README.md) | What it is, prerequisites, toolchain matching, quick start |
+| [docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md) | **Normative** output semantics: every field, sorry detection, trust base, spec-precedence chain |
+| [docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/USAGE.md) | Full CLI, lake build + Mathlib cache, declaration filtering config |
+| [docs/classification-security-protocol.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/classification-security-protocol.md) | Security-protocol `classification` field |
 
-Steps (in `ProbeLean/Extract.lean`):
-1. **Discover libraries** — parse `lakefile.toml` for library names
-2. **Build target** — run `lake build <lib1> <lib2> ...`
-3. **Walk environment** — introspect Lean environment for declarations (`ProbeLean/Analysis.lean`)
-4. **Atomize** — convert declarations to [atoms](../engineering/glossary.md#atom) with filtering (`ProbeLean/Atomize.lean`)
-5. **Sorry detection** — parse build output for sorry warnings (`ProbeLean/VerifyInternal.lean`)
-6. **Compute specs** — reverse dependency edges: which theorems depend on this definition
-7. **Wrap in envelope** — Schema 3.0 output to `.verilib/probes/lean_<pkg>_<ver>.json`
+## Hub contracts it must satisfy
 
-## Key challenges
+- Emits the shared interchange envelope
+  ([schema.md](../engineering/schema.md),
+  [atom-envelope.schema.json](../../schemas/atom-envelope.schema.json)).
+- `probe-lean/extract` is an **Atoms**-category file (`*/extract`); `probe-lean/viewify`
+  is a view and is never merged —
+  [P17](../engineering/properties.md#p17-schema-category-consistency).
+- `dependencies` = deduplicated union of `type-dependencies` + `term-dependencies`
+  ([P15](../engineering/properties.md#p15-dependency-completeness)).
+- `verification-status` / `trusted-reason` use the shared vocabulary
+  ([P16](../engineering/properties.md#p16-verification-status-mapping),
+  [P22](../engineering/properties.md#p22-cross-tool-trust-reason-vocabulary)).
+- Deterministic output
+  ([P14](../engineering/properties.md#p14-deterministic-output)).
+- Lean-specific and `classification` extension fields round-trip through
+  merge/project unchanged
+  ([P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)).
 
-### Written in Lean 4
+## Its own invariant
 
-probe-lean is a Lean program that imports and analyzes other Lean programs. This gives it direct access to the Lean environment (types, declarations, dependencies) but means:
-- Cannot be a Cargo workspace member
-- Requires Lean 4 toolchain (elan, lake)
-- Distributed as `.olean` files — version-specific, must match target project toolchain
-- Build performance sensitive: never >30 monadic binds in single `do` block
-
-### Two-phase build
-
-Lean projects must be built before environment walking works. probe-lean:
-1. Parses `lakefile.toml` to discover library names
-2. For Mathlib-dependent projects, auto-downloads the pre-built `.olean` cache via `lake exe cache get` if not already present (falls back gracefully on failure)
-3. Runs `lake build <libs>`
-4. Only then can it inspect the environment
-
-Building is automatically skipped when the build cache is up-to-date.
-
-### Type vs term dependencies
-
-Lean distinguishes two kinds of dependencies:
-- **Type dependencies** — from a declaration's type signature (analogous to requires/ensures in Verus)
-- **Term dependencies** — from the body/proof term (analogous to body-dependencies in Verus)
-
-The `dependencies` field is the deduplicated union of both. See [P15](../engineering/properties.md#p15-dependency-completeness).
-
-### Sorry detection
-
-A Lean definition with `sorry` is unverified (it uses an axiom that makes the proof trivially true). probe-lean detects sorries by parsing build output warnings, not by inspecting the term structure.
-
-Verification status mapping:
-| Condition | `verification-status` | `trusted-reason` |
-|-----------|----------------------|-----------------|
-| `kind == "axiom"` | `"trusted"` | `"axiom"` |
-| `code-path` ends with `External.lean` | `"trusted"` | `"external"` |
-| No sorry | `"verified"` | absent |
-| Has sorry | `"unverified"` | absent |
-| Build failure | `"failed"` | absent |
-
-**Precedence**: `"trusted"` overrides sorry-based status. When both conditions apply (axiom in `*External.lean`), `"axiom"` takes precedence as the more specific classification. The `trusted-reason` field enables automated trust-base classification without inspecting `kind` or `code-path`.
-
-### Declaration filtering
-
-Lean environments contain many auto-generated declarations (`.casesOn`, `.rec`, `.sizeOf_spec`, etc.). `ProbeLean/Analysis.lean` filters these via:
-- `autoGeneratedSuffixes` — known suffixes to exclude
-- `isInternalName` — checks for underscore prefix, internal markers
-- `isProjectDecl` — checks if declaration belongs to the current project (not imported)
-
-Additional filtering via `.verilib/probes/config.json`:
-- `is-hidden` — manually hidden declarations
-- `is-ignored` — manually ignored declarations
-- `extraction-artifact-suffixes` — Aeneas extraction artifact suffixes
-- `relevant-crate` — filter by Rust source crate (for Aeneas projects)
-
-### Specs as reverse dependencies
-
-Unlike probe-verus where specs are extracted from requires/ensures clauses, in Lean specs are identified by reverse dependency: a theorem that depends on a definition is a spec for that definition.
-
-- `specs` field: array of theorem code-names that depend on this atom
-- `primary-spec`: set by `@[primary_spec]` attribute or inferred from `<name>_spec` naming convention
-- Whether an atom is "specified" is inferred from `specs` being non-empty — no separate `specified` field. See [P18](../engineering/properties.md#p18-lean-specified-is-derived-not-stored).
-
-## Subcommands
-
-### `extract` (primary)
-Unified pipeline producing atoms with verification status and specs.
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output` | `.verilib/probes/lean_<pkg>_<ver>.json` | Output path |
-| `--module` | all | Restrict to specific module |
-| `--skip-verify` | false | Skip sorry detection |
-| `--from-file` | none | Read atoms from file instead of environment |
-
-### `viewify`
-Filters extract output for web UI consumption. Applies filtering (not hidden, not extraction artifact, is relevant, code-path ends with `Funs.lean`) and produces molecules.
-
-Output goes to `.verilib/views/`.
-
-## Key source files
-
-| File | Purpose |
-|------|---------|
-| `ProbeLean/Extract.lean` | Pipeline orchestration |
-| `ProbeLean/Analysis.lean` | Environment walking, declaration filtering |
-| `ProbeLean/Atomize.lean` | Declaration → Atom conversion |
-| `ProbeLean/VerifyInternal.lean` | Sorry warning parsing |
-| `ProbeLean/Types.lean` | Data structures, JSON serialization |
-| `ProbeLean/View.lean` | Viewify command (molecule generation) |
-| `ProbeLean/Metadata.lean` | Git + lakefile metadata |
-| `ProbeLean/Loader.lean` | Environment loading |
-
-## External tool dependencies
-
-| Tool | Required | Auto-install | Notes |
-|------|----------|-------------|-------|
-| Lean 4 (elan) | yes | no | `elan` toolchain manager |
-| lake | yes | no | Lean build tool (comes with elan) |
-
-## Lean-specific atom fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `kind` | string | `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot`, `projection` |
-| `type-dependencies` | array | From declaration's type signature |
-| `term-dependencies` | array | From body/proof term |
-| `is-in-package` | bool | Always `true` for atoms emitted by probe-lean |
-| `is-relevant` | bool | Whether relevant for analysis (config-based) |
-| `is-hidden` | bool | From config `is-hidden` list |
-| `is-extraction-artifact` | bool | Name ends with configured suffix |
-| `is-ignored` | bool | From config `is-ignored` list |
-| `attributes` | array | Lean tag attributes (e.g. `["primary_spec"]`). Absent when empty. |
-| `rust-source` | string/null | Rust source path from Aeneas docstring |
-| `specs` | array | Theorem code-names depending on this. Absent when empty. |
-| `primary-spec` | string | Primary spec theorem code-name. Absent when none. |
-| `verification-status` | string | `"verified"`, `"unverified"`, `"failed"`, `"trusted"`. Absent when skipped. |
-| `trusted-reason` | string | `"axiom"` or `"external"`. Present only when `verification-status` is `"trusted"`. |
-
-## Determinism (P14)
-
-probe-lean `extract` must produce byte-identical JSON (ignoring `timestamp`) for the same project, commit, and toolchain. See [P14](../engineering/properties.md#p14-deterministic-output) for the full requirement.
-
-**Current status:** Deterministic since v0.4.3. Violations C9–C12 resolved: declarations sorted by name, dependency/specs/attributes arrays sorted lexicographically, sorries sorted by line number, modules sorted before import, JSON keys deterministic via Lean's `RBNode` ordering. Verified by running extract twice on the same project and confirming byte-identical output (ignoring `timestamp`).
-
-## Build performance rules
-
-From CLAUDE.md — these are enforced constraints:
-- Never >30 monadic binds in single `do` block
-- `Tests/Main.lean` uses one function per test section
-- `main` must stay flat
-- Never add `set_option maxRecDepth`
-
-## Spec-driven development workflow
-
-probe-lean uses a spec-driven workflow (defined in its CLAUDE.md):
-- Specs live in `specs/active/` (template at `specs/TEMPLATE.md`)
-- Before implementing: check specs, read completely, create plan, wait for approval
-- Completed specs move to `specs/done/`
+Lean atoms have no `specified` field — whether an atom has specs is inferred from
+`specs` being non-empty. Normative in the probe's own
+[docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md).

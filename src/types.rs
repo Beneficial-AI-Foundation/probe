@@ -297,7 +297,6 @@ pub type GenericLoadResult = (
 // ---------------------------------------------------------------------------
 
 // @kb: kb/engineering/schema.md#mappings-file-format
-// @kb: kb/engineering/properties.md#p11-mapping-generation-is-1-to-1-probe-aeneas
 /// A single entry in a cross-language mappings file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mapping {

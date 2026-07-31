@@ -52,7 +52,7 @@ A bidirectional mapping between [code-names](#code-name) across languages (e.g. 
 
 Not to be confused with atom extension fields `translation-name`, `translation-path`, `translation-text`, which describe Aeneas Lean transpilation metadata on individual atoms — those retain "translation" because they refer to source-to-source transpilation, not the generic linking concept.
 
-See [properties.md](properties.md#p11-mapping-generation-is-1-to-1-probe-aeneas).
+Mapping-generation invariants are owned by probe-aeneas — see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo).
 
 ## SCIP
 
@@ -64,7 +64,7 @@ An Aeneas-generated file mapping Rust function names to their Lean translations.
 
 ## kind
 
-A classification of what an [atom](#atom) represents in its language. Rust: `exec`, `proof`, `spec`. Lean: `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot`. Determines how the atom is treated in analysis and visualization. For probe-verus output, `kind` also determines the `language` field: `exec` → `"rust"`, `proof`/`spec` → `"verus"` (see [P20](properties.md#p20-language-is-derived-from-kind-not-lexical-scope)).
+A classification of what an [atom](#atom) represents in its language. Rust: `exec`, `proof`, `spec`. Lean: `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot`. Determines how the atom is treated in analysis and visualization. For probe-verus output, `kind` also determines the `language` field: `exec` → `"rust"`, `proof`/`spec` → `"verus"` (see [schema.md § Language assignment for Verus atoms](schema.md#language-assignment-for-verus-atoms)).
 
 ## extensions
 
@@ -173,4 +173,4 @@ A human-authored roadmap for a Lean formalization project that annotates each re
 
 ## two-axis status
 
-The blueprint progress model, tracked on two independent axes: the **statement axis** (is the *statement* formalized in Lean? `none`/`blocked`/`ready`/`formalized`) and the **proof axis** (is the *proof* complete and sorry-free? `none`/`ready`/`proved`/`fully-proved`). Normalized canonically in `probe-leanblueprint/src/model.rs`. The proof axis is additive over probe-lean's machine `verification-status`, which stays authoritative (see [properties.md P26](properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative)).
+The blueprint progress model, tracked on two independent axes: the **statement axis** (is the *statement* formalized in Lean? `none`/`blocked`/`ready`/`formalized`) and the **proof axis** (is the *proof* complete and sorry-free? `none`/`ready`/`proved`/`fully-proved`). Normalized canonically in `probe-leanblueprint/src/model.rs`. The proof axis is additive over probe-lean's machine `verification-status`, which stays authoritative (owned by probe-leanblueprint; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo)).
