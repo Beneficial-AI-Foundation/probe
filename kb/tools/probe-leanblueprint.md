@@ -14,13 +14,11 @@ two-axis `probe-leanblueprint/summary` sidecar. A direct analogue of
 [probe-aeneas](probe-aeneas.md).
 **Subcommand**: `extract`
 
-> **This is a catalog stub, not a mechanics reference** ([ADR-005](../decisions/005-doc-ownership-boundary.md)).
-> The tool's mechanics — the Verso/Massot adapters, join/collision rules, the
-> two-axis status vocabulary, every `blueprint-*` field, the CLI, and the
-> probe-lean auto-install — are documented **normatively in the probe's own
-> repo**, updated in the same PR as the code. This page carries only what the
-> ecosystem needs to place the tool: its role, the hub contracts it must satisfy,
-> and where to read the rest.
+> **Catalog stub, not a mechanics reference** ([ADR-005](../decisions/005-doc-ownership-boundary.md)).
+> The tool's mechanics — Verso/Massot adapters, join/collision rules, the two-axis
+> status vocabulary, every `blueprint-*` field, the CLI, and the probe-lean
+> auto-install — are documented normatively in the probe's own repo. This page
+> carries its role, the hub contracts it must satisfy, and where to read the rest.
 
 ## Normative docs (in the probe-leanblueprint repo)
 

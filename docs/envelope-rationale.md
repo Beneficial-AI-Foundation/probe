@@ -118,8 +118,7 @@ and render it appropriately based on `schema` and `source.language`.
 Identifies the producing tool and data type. Format: `<tool>/<type>`.
 
 The registered `schema` values (and which are legacy) are listed in
-[SCHEMA.md § Registered `schema` Values](SCHEMA.md#registered-schema-values). They
-are not duplicated here, to avoid drift.
+[SCHEMA.md § Registered `schema` Values](SCHEMA.md#registered-schema-values).
 
 #### `schema-version` (string, required)
 

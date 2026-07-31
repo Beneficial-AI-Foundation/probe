@@ -214,8 +214,7 @@ Tools may add additional language-specific fields. Rules:
 3. Consumers that do not recognize an extension field must ignore it.
 4. Extension fields should be omitted (not set to null) when not applicable.
 
-Each tool's extension fields are specified in that tool's own `docs/SCHEMA.md`.
-To keep a single source of truth and avoid drift, they are not re-listed here:
+Each tool's extension fields are specified in that tool's own `docs/SCHEMA.md`:
 
 - probe-rust — [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/SCHEMA.md) (e.g. `rust-qualified-name`, `is-public`, `charon-def-id`, `charon-version`)
 - probe-verus — [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md) (e.g. `requires-dependencies`, `ensures-dependencies`, `body-dependencies`)

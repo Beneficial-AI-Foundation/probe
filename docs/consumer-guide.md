@@ -111,8 +111,7 @@ and tool-specific extension fields (e.g. probe-leanblueprint's `blueprint-*`
 progress fields). The authoritative list — field names, types, value sets, and
 which tool populates each — is
 [SCHEMA.md § Common Optional Fields](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md#common-optional-fields),
-with per-tool detail in each tool's own `SCHEMA.md`. It is not duplicated here, to
-avoid drift.
+with per-tool detail in each tool's own `SCHEMA.md`.
 
 ### Kind values
 
