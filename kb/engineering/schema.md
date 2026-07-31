@@ -320,7 +320,7 @@ This field is accommodated by `additionalProperties: true` on the merged envelop
 |---------|------|---------|
 | 2.0 | all | Initial Schema 2.0 envelope format |
 | 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
-| 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0` (minors had drifted: probe-rust up to `2.4`, probe-aeneas `2.1`, others `2.0`). |
+| 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0`. |
 
 ## Package versioning by language
 
