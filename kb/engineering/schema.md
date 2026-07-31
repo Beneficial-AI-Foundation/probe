@@ -44,7 +44,7 @@ Every probe output file is wrapped in a metadata envelope:
 | `tool.command` | string | yes | Which subcommand produced this file (e.g. `"extract"`, `"atomize"`, `"merge"`) |
 | `source.repo` | string | yes | Git remote URL |
 | `source.commit` | string | yes | Full git commit hash |
-| `source.language` | string | yes | `"rust"`, `"lean"`, `"latex"` |
+| `source.language` | string | yes | `"rust"`, `"lean"` |
 | `source.package` | string | yes | Crate/project name |
 | `source.package-version` | string | yes | Version identifier (semver for Rust; commit hash for Lean if no version) |
 | `timestamp` | string | yes | ISO 8601 |
@@ -117,7 +117,7 @@ When `schema` identifies an atoms-category file, `data` is a dictionary keyed by
 | `code-path` | string | Relative path to source file from project root. Empty string for [stubs](glossary.md#stub). |
 | `code-text` | object | `{"lines-start": N, "lines-end": N}` (1-based, inclusive). `{0, 0}` for stubs. |
 | `kind` | string | Language-specific classification (see below) |
-| `language` | string | `"rust"`, `"verus"`, `"lean"`, `"blueprint"`, `"latex"` |
+| `language` | string | `"rust"`, `"verus"`, `"lean"`, `"blueprint"` |
 
 ### Kind values
 
@@ -139,8 +139,6 @@ For probe-verus output, `language` is determined by `kind`, not by lexical scope
 | `spec` | `"verus"` | Spec functions are Verus-only constructs (erased at compilation) |
 
 See [P20](properties.md#p20-language-is-derived-from-kind-not-lexical-scope).
-
-Note: `"latex"` appears as a reserved `source.language` value in some envelope examples. No probe tool currently handles LaTeX — this is a placeholder for potential future support. Do not implement LaTeX handling without a dedicated tool and KB entry.
 
 ### Common optional fields
 
@@ -329,4 +327,3 @@ This field is accommodated by `additionalProperties: true` on the merged envelop
 |----------|----------|---------|
 | Rust (Cargo) | Use crate's semver version | `"4.1.3"` |
 | Lean (Lake) | `version` from `lakefile.toml` if present; else short git commit hash | `"0.1.0"` or `"a1b2c3d"` |
-| LaTeX | Short git commit hash | `"a1b2c3d"` |

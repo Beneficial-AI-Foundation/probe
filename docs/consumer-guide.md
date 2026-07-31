@@ -3,16 +3,17 @@
 A reference for consuming the JSON outputs produced by the probe tool
 family.
 
-## The four probes
+## The probe tools
 
 | Tool | Language | What it extracts | Repo |
 |------|----------|-----------------|------|
 | **probe-rust** | Rust | Call graph atoms from SCIP index | [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) |
 | **probe-lean** | Lean 4 | Call graph atoms + sorry detection + specs | [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) |
+| **probe-leanblueprint** | Lean 4 | probe-lean atoms enriched with blueprint progress (statement/proof status) | [probe-leanblueprint](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) |
 | **probe-verus** | Rust/Verus | Call graph + specs + verification status | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) |
 | **probe-aeneas** | Rust + Lean | Cross-language merged graph (Aeneas projects) | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) |
 
-All four produce JSON files conforming to the Schema 3.0 envelope format
+They all produce JSON files conforming to the Schema 3.0 envelope format
 defined in [`probe/docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md).
 
 ## Running extract
@@ -20,11 +21,17 @@ defined in [`probe/docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/
 The typical command for each tool is:
 
 ```bash
-probe-rust  extract <project_path>
-probe-lean  extract <project_path>
-probe-verus extract <project_path>
-probe-aeneas extract <project_path>
+probe-rust          extract <project_path>
+probe-lean          extract <project_path>
+probe-leanblueprint extract <project_path>
+probe-verus         extract <project_path>
+probe-aeneas        extract <project_path>
 ```
+
+For probe-leanblueprint, the Lean project must ship a blueprint — a Verso
+`versoBlueprint` dependency or a Massot `blueprint/src/web.tex` tree; the Massot
+path additionally needs the Python emitter dependencies. It runs `probe-lean
+extract` for the atom base and enriches it with blueprint progress.
 
 For probe-aeneas, the project path must be an Aeneas project directory
 containing `aeneas-config.yml`. The tool reads `crate.dir` from the
@@ -96,25 +103,22 @@ atom:
 | `code-path` | string | Relative file path (empty for stubs); can be used to reconstruct the project's folder structure |
 | `code-text` | object | `{ "lines-start": N, "lines-end": N }` (both 0 for stubs) |
 | `kind` | string | Declaration kind (language-specific) |
-| `language` | string | `"rust"`, `"lean"`, or `"latex"` |
+| `language` | string | Source language of the atom; see [SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md#language-string) for the value set |
 
-**Common optional fields** (see [SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md)
-for full details):
+**Common optional fields.** Beyond the core fields, atoms may carry
+`primary-spec`, `verification-status`, `trusted-reason`, `untracked`, `specs`,
+and tool-specific extension fields (e.g. probe-leanblueprint's `blueprint-*`
+progress fields). The authoritative list — field names, types, value sets, and
+which tool populates each — is
+[SCHEMA.md § Common Optional Fields](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md#common-optional-fields),
+with per-tool detail in each tool's own `SCHEMA.md`. It is not duplicated here, to
+avoid drift.
 
-| Field | Type | Tools | Description |
-|-------|------|-------|-------------|
-| `primary-spec` | string | probe-verus, probe-lean | Primary specification (text in Verus, code-name in Lean) |
-| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"` |
-| `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"` (e.g., `"axiom"`, `"external-body"`) |
-| `untracked` | bool | probe-verus, probe-rust, probe-aeneas | Whether the function is out of scope |
-| `specs` | array | probe-lean | Code-names of theorems that spec this atom |
+### Kind values
 
-### Kind values by language
-
-| Language | Values |
-|----------|--------|
-| Rust | `exec`, `proof`, `spec` |
-| Lean | `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque`, `quot` |
+`kind` values are language-specific. See
+[SCHEMA.md § Kind Values](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md#kind-values)
+for the full set per language.
 
 ### Stubs
 
@@ -133,6 +137,10 @@ project.
 | [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) | [`examples/lean_Curve25519Dalek_0.1.0.json`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/examples/lean_Curve25519Dalek_0.1.0.json) | `probe-lean/extract` |
 | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | [`examples/verus_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/examples/verus_curve25519-dalek_4.1.3.json) | `probe-verus/extract` |
 | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) | [`examples/aeneas_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/examples/aeneas_curve25519-dalek_4.1.3.json) | `probe-aeneas/extract` |
+
+probe-leanblueprint has no standalone example JSON — it enriches a `probe-lean`
+extract. Its [`examples/`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/tree/main/examples)
+directory holds runnable blueprint projects instead.
 
 ## Documentation
 
@@ -174,6 +182,18 @@ real_atoms = {
 }
 ```
 
+## Progress and summaries
+
+Extract files hold the full call graph. For a roll-up of verification progress,
+read the summary sidecars. These are analysis outputs and are never merged back
+into atom files:
+
+- `probe summary <atoms>` partitions the verified atoms of a merged file into
+  entrypoints, functions, and lemmas (`probe/summary`).
+- `probe-leanblueprint extract` writes a two-axis blueprint progress sidecar
+  next to its enriched atoms, counting statement and proof status per blueprint
+  node (`probe-leanblueprint/summary`).
+
 ## Validating extract output
 
 The [`probe-extract-check`](https://github.com/Beneficial-AI-Foundation/probe/tree/main/probe-extract-check)
@@ -197,4 +217,4 @@ for the test guide.
 ## Installation
 
 For installation instructions, see the README in each probe's
-repository listed in [The four probes](#the-four-probes) above.
+repository listed in [The probe tools](#the-probe-tools) above.

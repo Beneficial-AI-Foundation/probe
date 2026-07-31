@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Generate a markdown verification report from a probe extract JSON file.
 
-Works with probe-verus, probe-aeneas, and probe-lean extract JSON.
+Works with probe-verus, probe-aeneas, probe-lean, and probe-leanblueprint extract
+JSON. A probe-leanblueprint extract is summarized as a Lean verification report;
+its two-axis blueprint *progress* is emitted as a separate
+`probe-leanblueprint/summary` sidecar by `probe-leanblueprint extract`, not
+reproduced here.
 
 Usage:
     python scripts/summarize_extract.py <input> [OPTIONS]
@@ -122,6 +126,11 @@ TOOL_CONFIG = {
 def detect_tool(extract: dict) -> str:
     schema = extract.get("schema", "")
     tool_name = extract.get("tool", {}).get("name", "")
+    # probe-leanblueprint enriches a probe-lean atom base, so its extract is
+    # summarized with the Lean report path. Checked first because "lean" is a
+    # substring of "leanblueprint".
+    if "leanblueprint" in schema or "leanblueprint" in tool_name:
+        return "lean"
     for key in ("aeneas", "verus", "lean", "rust"):
         if key in schema or key in tool_name:
             return key

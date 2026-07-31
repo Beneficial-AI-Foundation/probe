@@ -251,6 +251,73 @@ fn single_tool_aeneas_extract_envelope_is_valid() {
 }
 
 #[test]
+fn single_tool_specs_envelope_is_valid() {
+    // Regression: specs/proofs data values are not full atoms (P7). A single-tool
+    // specs envelope with entries like `{ "specified": true }` must validate.
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+
+    let doc = json!({
+        "schema": "probe-verus/specs",
+        "schema-version": "3.0",
+        "tool": { "name": "probe-verus", "version": "2.0.0", "command": "atomize" },
+        "source": {
+            "repo": "https://github.com/org/project",
+            "commit": "abc123",
+            "language": "rust",
+            "package": "my-crate",
+            "package-version": "1.0.0"
+        },
+        "timestamp": "2026-03-05T14:30:00Z",
+        "data": {
+            "probe:my-crate/1.0.0/mod/f()": { "specified": true, "has_requires": true, "has_ensures": false }
+        }
+    });
+
+    let result = validator.validate(&doc);
+    assert!(
+        result.is_ok(),
+        "probe-verus/specs envelope should validate: {result:?}"
+    );
+}
+
+#[test]
+fn single_tool_proofs_stubs_and_report_envelopes_are_valid() {
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+    let source = json!({
+        "repo": "https://github.com/org/project",
+        "commit": "abc123",
+        "language": "rust",
+        "package": "my-crate",
+        "package-version": "1.0.0"
+    });
+
+    for schema_value in [
+        "probe-verus/proofs",
+        "probe-verus/stubs",
+        "probe-verus/verification-report",
+    ] {
+        let doc = json!({
+            "schema": schema_value,
+            "schema-version": "3.0",
+            "tool": { "name": "probe-verus", "version": "2.0.0", "command": "atomize" },
+            "source": source,
+            "timestamp": "2026-03-05T14:30:00Z",
+            "data": {
+                "probe:my-crate/1.0.0/mod/f()": { "verified": true }
+            }
+        });
+
+        let result = validator.validate(&doc);
+        assert!(
+            result.is_ok(),
+            "{schema_value} envelope should validate: {result:?}"
+        );
+    }
+}
+
+#[test]
 fn missing_required_field_is_rejected() {
     let schema = load_schema();
     let validator = Validator::new(&schema).expect("valid schema");

@@ -5,7 +5,7 @@ Date: 2026-03-05
 
 ## Context
 
-The `probe-*` tools (probe-verus, probe-lean, probe-latex, etc.) analyze source code and
+The `probe-*` tools (probe-verus, probe-lean, probe-leanblueprint, etc.) analyze source code and
 produce JSON files describing dependency graphs, specifications, and verification results.
 Today these files are **bare JSON dictionaries** with no metadata:
 
@@ -117,27 +117,9 @@ and render it appropriately based on `schema` and `source.language`.
 
 Identifies the producing tool and data type. Format: `<tool>/<type>`.
 
-Known values:
-
-- `probe-rust/extract` -- Rust call graph atoms
-- `probe-verus/atoms` -- Rust/Verus call graph atoms
-- `probe-verus/extract` -- Rust/Verus unified pipeline output (atoms + specs + proofs)
-- `probe-verus/specs` -- Rust/Verus function specifications
-- `probe-verus/proofs` -- Rust/Verus verification results
-- `probe-verus/stubs` -- Rust/Verus stubs (output of the `stubify` command)
-- `probe-verus/verification-report` -- Rust/Verus verification report (output of `verify` without atoms enrichment)
-- `probe-lean/extract` -- Lean unified pipeline output (atoms + specs + verification)
-- `probe-lean/atoms` -- Lean call graph atoms
-- `probe-lean/enriched-atoms` -- Lean enriched atoms (atoms augmented with specs/proofs)
-- `probe-lean/specs` -- Lean function specifications
-- `probe-lean/proofs` -- Lean verification results
-- `probe-lean/stubs` -- Lean stubs (output of the `stubify` command)
-- `probe-aeneas/extract` -- Cross-language Rust+Lean merged atoms (Aeneas projects)
-- `probe/merged-atoms` -- merged atoms from multiple tools
-- `probe/merged-specs` -- merged specs from multiple tools
-- `probe/merged-proofs` -- merged proofs from multiple tools
-
-New tools register their schema values by adding them to this list.
+The registered `schema` values (and which are legacy) are listed in
+[SCHEMA.md § Registered `schema` Values](SCHEMA.md#registered-schema-values). They
+are not duplicated here, to avoid drift.
 
 #### `schema-version` (string, required)
 
@@ -168,7 +150,7 @@ Structured metadata about what was analyzed.
 
 - `repo` (string, required): git remote URL of the analyzed project
 - `commit` (string, required): full git commit hash at analysis time
-- `language` (string, required): source language (`"rust"`, `"lean"`, `"latex"`)
+- `language` (string, required): source language (`"rust"`, `"lean"`)
 - `package` (string, required): package/crate/project name
 - `package-version` (string, required): version identifier (see
   [Package Versioning](#package-versioning))
@@ -195,7 +177,6 @@ Package versioning differs by ecosystem:
   (e.g., `"4.1.3"`).
 - **Lean (Lake):** The `version` field in lakefile is optional. Use it if present;
   otherwise fall back to the 7-character short git commit hash (e.g., `"a1b2c3d"`).
-- **LaTeX:** No package versioning convention. Use the short git commit hash.
 
 This means `package-version` is always present and non-empty, but its format varies.
 Consumers should treat it as an opaque identifier, not assume semver.
