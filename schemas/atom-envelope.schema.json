@@ -17,7 +17,7 @@
       "properties": {
         "schema": {
           "type": "string",
-          "pattern": "^probe-(rust|lean|verus|aeneas|latex)/(atoms|enriched-atoms|extract|proofs|specs)$"
+          "pattern": "^probe-(rust|lean|verus|aeneas|leanblueprint)/(atoms|enriched-atoms|extract|proofs|specs)$"
         },
         "schema-version": { "$ref": "#/$defs/schemaVersion" },
         "tool": { "$ref": "#/$defs/tool" },
@@ -151,8 +151,8 @@
         },
         "language": {
           "type": "string",
-          "enum": ["rust", "lean", "latex", "verus"],
-          "description": "Source language."
+          "enum": ["rust", "lean"],
+          "description": "Source language of the analyzed project."
         },
         "package": {
           "type": "string",
@@ -223,7 +223,7 @@
         },
         "language": {
           "type": "string",
-          "enum": ["rust", "lean", "latex", "verus"],
+          "enum": ["rust", "lean", "verus", "blueprint"],
           "description": "Source language of this atom."
         }
       },

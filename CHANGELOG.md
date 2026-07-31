@@ -18,7 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Schema documentation for `probe-leanblueprint/extract` (atoms) and `probe-leanblueprint/summary` (sidecar), the `blueprint-*` extension fields, `language: "blueprint"`, and `blueprint-definition`/`blueprint-theorem` kinds
 - Explicit `detect_category()` test coverage for `*/extract` schemas (`probe-leanblueprint/extract`, `probe-aeneas/extract`)
 
+### Fixed
+- `schemas/atom-envelope.schema.json` rejected valid `probe-leanblueprint/extract` envelopes (the tool was missing from the `schema` pattern) and omitted `blueprint` from the per-atom `language` enum. Both corrected.
+- Synced hub `docs/SCHEMA.md` with the KB source of truth (`kb/engineering/schema.md`): corrected the doc version header (`2.0` → `3.0`); completed the registered-`schema` table (added `probe-lean/viewify`, `probe-leanblueprint/extract`, `probe-leanblueprint/summary`, `probe/summary`, `probe/mappings`; marked the Schema-1.x `probe-lean/{atoms,enriched-atoms,specs,proofs,stubs}` legacy); added Projection-metadata, Version-history, and Package-versioning sections.
+- Removed cross-doc duplication that was driving drift: per-tool extension-field lists in `docs/SCHEMA.md` now delegate to each tool's own `docs/SCHEMA.md`; the consumer-guide's `language`/`kind`/optional-field enumerations link to `docs/SCHEMA.md` instead of restating them; and `docs/envelope-rationale.md`'s duplicate schema list is replaced by a pointer.
+- Added `probe-leanblueprint` to the README ecosystem table and the consumer-guide tool listing.
+
 ### Removed
+- Dropped the reserved `probe-latex` tool from the schema spec, KB, docs, and JSON Schema: the `latex` per-atom and `source.language` value, the `latex:` code-name scheme, and the LaTeX kind/package-versioning entries. LaTeX blueprint support is now provided by `probe-leanblueprint`, which emits `language: "blueprint"`.
 - Moved `docs/atoms_roles_statuses.md` and `scripts/count-colors.sh` to the VeriLib engineering docs ([Atom statuses and colours](https://docs.verilib.org/components/processor/atom-statuses-and-colours/)). The colouring scheme is VeriLib-specific (how VeriLib presents atom statuses), not a probe concern; the script is reproduced there as the reference implementation.
 - Untracked the remaining VeriLib-specific colour/stats docs (`docs/probes_statuses_colours.md`/`.pdf`, `docs/archive/verification-statuses.md`, `docs/VeriLib_Atom_Proposal.pdf`) and dropped their README links. Colour/stats are orthogonal to the probes; the files are kept locally (gitignored), with the canonical home in Beneficial-AI-Foundation/engineering-docs.
 

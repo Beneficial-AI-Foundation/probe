@@ -1,12 +1,12 @@
 # Probe Atom Interchange Specification
 
-Version: 2.0
+Version: 3.0
 
 ## Purpose
 
 The interchange format for atom files produced by `probe-*` tools (probe-verus,
-probe-lean, probe-latex, etc.). Any tool that produces or consumes atom files should
-conform to it. A shared schema enables:
+probe-lean, probe-leanblueprint, etc.). Any tool that produces or consumes atom files
+should conform to it. A shared schema enables:
 
 - Merging atoms from different languages/tools into a single file
 - Generic consumers (verilib-cli, specs browser, etc.) that work across languages
@@ -34,17 +34,22 @@ The `schema` field identifies the producing tool and data type. Format: `<tool>/
 | `probe-verus/stubs` | Rust/Verus stubs (output of the `stubify` command) | Atoms |
 | `probe-verus/verification-report` | Rust/Verus verification report (output of `verify` without atoms enrichment) | Proofs |
 | `probe-lean/extract` | Lean unified pipeline output (atoms + specs + verification) | Atoms |
-| `probe-lean/enriched-atoms` | Lean atoms + specs + proofs combined (legacy) | Atoms |
-| `probe-lean/specs` | Lean specification status | Specs |
-| `probe-lean/proofs` | Lean verification results (sorry detection) | Proofs |
-| `probe-lean/stubs` | Lean stubs (output of the `stubify` command) | Atoms |
+| `probe-lean/viewify` | Lean view data | Analysis |
 | `probe-aeneas/extract` | Cross-language Rust+Lean merged atoms (Aeneas projects) | Atoms |
-| `probe-latex/atoms` | LaTeX atoms (reserved, not yet defined) | Atoms |
+| `probe-leanblueprint/extract` | probe-lean atoms enriched with blueprint progress | Atoms |
+| `probe-leanblueprint/summary` | Two-axis blueprint progress counts (sidecar; never merged) | Analysis |
 | `probe/merged-atoms` | Merged atoms from multiple tools | Atoms |
 | `probe/merged-specs` | Merged specs from multiple tools | Specs |
 | `probe/merged-proofs` | Merged proofs from multiple tools | Proofs |
+| `probe/summary` | Verified-atom partitioning summary (sidecar; never merged) | Analysis |
+| `probe/mappings` | Cross-language code-name mappings | Special |
 
 New tools register their `schema` values by adding them to this table.
+
+**Legacy (Schema 1.x).** `probe-lean/atoms`, `probe-lean/enriched-atoms`,
+`probe-lean/specs`, `probe-lean/proofs`, and `probe-lean/stubs` may appear in older
+files or as input sources in merged envelopes. Current probe-lean produces only
+`probe-lean/extract` and `probe-lean/viewify`.
 
 The `schema` field implicitly identifies the source language (`probe-verus` produces
 Rust/Verus atoms, `probe-lean` produces Lean atoms, etc.). There is no separate `language`
@@ -72,7 +77,7 @@ but all code-names must:
 
 - Be valid UTF-8 strings
 - Be unique within a single file
-- Contain a scheme prefix followed by `:` (e.g., `probe:`, `latex:`)
+- Contain a scheme prefix followed by `:` (e.g., `probe:`)
 
 #### `display-name` (string)
 
@@ -94,7 +99,6 @@ Interpretation is language-specific:
 
 - Rust: module path (e.g., `"scalar"`, `"backend/serial/u64/field"`)
 - Lean: namespace (e.g., `"Mathlib.Data.Nat"`)
-- LaTeX: section path (e.g., `"chapter3/elliptic_curves"`)
 
 May be empty for top-level definitions.
 
@@ -102,7 +106,7 @@ May be empty for top-level definitions.
 
 Relative path to the source file from the project root.
 
-Examples: `"src/scalar.rs"`, `"Mathlib/Data/Nat.lean"`, `"chapters/ch3.tex"`
+Examples: `"src/scalar.rs"`, `"Mathlib/Data/Nat.lean"`
 
 Empty string for external stubs (atoms without a local source definition).
 
@@ -126,7 +130,16 @@ it answers "what kind of unit is this?"
 The source language of the atom. This field allows consumers to distinguish
 atoms in a merged file without parsing the code-name URI.
 
-Known values: `"rust"`, `"lean"`, `"latex"`
+Known values: `"rust"`, `"verus"`, `"lean"`, `"blueprint"`.
+
+For probe-verus output, `language` is derived from `kind`, not lexical scope:
+`exec` atoms are `"rust"`, while `proof`/`spec` atoms are `"verus"`. `"blueprint"`
+marks synthetic planned atoms emitted by probe-leanblueprint (blueprint nodes with
+no Lean binding yet).
+
+This per-atom `language` is a wider set than the envelope's `source.language`
+(`"rust"`, `"lean"`), which records the analyzed project's language: a Rust/Verus
+project has `source.language: "rust"` but its atoms may be `"rust"` or `"verus"`.
 
 ### Kind Values
 
@@ -141,7 +154,8 @@ should treat it as opaque (display it, but do not assign special semantics).
 | `proof` | Proof code (verified but erased at runtime) |
 | `spec` | Specification (defines logical properties, erased at runtime) |
 
-Default for external stubs: `exec`.
+Non-Verus Rust is always `exec`; `proof` and `spec` only occur in Verus code
+(and carry `language: "verus"`, see above). Default for external stubs: `exec`.
 
 #### Lean
 
@@ -161,10 +175,15 @@ Default for external stubs: `exec`.
 Lean does not have a separate "proof" kind because proofs are the bodies of `theorem`
 declarations, not standalone units.
 
-#### LaTeX (reserved, not yet finalized)
+#### Blueprint (synthetic)
 
-Anticipated values: `definition`, `theorem`, `lemma`, `proof`, `remark`, `corollary`.
-These will be defined when probe-latex is implemented.
+Emitted by probe-leanblueprint for planned nodes that have no Lean binding yet
+(`language: "blueprint"`).
+
+| Value | Meaning |
+|-------|---------|
+| `blueprint-definition` | Planned definition declared in a blueprint, not yet formalized in Lean |
+| `blueprint-theorem` | Planned theorem/lemma declared in a blueprint, not yet formalized in Lean |
 
 ### Common Optional Fields
 
@@ -195,33 +214,14 @@ Tools may add additional language-specific fields. Rules:
 3. Consumers that do not recognize an extension field must ignore it.
 4. Extension fields should be omitted (not set to null) when not applicable.
 
-Extensions defined by probe-verus:
+Each tool's extension fields are specified in that tool's own `docs/SCHEMA.md`.
+To keep a single source of truth and avoid drift, they are not re-listed here:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `requires-dependencies` | array of strings | Subset of `dependencies` called in `requires` clauses |
-| `ensures-dependencies` | array of strings | Subset of `dependencies` called in `ensures` clauses |
-| `body-dependencies` | array of strings | Subset of `dependencies` called in the function body |
-
-Extensions defined by probe-lean:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `type-dependencies` | array of strings | Dependencies from the type signature |
-| `term-dependencies` | array of strings | Dependencies from the value/proof body |
-| `is-hidden` | bool | From `.verilib/config.json` `user.is-hidden` list |
-| `is-extraction-artifact` | bool | Name ends with configured extraction artifact suffix |
-| `is-ignored` | bool | From `.verilib/config.json` `user.is-ignored` list |
-| `is-relevant` | bool | Rust source is from the target crate (Aeneas projects only) |
-| `rust-source` | string or null | Rust source path from Aeneas docstring |
-
-Extensions defined by probe-aeneas:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `translation-name` | string | Code-name of the Lean translation for a Rust atom |
-| `translation-path` | string | File path of the Lean translation |
-| `translation-text` | object | Line range of the Lean translation (`lines-start`, `lines-end`) |
+- probe-rust — [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/SCHEMA.md) (e.g. `rust-qualified-name`, `is-public`, `charon-def-id`, `charon-version`)
+- probe-verus — [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md) (e.g. `requires-dependencies`, `ensures-dependencies`, `body-dependencies`)
+- probe-lean — [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md) (e.g. `type-dependencies`, `term-dependencies`, filtering flags, `attributes`)
+- probe-aeneas — [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md) (e.g. `translation-name`, `translation-path`, `translation-text`, `is-public`)
+- probe-leanblueprint — [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/SCHEMA.md) (`blueprint-*` progress fields; also carries the probe-lean fields, since it enriches a `probe-lean/extract` base)
 
 ## Code-Name URI Conventions
 
@@ -261,10 +261,6 @@ Lean's namespace hierarchy already encodes the package/library prefix (e.g.,
 are not embedded in the code-name. Cross-project disambiguation is handled by the
 envelope's `source.package` field and, in merged files, by the per-atom `language`
 field.
-
-### LaTeX (`latex:`) -- reserved
-
-Format to be defined when probe-latex is implemented.
 
 ## External Function Stubs
 
@@ -317,6 +313,15 @@ considerations, is specified in [merge-algorithm.md](merge-algorithm.md).
 Cross-language merging requires a mappings file that maps code-names between
 languages. The mappings file format is specified in
 [mappings-spec.md](mappings-spec.md).
+
+### Projection metadata
+
+`probe project` reuses the `probe/merged-atoms` schema but adds a `projection`
+block at the envelope level recording the projection parameters and statistics
+(`mappings-file`, `seeds`, `forward-depth`, `reverse-depth`, `atoms-in`,
+`atoms-out`, `deps-trimmed`). It is accommodated by `additionalProperties: true`
+on the merged envelope and ignored by consumers that don't recognize it. See
+[kb/tools/probe-project.md](../kb/tools/probe-project.md) for details.
 
 ## Complete Example
 
@@ -448,7 +453,22 @@ This specification follows semver:
   Registers new `schema` values.
 
 Consumers should check `schema-version` major version for compatibility and ignore
-unknown optional fields for forward compatibility.
+unknown optional fields for forward compatibility (currently the major is `3`).
+
+### Version history
+
+| Version | Tool | Changes |
+|---------|------|---------|
+| 2.0 | all | Initial Schema 2.0 envelope format |
+| 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, `is-public` fields to atoms |
+| 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0`. |
+
+## Package versioning by language
+
+| Language | Strategy | Example |
+|----------|----------|---------|
+| Rust (Cargo) | Crate's semver version | `"4.1.3"` |
+| Lean (Lake) | `version` from `lakefile.toml` if present, else short git commit hash | `"0.1.0"` or `"a1b2c3d"` |
 
 ## JSON Schema
 
