@@ -16,3 +16,4 @@ Why we chose this approach over alternatives. Each record captures the context, 
 | [002-schema-2.0.md](002-schema-2.0.md) | Wrap all output in Schema 3.0 metadata envelopes | Accepted |
 | [003-mappings-design.md](003-mappings-design.md) | Use bidirectional cross-language mappings for cross-language edges | Accepted |
 | [004-probe-leanblueprint.md](004-probe-leanblueprint.md) | Standalone probe-leanblueprint enriches probe-lean atoms with two-axis blueprint status (Verso + Massot); machine status stays authoritative | Accepted |
+| [005-doc-ownership-boundary.md](005-doc-ownership-boundary.md) | Hub holds cross-probe contracts; each probe owns its own mechanics. `kb/tools/*.md` become catalog stubs | Accepted |

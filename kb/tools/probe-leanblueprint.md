@@ -1,182 +1,62 @@
 ---
 title: "Tool: probe-leanblueprint"
-last-updated: 2026-07-21
+last-updated: 2026-07-31
 status: draft
 ---
 
 # probe-leanblueprint
 
-**Directory**: `baif/probe-leanblueprint/`
-**Role**: Enrich `probe-lean/extract` atoms with Lean **blueprint** progress metadata (a human-authored roadmap plus a two-axis statement/proof status), so Lean projects get meaningful verification-progress stats rather than a bare theorem count.
-**Subcommands**: `extract`
+**Directory**: `baif/probe-leanblueprint/` · **Repo**: <https://github.com/Beneficial-AI-Foundation/probe-leanblueprint>
+**Role**: Enricher over a `probe-lean/extract` atom base. Joins Lean **blueprint**
+progress (Verso manifest or Massot LaTeX) onto probe-lean's code call graph by
+declaration name and re-emits a `probe-leanblueprint/extract` envelope plus a
+two-axis `probe-leanblueprint/summary` sidecar. A direct analogue of
+[probe-aeneas](probe-aeneas.md).
+**Subcommand**: `extract`
 
-## What this tool is (and isn't)
+> **This is a catalog stub, not a mechanics reference** ([ADR-005](../decisions/005-doc-ownership-boundary.md)).
+> The tool's mechanics — the Verso/Massot adapters, join/collision rules, the
+> two-axis status vocabulary, every `blueprint-*` field, the CLI, and the
+> probe-lean auto-install — are documented **normatively in the probe's own
+> repo**, updated in the same PR as the code. This page carries only what the
+> ecosystem needs to place the tool: its role, the hub contracts it must satisfy,
+> and where to read the rest.
 
-probe-leanblueprint is an **enricher**, analogous to [probe-aeneas](probe-aeneas.md): it consumes another probe's output (probe-lean atoms) as its atom "spine" and re-emits a Schema 2.0 envelope with extra fields. It:
+## Normative docs (in the probe-leanblueprint repo)
 
-- **Consumes** a `probe-lean/extract` atom base (the code call graph + machine `verification-status`)
-- **Reads** the blueprint via one of two adapters (Verso manifest or Massot LaTeX)
-- **Joins** blueprint nodes to atoms by Lean declaration name
-- **Enriches** matched atoms with `blueprint-*` extension fields, and **synthesizes** planned atoms for blueprint nodes with no Lean binding
-- **Re-emits** a `probe-leanblueprint/extract` envelope plus a first-class `probe-leanblueprint/summary` sidecar
+| Doc | Covers |
+|-----|--------|
+| [README](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/README.md) | What it is, supported blueprint ecosystems and projects, quick start |
+| [docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/SCHEMA.md) | **Normative** output semantics: status axes, node classification, every `blueprint-*` field, both output envelopes |
+| [docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/USAGE.md) | Install (incl. the probe-lean auto-install), flags, output formats, the `blueprint_stats.py` reporter |
 
-It does **not** re-implement blueprint parsing, does not touch probe-lean (which stays blueprint-unaware), and does **not** override the machine `verification-status` — the blueprint proof axis is additive (see [P26](../engineering/properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative)).
+## Hub contracts it must satisfy
 
-Why not extend probe-lean? probe-lean is written in Lean and is deliberately generic across all Lean projects; blueprint is a complementary, doc-authoritative layer that only some projects have. Keeping it separate avoids growing probe-lean into a project-type-specific monster and keeps downstream schema consumers working for free via extension preservation ([P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)).
+- Emits the shared interchange envelope at the current `schema-version` (**3.0**),
+  so `probe merge`/`project` accept the extract —
+  [engineering/schema.md](../engineering/schema.md),
+  [schemas/atom-envelope.schema.json](../../schemas/atom-envelope.schema.json).
+- `probe-leanblueprint/extract` is an **Atoms**-category file (matched by the
+  `*/extract` rule in `detect_category()`); the `probe-leanblueprint/summary`
+  sidecar is not a category and is never merged —
+  [P17](../engineering/properties.md#p17-schema-category-consistency).
+- Its `blueprint-*` extensions round-trip through `merge`/`project` unchanged —
+  [P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge).
+- Reuses `probe::commands::propagate::enrich_verification_status` and depends on
+  the hub crate for shared types (`Atom`, `AtomEnvelope`, `Source`, `Tool`,
+  `CodeText`, `load_atom_file`).
 
-## Two blueprint ecosystems
+## Its own invariant
 
-| Ecosystem | Source of truth | How we read it | Status authority |
-|-----------|-----------------|----------------|------------------|
-| **Verso Blueprint** (`versoBlueprint`, Lean-native; used by baif projects) | `blueprint-manifest.json` (rendered by the Verso docs build) | Parse the JSON directly (Rust) | code-derived (`blueprint-status-source: code-derived`) |
-| **Patrick Massot `leanblueprint`** (LaTeX/plasTeX; the Mathlib-community standard) | `blueprint/src/web.tex` | Bundled headless plasTeX emitter reusing leanblueprint's own parser | human-declared (`blueprint-status-source: declared`) |
+The machine `verification-status` stays authoritative on the proof axis; the
+blueprint's declared status is additive and a `blueprint-status-mismatch` fires
+when the blueprint over-claims. This is a probe-leanblueprint rule (currently
+recorded as [P26](../engineering/properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative);
+migrating to the probe repo per [ADR-005](../decisions/005-doc-ownership-boundary.md)).
+Its consumer-side obligation — preserve the additive fields through merge — is
+the hub contract [P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge).
 
-## Two-axis status vocabulary (canonical)
+## Design rationale
 
-Both ecosystems track progress on two independent axes. probe-leanblueprint normalizes every source status into a single canonical vocabulary (`src/model.rs`):
-
-- **statement axis** — is the *statement* formalized in Lean? `none` (informal only) < `blocked` (prerequisites not ready) < `ready` (ready to formalize) < `formalized`.
-- **proof axis** — is the *proof* complete (sorry-free)? `none` < `ready` < `proved` (local, sorry-free) < `fully-proved` (proved + all ancestors).
-
-### Mapping table
-
-| Source | statement axis | proof axis |
-|--------|----------------|------------|
-| Verso `statementStatus` | `formalized`/`ready`/`blocked`/`none` → direct | — |
-| Verso `proofStatus` | — | `formalizedWithAncestors`→`fully-proved`, `formalized`→`proved`, `ready`→`ready`, `none`→`none` |
-| Massot (`\leanok`/`\mathlibok`/`\notready`/computed `can_state`) | `leanok`→`formalized`, `can_state`→`ready`, `notready`→`blocked`, else `none` | `proved`+`fully_proved`→`fully-proved`, `proved`→`proved`, `can_prove`→`ready`, else `none` |
-
-Note: leanblueprint's `fully_proved` counts definitions as vacuously done, so the strongest proof state is gated on `proved` to avoid over-claiming on `definition` nodes.
-
-## Extract pipeline
-
-The `extract` command (`src/main.rs` → `src/enrich.rs`):
-
-```
-project → (probe-lean extract | --lean) → atom base
-        → adapter (Verso manifest | Massot plasTeX) → BlueprintModel
-        → join by probe:<canonical> → enrich atoms + synthesize planned atoms
-        → propagate::enrich_verification_status (idempotent)
-        → probe-leanblueprint/extract envelope + probe-leanblueprint/summary sidecar
-```
-
-1. **Resolve adapter** — explicit `--adapter`, else auto-detect: `--verso-manifest`/`versoBlueprint` in the lakefile → Verso; `--blueprint-src`/`blueprint/src/web.tex` → Massot.
-2. **Load atom base** — `--lean <probe-lean.json>` if given, else run `probe-lean extract <project>` (a single incremental compile).
-3. **Build the blueprint model** — Verso adapter parses `blueprint-manifest.json`; Massot adapter shells out to the bundled `scripts/blueprint_emit.py`. That script is **embedded into the binary** (`include_str!`) and materialized to a temp file at runtime, so a `cargo install`ed executable is self-contained; an explicit `--emitter` or a copy shipped next to the executable takes precedence.
-4. **Join + enrich** — match blueprint nodes to atoms by `probe:` + Lean declaration name; attach `blueprint-*` fields; synthesize planned atoms; compute `blueprint-status-mismatch`.
-5. **Propagate** — reuse `probe::commands::propagate::enrich_verification_status` (idempotent; machine status stays authoritative).
-6. **Emit** — the enriched atom envelope and the summary sidecar (an aggregate over the blueprint nodes).
-
-### Single-build guarantee
-
-Lake builds are incremental and the code libraries are shared between the code target and the Verso docs/blueprint target. Total cost is **one full compile**: rendering the Verso docs (which writes `blueprint-manifest.json`) compiles the libs; the subsequent `probe-lean extract` is an incremental no-op on the already-compiled libs. The Massot/LaTeX path needs no Lean docs build at all — plasTeX only parses LaTeX.
-
-## The join
-
-Both ecosystems bind a blueprint node to Lean declarations by **user-facing fully-qualified name**: Massot via `\lean{Foo.bar}`, Verso via `codeData.external.decls[].canonical`. probe-lean keys atoms as `probe:` + that same user-facing name (`probeRef`), so the join is `probe:<canonical>`.
-
-Edge-case rules (`src/enrich.rs`):
-
-- **Ownership pass** — enrichment first computes, per present atom, the *last* blueprint node that binds it (keep-last), then resolves every node to a **primary key**: the first present atom it owns, else its synthetic `probe:blueprint:<label>` key. This makes the extract **node-complete** (every model node leaves exactly one label-bearing record) and guarantees `uses` edges resolve to a real atom key.
-- **Node binds multiple decls** — attach the node to every present atom it owns.
-- **Same-decl collision** — if two blueprint nodes bind the same present atom, the later node wins the real atom (keep-last); a warning is logged and the case is counted in the summary `collisions` total. The **losing** node is preserved as a synthetic `blueprint-shadow: true` atom (carrying its full status, plus any mismatch / missing-decls) so it is not dropped from the extract. It is still counted as bound (`with-lean-decl`), and `blueprint_stats.py` treats a shadow node as bound, keeping the sidecar and the script in exact agreement.
-- **Decl-missing authority** — probe-lean atom membership is the **sole** authority on whether a bound declaration is present. (Verso also emits its own per-decl `present` / node `missingExternalDecl` hints; these are intentionally **not** consumed — they coincide with atom membership on real data, and atom membership is the tool's premise that probe-lean is the code spine.)
-  - **All bound decls absent** — emit a synthetic planned node flagged `blueprint-decl-missing: true` (counted in `decl-missing`) rather than fabricating a code atom.
-  - **Some bound decls absent (partial miss)** — the node stays bound (attached to its present atoms); the absent names are recorded on the present atom(s) as `blueprint-missing-decls: [...]` and counted in the `partial-missing` total. This keeps the bound / planned-only / decl-missing partition clean.
-- **Node has no Lean binding** (planned-only) — synthesize a `probe:blueprint:<label>` atom with `language: "blueprint"`, `kind: "blueprint-<def|theorem>"`, and a non-empty `code-path` marker (`"blueprint"`) so [P3](../engineering/properties.md#p3-stub-detection-is-structural) stub detection does not misclassify it.
-- **Blueprint `uses` edges stay extension-only** (`blueprint-statement-uses`/`blueprint-proof-uses`); they are the informal roadmap graph and are never merged into an atom's `dependencies` (the code call graph).
-
-## Status reconciliation
-
-The statement axis is blueprint-exclusive (no conflict with any machine signal). Only the proof axis can disagree with probe-lean's machine sorry-truth. Resolution (see [P26](../engineering/properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative)):
-
-- `verification-status` stays probe-lean's machine value — a `sorry` can never render green, consistent with every other probe.
-- The blueprint's declared proof status is kept in the separate `blueprint-proof-status` field.
-- When the blueprint claims a proof is done (`proved`/`fully-proved`) but the machine status is `unverified`/`failed`, `blueprint-status-mismatch` is set (e.g. `"claims-proved-but-unverified"`).
-
-This flag is most valuable for the Massot path, where `\leanok` is a human claim (leanblueprint only `checkdecls` that a declaration *exists*, not that it is sorry-free). Verso's `proofStatus` is code-derived and usually agrees.
-
-## Outputs
-
-### `probe-leanblueprint/extract` (atoms category)
-
-A Schema 2.0 atom envelope. Detected as the **Atoms** category by the hub (via the `*/extract` suffix in `detect_category()`), so `probe merge`/`project` accept it and preserve the blueprint extensions ([P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)).
-
-### `probe-leanblueprint/summary` (sidecar)
-
-A first-class, two-axis progress report that **aggregates over** the blueprint nodes (it is not keyed per node) — this is where the meaningful blueprint stats live (the hub's `probe summary` is Rust/Verus-centric). Contains statement/proof histograms overall and by kind (definition vs theorem), totals (nodes, with-lean-decl, planned-only, decl-missing, partial-missing, collisions, mismatches), a headline "theorems fully proved" fraction, and a `by-chapter` breakdown (per-chapter node count, two-axis histograms, and theorems-fully-proved / theorems-total). Not an atoms-category schema, so it is never merged.
-
-### Displaying stats
-
-`scripts/blueprint_stats.py <extract.json>` renders a readable report (headline, statement/proof tables, per-chapter breakdown, and any mismatches / missing decls) directly from a `probe-leanblueprint/extract` file. It recomputes everything from the `blueprint-*` extension fields, so it doubles as an independent cross-check of the summary sidecar and needs no Python blueprint dependencies. Pass `--json` for a machine-readable form.
-
-Because the extract is node-complete (see the ownership pass under [The join](#the-join)), the script and the summary sidecar agree exactly on node/headline/axis/bound counts, even under same-decl collisions; a `python3` parity test (`tests/stats_parity.rs`) enforces this.
-
-## Blueprint extension fields
-
-Attached (flattened per [P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)) to enriched and synthetic atoms:
-
-| Field | Description |
-|-------|-------------|
-| `blueprint-label` | Blueprint node label |
-| `blueprint-kind` | Blueprint node kind (`definition`/`theorem`); lets consumers classify bound atoms whose atom `kind` is the Lean kind |
-| `blueprint-statement-status` | Canonical statement axis (`none`/`blocked`/`ready`/`formalized`) |
-| `blueprint-proof-status` | Canonical proof axis (`none`/`ready`/`proved`/`fully-proved`) |
-| `blueprint-status-source` | `code-derived` (Verso) or `declared` (Massot) |
-| `blueprint-group` | Sub-construction grouping label, Verso `parent` (optional) |
-| `blueprint-chapter` | Chapter the node belongs to; one Verso manifest = one chapter (optional) |
-| `blueprint-title` | Display title, e.g. "Theorem 2.3" (optional) |
-| `blueprint-discussion` | GitHub discussion issue number (optional) |
-| `blueprint-statement-uses` | Code-names used by the statement (resolved from blueprint labels) |
-| `blueprint-proof-uses` | Code-names used by the proof |
-| `blueprint-status-mismatch` | Set when the blueprint over-claims vs the machine status (optional) |
-| `blueprint-decl-missing` | `true` when **all** bound Lean decls are absent from the atom set (synthetic planned node; optional) |
-| `blueprint-missing-decls` | For a bound node, the subset of `\lean{...}` decls absent from the atom set (partial miss); recorded on the present atom(s) (optional) |
-| `blueprint-shadow` | `true` on the synthetic atom preserved for a node that lost a same-decl collision (its real atom was claimed by a later node). Keeps the extract node-complete; consumers should count a shadow node as bound despite its `language: "blueprint"` (optional) |
-
-## CLI
-
-```
-probe-leanblueprint extract <PROJECT>
-    [--lean <probe-lean.json>]
-    [--adapter auto|verso|massot]
-    [--verso-manifest <file|dir>]
-    [--blueprint-src <web.tex|dir>]
-    [--python <interp>] [--emitter <blueprint_emit.py>]
-    [-o <extract.json>] [--summary-output <summary.json>]
-    [--source-package <name>] [--source-version <ver>]
-```
-
-The `--lean` input must be a `probe-lean/extract` (or a merged spine); passing probe-leanblueprint's own `probe-leanblueprint/extract` is rejected (self-ingestion). `--source-package`/`--source-version` override the atom base's identity and, when both are given, disambiguate a spine with multiple probe-lean inputs.
-
-Defaults write to `<project>/.verilib/probes/leanblueprint_<package>[_<version>].json` and `..._summary.json`.
-
-## Key source files
-
-| File | Purpose |
-|------|---------|
-| `src/main.rs` | CLI, adapter auto-detection, orchestration, output |
-| `src/model.rs` | Normalized `BlueprintModel`/`BlueprintNode`, canonical status enums, extension field set |
-| `src/adapters/verso.rs` | Verso `blueprint-manifest.json` → `BlueprintModel` |
-| `src/adapters/massot.rs` | Shell out to the plasTeX emitter → `BlueprintModel` |
-| `src/enrich.rs` | Join, synthesis, mismatch, summary computation |
-| `src/emit.rs` | Envelope + summary sidecar construction |
-| `src/emitter.rs` | Embeds `blueprint_emit.py` (`include_str!`) and resolves/materializes it at runtime |
-| `scripts/blueprint_emit.py` | Bundled headless plasTeX emitter (reuses leanblueprint's parser); embedded into the binary |
-| `scripts/blueprint_stats.py` | Display two-axis + per-chapter stats from an `extract.json` |
-
-## External tool dependencies
-
-| Tool | Required | Notes |
-|------|----------|-------|
-| probe-lean | yes (unless `--lean` given) | Produces the atom base; single incremental build |
-| Verso docs build (`lake`) | yes for Verso (unless a fresh manifest / `--verso-manifest` exists) | Writes `blueprint-manifest.json` |
-| python3 + plasTeX + leanblueprint | yes for Massot | `pip install leanblueprint`; needs graphviz/libgraphviz-dev for pygraphviz. No Lean build needed. |
-
-## Dependency on the probe crate
-
-probe-leanblueprint depends on the `probe` hub crate. Uses:
-- `probe::types::{Atom, AtomEnvelope, Source, Tool, CodeText, load_atom_file}`
-- `probe::commands::propagate::enrich_verification_status`
-
-Rationale and alternatives considered: [ADR-004](../decisions/004-probe-leanblueprint.md). Broader Lean stats context: `docs/lean-stats-brainstorm.md` (non-normative).
+[ADR-004](../decisions/004-probe-leanblueprint.md) — why it is a standalone
+enricher rather than an extension of probe-lean.

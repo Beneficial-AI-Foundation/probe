@@ -30,4 +30,4 @@ Each file covers what is **unique** to that tool — what it does differently fr
 - Working on Verus verification, spec taxonomy, or dual-AST parsing → [probe-verus.md](probe-verus.md)
 - Touching Lean environment walking, sorry detection, or lake builds → [probe-lean.md](probe-lean.md)
 - Working on cross-language mapping or parallel orchestration → [probe-aeneas.md](probe-aeneas.md)
-- Working on Lean blueprint progress stats (Verso or Massot leanblueprint) → [probe-leanblueprint.md](probe-leanblueprint.md)
+- Working on Lean blueprint progress stats (Verso or Massot leanblueprint) → the [probe-leanblueprint repo docs](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) (the hub [probe-leanblueprint.md](probe-leanblueprint.md) is a catalog stub per [ADR-005](../decisions/005-doc-ownership-boundary.md))
