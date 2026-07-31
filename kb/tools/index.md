@@ -1,33 +1,39 @@
 ---
 title: Per-Tool Knowledge
-last-updated: 2026-07-21
+last-updated: 2026-07-31
 status: draft
 ---
 
 # Per-Tool Knowledge
 
-Each file covers what is **unique** to that tool — what it does differently from the common patterns described in [engineering/](../engineering/index.md). For shared concepts (envelope, atom fields, merge), see the engineering section.
+The hub owns full docs for its own subcommands (`merge`, `project`, `summary`).
+Each external probe has a **catalog stub** ([ADR-005](../decisions/005-doc-ownership-boundary.md)):
+its role, the hub contracts it must satisfy, and a link to the probe's own
+normative docs. Mechanics live in each probe's repo, next to the code. For shared
+concepts (envelope, atom fields, merge), see [engineering/](../engineering/index.md).
 
-## Files
+## Hub subcommands (full docs)
 
-| File | Tool | LOC | Language | Complexity |
-|------|------|-----|----------|------------|
-| [probe-merge.md](probe-merge.md) | probe (merge) | ~1.5K | Rust | Low |
-| [probe-project.md](probe-project.md) | probe (project) | ~0.3K | Rust | Low |
-| [probe-summary.md](probe-summary.md) | probe (summary) | ~0.3K | Rust | Low |
-| [probe-rust.md](probe-rust.md) | probe-rust | ~6K | Rust | Medium |
-| [probe-verus.md](probe-verus.md) | probe-verus | ~13K | Rust | Highest |
-| [probe-lean.md](probe-lean.md) | probe-lean | ~5.7K | Lean 4 | Medium-high |
-| [probe-aeneas.md](probe-aeneas.md) | probe-aeneas | ~2.3K | Rust | Medium |
-| [probe-leanblueprint.md](probe-leanblueprint.md) | probe-leanblueprint | ~1K | Rust + Python | Medium |
+| File | Subcommand | Covers |
+|------|------------|--------|
+| [probe-merge.md](probe-merge.md) | `probe merge` | Merge algorithm, schema category detection, mapping application |
+| [probe-project.md](probe-project.md) | `probe project` | Graph projection from mapping seeds, focus-set emission |
+| [probe-summary.md](probe-summary.md) | `probe summary` | Entrypoint analysis, verified-dependency partitioning |
+
+## External probes (catalog stubs → repo docs)
+
+| File | Tool | Language | Repo |
+|------|------|----------|------|
+| [probe-rust.md](probe-rust.md) | probe-rust | Rust | [repo](https://github.com/Beneficial-AI-Foundation/probe-rust) |
+| [probe-verus.md](probe-verus.md) | probe-verus | Rust + Verus | [repo](https://github.com/Beneficial-AI-Foundation/probe-verus) |
+| [probe-lean.md](probe-lean.md) | probe-lean | Lean 4 | [repo](https://github.com/Beneficial-AI-Foundation/probe-lean) |
+| [probe-aeneas.md](probe-aeneas.md) | probe-aeneas | Rust | [repo](https://github.com/Beneficial-AI-Foundation/probe-aeneas) |
+| [probe-leanblueprint.md](probe-leanblueprint.md) | probe-leanblueprint | Rust + Python | [repo](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) |
 
 ## When to read which file
 
 - Modifying the merge algorithm or Schema 3.0 types → [probe-merge.md](probe-merge.md)
 - Working on graph projection from mappings or focus-set emission → [probe-project.md](probe-project.md)
 - Working on entrypoint analysis or verified-dependency partitioning → [probe-summary.md](probe-summary.md)
-- Fixing Rust extraction issues (SCIP, trait disambiguation) → [probe-rust.md](probe-rust.md)
-- Working on Verus verification, spec taxonomy, or dual-AST parsing → [probe-verus.md](probe-verus.md)
-- Touching Lean environment walking, sorry detection, or lake builds → [probe-lean.md](probe-lean.md)
-- Working on cross-language mapping or parallel orchestration → [probe-aeneas.md](probe-aeneas.md)
-- Working on Lean blueprint progress stats (Verso or Massot leanblueprint) → the [probe-leanblueprint repo docs](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) (the hub [probe-leanblueprint.md](probe-leanblueprint.md) is a catalog stub per [ADR-005](../decisions/005-doc-ownership-boundary.md))
+- Working on any external probe's mechanics → its stub here for the hub contracts,
+  then the probe's own repo docs for the mechanics.

@@ -18,7 +18,7 @@ Use a separate mappings file (`probe/mappings` schema) containing bidirectional 
 
 A single `from` key may map to multiple `to` targets (1-to-many), enabling scenarios like mapping one Rust function to several Lean constructs.
 
-See [schema.md](../engineering/schema.md#mappings-file-format) for the file format and [properties.md](../engineering/properties.md#p11-mapping-generation-is-1-to-1-probe-aeneas) for invariants.
+See [schema.md](../engineering/schema.md#mappings-file-format) for the file format. Mapping-generation invariants (1-to-1, strategy priority) are owned by probe-aeneas — see [properties.md § Single-probe invariants](../engineering/properties.md#single-probe-invariants-owned-by-each-probes-repo).
 
 ## Rationale
 
@@ -33,7 +33,7 @@ Mapping generation requires domain knowledge (Aeneas name conventions, functions
 ### Name/location matching is pragmatic (probe-aeneas)
 
 Aeneas doesn't always produce clean name mappings. When a precise charon-`def_id`
-join is unavailable (Strategy 0 — see [probe-aeneas.md](../tools/probe-aeneas.md#mapping-generation)), three name/location strategies handle the spectrum:
+join is unavailable (Strategy 0 — see [probe-aeneas docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md)), three name/location strategies handle the spectrum:
 1. **Rust-qualified-name** — when Charon provides exact names (best case)
 2. **File + display-name** — when names match but no qualified name available
 3. **File + line-overlap** — when names don't match but source locations overlap (fallback)

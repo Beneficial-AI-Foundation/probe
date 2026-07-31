@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Applied [ADR-005](kb/decisions/005-doc-ownership-boundary.md) doc-ownership boundary to the KB: the five external-probe docs (`kb/tools/probe-{rust,verus,lean,aeneas,leanblueprint}.md`) are now catalog stubs (role + hub contracts + link to each probe's own normative docs); mechanics live in the probe repos. Removed single-probe invariants P11/P12 (probe-aeneas), P18 (probe-lean), P20 (probe-verus), P26 (probe-leanblueprint) and the resolved probe-aeneas bug records C6/C7/C8 from `kb/engineering/properties.md`, leaving a pointer section; repointed all cross-references and the `@kb:` annotations in `src/`.
 - **Breaking**: bumped the interchange `schema-version` to `3.0`. The hub now accepts only `3.x` inputs (`starts_with("3.")` in `types.rs`/`propagate.rs`) and emits `3.0` for merged/summary/project output. This unifies every producer, whose emitted minors had drifted (probe-rust up to `2.4`, probe-aeneas `2.1`, others `2.0`). Consumers must update their major-version check from `2.` to `3.`.
 - Renamed the atom scope field `is-disabled` to `untracked` across the schema spec, KB (P16/P24/P25), docs, and extract-check golden fixtures (#42). Semantics are unchanged and polarity is preserved: `untracked: true` means out of verification scope, `untracked: false` means in scope (verified atoms plus the spec-less backlog). Producers (`probe-rust`, `probe-verus`, `probe-aeneas`) emit `untracked` accordingly.
 
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `probe-leanblueprint` to the README ecosystem table and the consumer-guide tool listing.
 
 ### Removed
+- Moved the Lean-specific docs out of the hub into the probe-lean repo (per ADR-005): `kb/engineering/lean-verification-landscape.md`, `docs/lean-stats-brainstorm.md`, `docs/slides-lean-verification-landscape.md`. Deleted the superseded `docs/web-cli-probe/002_probe_lean.md` (legacy `syncstatus` pipeline).
 - Dropped the reserved `probe-latex` tool from the schema spec, KB, docs, and JSON Schema: the `latex` per-atom and `source.language` value, the `latex:` code-name scheme, and the LaTeX kind/package-versioning entries.
 - Moved `docs/atoms_roles_statuses.md` and `scripts/count-colors.sh` to the VeriLib engineering docs ([Atom statuses and colours](https://docs.verilib.org/components/processor/atom-statuses-and-colours/)). The colouring scheme is VeriLib-specific (how VeriLib presents atom statuses), not a probe concern; the script is reproduced there as the reference implementation.
 - Untracked the remaining VeriLib-specific colour/stats docs (`docs/probes_statuses_colours.md`/`.pdf`, `docs/archive/verification-statuses.md`, `docs/VeriLib_Atom_Proposal.pdf`) and dropped their README links. Colour/stats are orthogonal to the probes; the files are kept locally (gitignored), with the canonical home in Beneficial-AI-Foundation/engineering-docs.

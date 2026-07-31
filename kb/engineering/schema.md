@@ -138,7 +138,8 @@ For probe-verus output, `language` is determined by `kind`, not by lexical scope
 | `proof` | `"verus"` | Proof functions are Verus-only constructs (erased at compilation) |
 | `spec` | `"verus"` | Spec functions are Verus-only constructs (erased at compilation) |
 
-See [P20](properties.md#p20-language-is-derived-from-kind-not-lexical-scope).
+The derivation rule and its rationale are owned by probe-verus:
+[docs/SCHEMA.md § Language assignment](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md#language-assignment).
 
 ### Common optional fields
 
@@ -184,7 +185,7 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `blueprint-status-source` — `code-derived` (Verso) or `declared` (Massot `\leanok`)
 - `blueprint-group`, `blueprint-chapter`, `blueprint-title`, `blueprint-discussion` — sub-construction group, chapter, display title, GitHub issue (all optional)
 - `blueprint-statement-uses`, `blueprint-proof-uses` — code-names used by the statement/proof (informal roadmap edges; never merged into `dependencies`)
-- `blueprint-status-mismatch` — set when the blueprint over-claims a proof vs the machine `verification-status` (see [P26](properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative))
+- `blueprint-status-mismatch` — set when the blueprint over-claims a proof vs the machine `verification-status` (owned by probe-leanblueprint; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo))
 - `blueprint-decl-missing` — `true` when **all** bound Lean decls are absent from the atom set (synthetic planned node)
 - `blueprint-missing-decls` — for a bound node, the subset of `\lean{...}` decls absent from the atom set (partial miss; recorded on the present atom(s))
 

@@ -49,9 +49,8 @@ two-axis `probe-leanblueprint/summary` sidecar. A direct analogue of
 
 The machine `verification-status` stays authoritative on the proof axis; the
 blueprint's declared status is additive and a `blueprint-status-mismatch` fires
-when the blueprint over-claims. This is a probe-leanblueprint rule (currently
-recorded as [P26](../engineering/properties.md#p26-blueprint-status-is-additive-machine-verification-status-stays-authoritative);
-migrating to the probe repo per [ADR-005](../decisions/005-doc-ownership-boundary.md)).
+when the blueprint over-claims. This is a probe-leanblueprint rule, normative in
+the probe's own [docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/SCHEMA.md).
 Its consumer-side obligation — preserve the additive fields through merge — is
 the hub contract [P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge).
 

@@ -19,7 +19,7 @@ Criteria (all must hold):
 | Verified | `extensions["verification-status"] == "verified"` |
 | Non-stub | `is_stub() == false` ([P3](../engineering/properties.md#p3-stub-detection-is-structural)) |
 | Non-test | `code_module` and `display_name` do not contain `"test"` |
-| Rust exec | `language == "rust"` and `kind == "exec"` ([P20](../engineering/properties.md#p20-language-is-derived-from-kind-not-lexical-scope)) |
+| Rust exec | `language == "rust"` and `kind == "exec"` ([schema.md § Language assignment for Verus atoms](../engineering/schema.md#language-assignment-for-verus-atoms)) |
 | Not depended upon | code-name does not appear in any non-test atom's `dependencies` |
 
 ## Verified functions
@@ -61,4 +61,4 @@ Summary statistics are always printed to stderr.
 
 ## Implementation
 
-`src/commands/summary.rs` — annotated with `@kb` references to [P1](../engineering/properties.md#p1-envelope-completeness), [P3](../engineering/properties.md#p3-stub-detection-is-structural), [P14](../engineering/properties.md#p14-deterministic-output), [P20](../engineering/properties.md#p20-language-is-derived-from-kind-not-lexical-scope).
+`src/commands/summary.rs` — annotated with `@kb` references to [P1](../engineering/properties.md#p1-envelope-completeness), [P3](../engineering/properties.md#p3-stub-detection-is-structural), [P14](../engineering/properties.md#p14-deterministic-output), and [schema.md § Language assignment for Verus atoms](../engineering/schema.md#language-assignment-for-verus-atoms).

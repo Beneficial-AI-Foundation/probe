@@ -77,27 +77,6 @@ Every merged output records the provenance of its inputs in the `inputs` array. 
 
 Tool-specific extension fields (any JSON key/value not part of the core atom schema) MUST be preserved through merge operations. The `extensions` BTreeMap in the Rust `Atom` struct captures these via `#[serde(flatten)]`.
 
-## P11. Mapping generation is 1-to-1 (probe-aeneas)
-
-When generating cross-language mappings (probe-aeneas):
-- Each Rust atom maps to at most one Lean atom
-- Each Lean atom is claimed by at most one Rust atom
-- Once matched, neither side can be matched again
-
-Enforced by `matched_rust` and `matched_lean` HashSets in `probe-aeneas/src/translate.rs`.
-
-Note: `probe merge` accepts 1-to-many mappings (a single `from` key can map to multiple `to` targets). The 1-to-1 constraint is specific to probe-aeneas's generation logic.
-
-## P12. Mapping strategy priority
-
-The matching strategies run in strict priority order:
-0. **charon-`def_id`** (confidence: `exact`, method `charon-def-id`) — integer join on the charon `FunDeclId`: probe-rust's `charon-def-id` atom field equals Aeneas's `translation.json` `def_id`, binding to the family's primary (non-loop) Lean def. Only the manifest's `functions` array feeds the join: `globals`/`trait_impls` carry ids from charon's separate `GlobalDeclId`/`TraitImplId` spaces, which could otherwise collide with a `FunDeclId` integer. **Provenance-gated**: runs only when the atom's `charon-version` matches the manifest's `charon_version`, else it is skipped — mismatched ids point at different functions and would corrupt the mapping. Version equality is best-effort provenance, not proof of an identical run (same version + different cargo flags/sources can still diverge); a charon commit hash or LLBC digest would be the durable fix. No-op when probe-rust does not emit `charon-def-id`.
-1. **Rust-qualified-name** (confidence: `exact` or `exact-disambiguated`) — Charon-derived names
-2. **File + display-name** (confidence: `file-and-name`) — same source file + matching base name, unambiguous matches only
-3. **File + line-overlap** (confidence: `file-and-lines`) — same source file + overlapping line ranges, best overlap wins
-
-Higher-priority strategies run first and claim atoms. Lower-priority strategies only see unclaimed atoms.
-
 ## P13. Cross-language edges require existence
 
 When applying mappings during merge:
@@ -160,10 +139,6 @@ For probe-lean, verification status is determined by sorry detection and trust-b
 
 All inputs to a single `probe merge` invocation MUST belong to the same [schema category](schema.md#schema-categories) (atoms, specs, or proofs). Mixing categories is an error.
 
-## P18. Lean `specified` is derived, not stored
-
-Lean atoms do not have a `specified` field. Whether an atom has specs is inferred from `specs` being non-empty. This aligns with probe-verus v5.0.0 and avoids data redundancy.
-
 ## P19. No cross-repo path dependencies
 
 All `Cargo.toml` dependencies referencing crates in a **different** git repository MUST use `git = "https://..."` URLs, never `path = "../..."`.
@@ -175,18 +150,6 @@ All `Cargo.toml` dependencies referencing crates in a **different** git reposito
 **Why**: Path deps pointing outside the repo root break `cargo install --git`, CI builds, and any standalone consumer. Cargo validates all path deps during manifest parsing, even for dev-dependencies it won't build.
 
 **Validation**: No `Cargo.toml` in any probe-* repo contains a `path = "..."` dependency where the resolved path exits the repository root.
-
-## P20. Language is derived from kind, not lexical scope
-
-For probe-verus atoms, the `language` field is determined by the atom's `kind`, not by whether the function appears inside a `verus!{}` block:
-
-- `kind == "exec"` → `language: "rust"` — exec functions are Rust code, even when annotated with Verus specifications
-- `kind == "proof"` → `language: "verus"` — proof functions are Verus-only constructs, erased at compilation
-- `kind == "spec"` → `language: "verus"` — spec functions are Verus-only constructs, erased at compilation
-
-**Why**: Verus exec functions (e.g. `compress`, `decompress`, `mul`) are real Rust code that compiles to machine instructions. They happen to sit inside `verus!{}` blocks because that's where their specs live, but they are not "Verus constructs" — they are Rust functions with formal contracts. Tagging them `language: "verus"` would exclude them from any Rust-specific analysis (e.g. entrypoint detection, call graph filtering).
-
-**Implemented in**: `probe-verus/src/lib.rs` (language assignment in `convert_to_atoms_with_lines_internal`).
 
 ## P21. Cross-tool RQN alignment
 
@@ -291,21 +254,23 @@ For Aeneas projects, a Rust function is **out of verification scope** — `untra
 - The **active configuration** for the Aeneas build = the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`), overlaid by any `--features` / `--no-default-features` / `--all-features` in the project's `charon.cargo_args`. cfg evaluation mirrors the Verus rules above: only item-gating `#[cfg(...)]` counts (not cosmetic `#[cfg_attr(...)]`), and evaluation is **conservative** — a predicate referencing a flag/feature the tool cannot resolve keeps the atom in scope (backlog), never silently dropping a real backlog item.
 - As with Verus, a status-bearing atom is never untracked (P24): the cfg/`@[out_of_scope]` reclassification applies only to atoms that would otherwise be backlog.
 
-## P26. Blueprint status is additive; machine `verification-status` stays authoritative
+## Single-probe invariants (owned by each probe's repo)
 
-For blueprint-enriched atoms (probe-leanblueprint), the blueprint's two-axis status is **additive metadata** and never overrides probe-lean's machine `verification-status`.
+Per [ADR-005](../decisions/005-doc-ownership-boundary.md), invariants specific to
+one probe live in that probe's own repo, not in this shared file:
 
-- The **statement axis** (`blueprint-statement-status`) is blueprint-exclusive — no machine signal contradicts it.
-- The **proof axis** carries two independent fields: `verification-status` remains probe-lean's machine sorry-truth (a `sorry` can never render green, consistent with every other probe), and `blueprint-proof-status` records the blueprint's declared/derived claim.
-- When the blueprint claims a proof is complete (`proved`/`fully-proved`) but the machine status is `unverified`/`failed`, `blueprint-status-mismatch` is set. probe-leanblueprint MUST NOT silently rewrite `verification-status` to match a blueprint claim.
-- Synthetic **planned** atoms (blueprint nodes with no Lean binding) carry **no** `verification-status` — they are roadmap items, not verified/unverified code. They are non-stubs (P3) via a non-empty `code-path` marker.
-
-**Why it matters**: the blueprint is doc-authoritative for *intent* (what should be formalized) but its proof claims — especially Massot's human-authored `\leanok` — are not machine-checked for sorry-freeness. Keeping the machine status authoritative preserves the ecosystem invariant that `verified` means checked, while the mismatch flag surfaces over-claims for review.
-
-## Known bugs and edge cases
-
-### Resolved
-
-- **C6** *(fixed)*: `strategy_rust_qualified_name` in probe-aeneas now uses `HashMap<String, Vec<String>>` for RQN→Rust-atom lookup with disambiguation when multiple candidates share a normalized RQN.
-- **C7** *(fixed)*: `enrich_with_aeneas_metadata` in probe-aeneas skips `translation-text` when `start == 0 || end == 0`.
-- **C8** *(fixed)*: `load_mappings()` uses `HashMap<String, Vec<String>>` with `or_default().push()` — duplicate `from` keys collect all targets (1-to-many). Covered by `test_duplicate_from_keys_preserved` and `test_one_to_many_mapping_produces_multiple_edges`.
+- Mapping generation is 1-to-1 and strategy-priority-ordered → **probe-aeneas**
+  ([docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md),
+  [docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md)).
+  The hub's merge accepts 1-to-many mappings ([P13](#p13-cross-language-edges-require-existence)).
+- `language` is derived from `kind`, not lexical scope → **probe-verus**
+  ([docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md#language-assignment)).
+  The resulting `kind → language` value convention is recorded in the shared
+  [schema.md#language-assignment-for-verus-atoms](schema.md#language-assignment-for-verus-atoms).
+- Lean `specified` is derived from non-empty `specs`, not stored → **probe-lean**
+  ([docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md)).
+- Blueprint status is additive; machine `verification-status` stays authoritative
+  → **probe-leanblueprint**
+  ([docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/SCHEMA.md)).
+  Its consumer-side obligation — preserve the additive fields through merge — is
+  the hub contract [P10](#p10-extensions-are-preserved-through-merge).
