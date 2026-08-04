@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-04
+
 ### Changed
 - Applied [ADR-005](kb/decisions/005-doc-ownership-boundary.md) doc-ownership boundary to the KB: the five external-probe docs (`kb/tools/probe-{rust,verus,lean,aeneas,leanblueprint}.md`) are now catalog stubs (role + hub contracts + link to each probe's own normative docs); mechanics live in the probe repos. Removed single-probe invariants P11/P12 (probe-aeneas), P18 (probe-lean), P20 (probe-verus), P26 (probe-leanblueprint) and the resolved probe-aeneas bug records C6/C7/C8 from `kb/engineering/properties.md`, leaving a pointer section; repointed all cross-references and the `@kb:` annotations in `src/`.
 - **Breaking**: bumped the interchange `schema-version` to `3.0`. The hub now accepts only `3.x` inputs (`starts_with("3.")` in `types.rs`/`propagate.rs`) and emits `3.0` for merged/summary/project output, unifying every producer. Consumers must update their major-version check from `2.` to `3.`.
