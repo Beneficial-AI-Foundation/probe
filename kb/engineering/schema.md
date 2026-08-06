@@ -322,6 +322,24 @@ This field is accommodated by `additionalProperties: true` on the merged envelop
 | 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
 | 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0`. |
 
+### Bumping the interchange schema-version (major)
+
+The `schema-version` major is a **cross-repo contract**: every producer stamps it, every consumer validates it (`schema_version.starts_with("<major>.")` in `src/types.rs` and `src/commands/propagate.rs`). A major bump is breaking and must land **in lockstep across the ecosystem** — a partial bump makes atom-loading fail with `… incompatible schema-version "X.0" (expected <major>.x)`.
+
+Checklist for a major bump (N → N+1):
+
+1. **Hub (this repo).** Move the gate to `starts_with("N+1.")` in `src/types.rs` and `src/commands/propagate.rs`; bump the version emitted by `merge`/`summary`/`project`; update this file, `docs/SCHEMA.md`, and the version-history table above. Cut a **tagged release** — downstream pins tags, not `main`.
+2. **Producers** (`probe-rust`, `probe-lean`, `probe-verus`, `probe-leanblueprint`, `probe-aeneas`). Change the emitted `schema-version` to N+1; pin the hub dep to the new tag; relock; cut a **tagged release** each.
+3. **Consumers** (`probe-aeneas`, `probe-verus`). Pin the hub tag — this is the validator — and ensure the sub-extractors they invoke emit N+1 (probe-aeneas installs `probe-rust`/`probe-lean` unpinned, see [probe-aeneas#53](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/53)); relock; release.
+4. **Images / verilib.** Rebuild every ECR image from the new releases, repoint verilib, and build `--locked` so a dependency can't silently float.
+5. **Verify** end-to-end: run atomization on real N+1 atoms and confirm they load.
+
+Gotchas (from the 2 → 3 bump):
+
+- **Pin the hub by `tag`, never a floating `git` dep.** Otherwise released/ECR builds freeze whatever validator their lockfile held while local `cargo install` floats to `main` — the "works locally, breaks in verilib" split.
+- **Emit and validate must ship in the same release.** probe-aeneas 0.17.0 emitted `3.0` but linked a `2.x` validator, so it rejected its own schema.
+- **Don't rely on gitignored `.cargo/config.toml` path-patches** (`probe = { path = "../probe" }`) — they mask the mismatch locally.
+
 ## Package versioning by language
 
 | Language | Strategy | Example |
