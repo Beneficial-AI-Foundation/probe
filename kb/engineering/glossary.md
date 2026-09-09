@@ -198,3 +198,21 @@ A function declared inside an `extern { … }` block, binding to an implementati
 ## trait signature
 
 A trait method declared without a default body, reported by probe-rust as `trait-required`. Its proof obligations belong to the `impl`s, which are tracked as their own atoms. Trait methods *with* a default body are ordinary code.
+
+## untracked
+
+The atom field marking **verification scope**: `untracked: true` means the atom
+is outside the verification effort, `false` means it is in scope. It is not a
+progress signal, and `true` is not "unverified work to do" — see
+[P24](properties.md#p24-a-status-bearing-atom-is-in-analysis-scope) and
+[P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope).
+An out-of-scope atom carries no `verification-status`; the reason it is out of
+scope is reported in `untracked-reason`.
+
+## backlog
+
+The work a project still owes: atoms that are **in scope and unproved** —
+`untracked: false` with no `verification-status`, or one of `unverified` /
+`failed`. The backlog is the complement of out-of-scope within the tracked set,
+which is why widening [untracked](#untracked) shrinks the denominator progress
+is measured against.

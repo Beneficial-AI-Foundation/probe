@@ -216,7 +216,7 @@ Scope, spec, and status align as:
 | specified, not proved | false | `unverified` / `failed` |
 | `#[verifier::external_body]` / `admit()` | false | `trusted` |
 | **backlog** — compiled, non-external, unspecified | false | *(none)* |
-| out of scope — Verus: cfg-inactive / `#[verifier::external]` / external-crate stub / bodiless declaration / non-library target; Aeneas: untranslated / `@[out_of_scope]` translation | true | *(none)* |
+| out of scope — Verus: cfg-inactive / `#[verifier::external]` / external-crate stub / bodiless declaration / non-library target; Aeneas: cfg-inactive / unmounted / bodiless declaration / non-library target / `@[out_of_scope]` translation / config out-of-scope | true | *(none)* |
 
 The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `untracked: false`, no status.
 
