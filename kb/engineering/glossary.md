@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-07-21
+last-updated: 2026-09-09
 status: draft
 ---
 
@@ -174,3 +174,27 @@ A human-authored roadmap for a Lean formalization project that annotates each re
 ## two-axis status
 
 The blueprint progress model, tracked on two independent axes: the **statement axis** (is the *statement* formalized in Lean? `none`/`blocked`/`ready`/`formalized`) and the **proof axis** (is the *proof* complete and sorry-free? `none`/`ready`/`proved`/`fully-proved`). Normalized canonically in `probe-leanblueprint/src/model.rs`. The proof axis is additive over probe-lean's machine `verification-status`, which stays authoritative (owned by probe-leanblueprint; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo)).
+
+## mount chain
+
+The sequence of `mod` declarations linking a package's library or binary target entry (`src/lib.rs`, `src/main.rs`, `[[bin]]` paths) to a given source file. A file can be reached by several chains, including chains from different targets or workspace members. Computed by probe-rust's module-tree walk.
+
+## unmounted
+
+A source file that no [mount chain](#mount-chain) reaches, so rustc compiles it into no lib or bin build. Reported by probe-rust as `is-unmounted` and treated as out of scope ([P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope)). Emitted only from a provably complete walk: any construct the walk cannot resolve (unparsable file, unresolvable `mod` target, `include!`, `cfg_attr` on a `mod`, a macro whose tokens mention `mod`, a mount cycle, chain-cap overflow) disables the inference for the whole project, so compiled code is never mislabeled.
+
+## file gate
+
+The `#[cfg(...)]` predicate contributed by the `mod` declarations along a file's [mount chains](#mount-chain), as opposed to the gates written on the item itself or on its enclosing same-file blocks. probe-rust folds the file gate into each function's `cfg` and also emits it alone as `file-cfg`. The standalone field never decides scope; it only refines the reported reason.
+
+## bodiless declaration
+
+A function with no body, so there is no implementation at that site to verify. Rust has exactly two forms: a [foreign declaration](#foreign-declaration) and a [trait signature](#trait-signature). Verus-side tooling expresses the same property as `has-body: false`; probe-rust reports the two forms as separate positive facts. Out of scope under [P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope).
+
+## foreign declaration
+
+A function declared inside an `extern { … }` block, binding to an implementation written in another language. Reported by probe-rust as `is-foreign`. Not to be confused with a function that merely has a non-Rust ABI and a real body (`pub extern "C" fn f() { … }`), which is ordinary verifiable code.
+
+## trait signature
+
+A trait method declared without a default body, reported by probe-rust as `trait-required`. Its proof obligations belong to the `impl`s, which are tracked as their own atoms. Trait methods *with* a default body are ordinary code.
