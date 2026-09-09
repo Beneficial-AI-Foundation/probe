@@ -174,7 +174,7 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `translation-name` — corresponding name in other language
 - `translation-path` — file path of translation
 - `translation-text` — line range of translation
-- `untracked` — computed from functions.json
+- `untracked` — verification scope ([P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope)), computed from probe-rust source facts and the Lean translation's attributes. **Not** from `functions.json`: absence from it means untranslated backlog, not out of scope. `untracked-reason` names the cause.
 - `is-public` — Rust item visibility: `true` if declared `pub` per Charon, `false` if private or visibility data unavailable (set on all Rust atoms; preserved from probe-rust when present, defaulted to `false` when absent)
 
 **probe-leanblueprint extensions** (on enriched Lean atoms and synthetic planned atoms):
