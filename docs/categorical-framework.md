@@ -1,5 +1,9 @@
 # Categorical Framework for Probe Tools
 
+Below, a few notes following the input from Shaowei. Credit goes to Shaowei. Errors are mine. 
+
+---
+
 The categorical structure underlying the probe tools architecture, drawing on two frameworks:
 
 - **DOTS** (Double Operadic Theory of Systems) by Libkind & Myers ([arXiv 2505.18329](https://arxiv.org/abs/2505.18329))
