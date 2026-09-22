@@ -7,9 +7,9 @@ Parent document: [consumer-guide.md](consumer-guide.md)
 The views a UI should implement to let users explore probe atom data: language toggles,
 the three visualization layouts (call graph, file map, crate map), and filtering by atom
 metadata. A reference implementation is the
-[scip-callgraph](https://github.com/Beneficial-AI-Foundation/scip-callgraph) viewer,
+[probegraph](https://github.com/Beneficial-AI-Foundation/probegraph) viewer,
 deployed at
-[beneficial-ai-foundation.github.io/scip-callgraph](https://beneficial-ai-foundation.github.io/scip-callgraph/).
+[beneficial-ai-foundation.github.io/probegraph](https://beneficial-ai-foundation.github.io/probegraph/).
 
 ## Language toggles
 
@@ -70,9 +70,9 @@ graph (nodes = atoms, edges = dependencies), differing only in layout and groupi
 ### Call graph view
 
 > **Reference PoC implementation:**
-> [CALL_GRAPH_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CALL_GRAPH_ALGORITHM.md)
+> [CALL_GRAPH_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/CALL_GRAPH_ALGORITHM.md)
 > describes the layout algorithm (hybrid Sugiyama + force-directed simulation)
-> used by scip-callgraph.
+> used by probegraph.
 
 A force-directed (or hierarchical) graph where each node is one atom and each edge a
 dependency.
@@ -91,9 +91,9 @@ dependency.
 - **Kind badges.** Show the `kind` value (exec/proof/spec or
   def/theorem/etc.) as a badge or icon on each node.
 
-**Example (scip-callgraph):**
+**Example (probegraph):**
 
-[`scalar::batch_invert` at depth 1](https://beneficial-ai-foundation.github.io/scip-callgraph/?source=scalar%3A%3Abatch_invert&depth=1)
+[`scalar::batch_invert` at depth 1](https://beneficial-ai-foundation.github.io/probegraph/?source=scalar%3A%3Abatch_invert&depth=1)
 shows the immediate callees of `batch_invert` in curve25519-dalek. Clicking a callee
 expands *its* callees.
 
@@ -111,9 +111,9 @@ expands *its* callees.
 ### File map view
 
 > **Reference PoC implementation:**
-> [FILE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/FILE_MAP_ALGORITHM.md)
+> [FILE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/FILE_MAP_ALGORITHM.md)
 > describes the compound DAG layout (transitive reduction + dagre/Sugiyama)
-> used by scip-callgraph.
+> used by probegraph.
 
 A hierarchical layout grouping atoms by source file. Each file is a compound box
 containing its atoms; edges between atoms in different files are drawn between the file
@@ -144,10 +144,10 @@ or omit them and show them only as edge targets.
 ### Crate map view
 
 > **Reference PoC implementation:**
-> [CRATE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CRATE_MAP_ALGORITHM.md)
+> [CRATE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/CRATE_MAP_ALGORITHM.md)
 > describes the crate aggregation, boundary selection, and three-mode
 > interaction model (collapsed / expanded edge / boundary) used by
-> scip-callgraph.
+> probegraph.
 
 A high-level overview where each node is a crate (Rust) or package (Lean) and edges are
 cross-crate function calls.
@@ -165,7 +165,7 @@ depend on?", "how many functions does crate A call in crate B?"
   cross-crate dependency edges between the two crates.
 - **Boundary selection.** Select two crates to see the interface
   between them: which functions in crate A are called by crate B.
-  The [scip-callgraph crate boundary feature](https://beneficial-ai-foundation.github.io/scip-callgraph/)
+  The [probegraph crate boundary feature](https://beneficial-ai-foundation.github.io/probegraph/)
   implements this with a source/target crate dropdown.
 - **Drill-down.** Double-click a crate to switch to call graph view
   filtered to that crate's atoms.
@@ -182,8 +182,8 @@ depend on?", "how many functions does crate A call in crate B?"
 ## Filtering dimensions
 
 > **Reference PoC implementation:**
-> [QUERY_PIPELINE.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/QUERY_PIPELINE.md)
-> describes scip-callgraph's composable query pipeline: source/sink
+> [QUERY_PIPELINE.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/QUERY_PIPELINE.md)
+> describes probegraph's composable query pipeline: source/sink
 > queries, pattern matching syntax, kind and call-type filters,
 > traversal vs. display predicates, and URL parameter encoding.
 
@@ -232,7 +232,7 @@ hidden by default and shown on request.
 
 ## URL-driven state
 
-The scip-callgraph viewer demonstrates a useful pattern: encode the
+The probegraph viewer demonstrates a useful pattern: encode the
 current view state in the URL query string so that views are
 shareable and bookmarkable. Key parameters:
 
@@ -259,7 +259,7 @@ function from curve25519-dalek:
 
 ### Call graph view (Rust, depth 1)
 
-URL: [`?source=scalar::batch_invert&depth=1`](https://beneficial-ai-foundation.github.io/scip-callgraph/?source=scalar%3A%3Abatch_invert&depth=1)
+URL: [`?source=scalar::batch_invert&depth=1`](https://beneficial-ai-foundation.github.io/probegraph/?source=scalar%3A%3Abatch_invert&depth=1)
 
 Shows `batch_invert` at the center with its immediate callees
 (functions it calls). The viewer renders each callee as a node
@@ -267,7 +267,7 @@ colored by verification status.
 
 ### Call graph view (Rust, depth 2)
 
-URL: [`?source=scalar::batch_invert&depth=2`](https://beneficial-ai-foundation.github.io/scip-callgraph/?source=scalar%3A%3Abatch_invert&depth=2)
+URL: [`?source=scalar::batch_invert&depth=2`](https://beneficial-ai-foundation.github.io/probegraph/?source=scalar%3A%3Abatch_invert&depth=2)
 
 Expands one more level: callees of callees. The graph grows but
 remains navigable with the depth slider.
@@ -321,16 +321,16 @@ direct link:
 
 This gives every node a "View source" action.
 
-## scip-callgraph reference documentation
+## probegraph reference documentation
 
-The [scip-callgraph](https://github.com/Beneficial-AI-Foundation/scip-callgraph)
+The [probegraph](https://github.com/Beneficial-AI-Foundation/probegraph)
 viewer implements the views and queries described above. Technical
 documentation for the algorithms and query system:
 
 | Document | Covers |
 |----------|--------|
-| [INTERACTIVE_VIEWER.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/docs/guides/INTERACTIVE_VIEWER.md) | User-facing guide to the three views, filtering, and interactions |
-| [CALL_GRAPH_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CALL_GRAPH_ALGORITHM.md) | Hybrid Sugiyama + force-directed layout for the call graph view |
-| [FILE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/FILE_MAP_ALGORITHM.md) | Compound DAG layout (transitive reduction + dagre) for the file map view |
-| [CRATE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/docs/technical/CRATE_MAP_ALGORITHM.md) | Quotient graph aggregation and three-mode interaction for the crate map view |
-| [QUERY_PIPELINE.md](https://github.com/Beneficial-AI-Foundation/scip-callgraph/blob/main/web/QUERY_PIPELINE.md) | Composable query pipeline: source/sink queries, pattern matching, filters, URL parameters |
+| [INTERACTIVE_VIEWER.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/docs/guides/INTERACTIVE_VIEWER.md) | User-facing guide to the three views, filtering, and interactions |
+| [CALL_GRAPH_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/CALL_GRAPH_ALGORITHM.md) | Hybrid Sugiyama + force-directed layout for the call graph view |
+| [FILE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/FILE_MAP_ALGORITHM.md) | Compound DAG layout (transitive reduction + dagre) for the file map view |
+| [CRATE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/CRATE_MAP_ALGORITHM.md) | Quotient graph aggregation and three-mode interaction for the crate map view |
+| [QUERY_PIPELINE.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/QUERY_PIPELINE.md) | Composable query pipeline: source/sink queries, pattern matching, filters, URL parameters |

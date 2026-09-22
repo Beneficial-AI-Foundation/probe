@@ -73,7 +73,7 @@ merged result, but the envelope handles identity of the *inputs* to the merge.
 
 ### 7. Self-describing files for viewers
 
-The web viewer (scip-callgraph) currently receives a bare JSON blob and must be told
+The web viewer (probegraph) currently receives a bare JSON blob and must be told
 externally what it represents. With an envelope, a viewer can accept any probe output file
 and render it appropriately based on `schema` and `source.language`.
 

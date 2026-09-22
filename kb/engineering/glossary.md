@@ -102,9 +102,9 @@ A filtered, projected view of [atoms](#atom) prepared for web UI consumption. Mo
 
 A derived projection computed from raw probe output. Views live in `.verilib/views/` and are produced by downstream tools (e.g. probe-lean `viewify`, verilib-cli). They are not normative — the raw probe output in `.verilib/probes/` is the source of truth.
 
-## scip-callgraph
+## probegraph
 
-A web UI application (separate from the probe tools) that visualizes call graphs, verification status, and cross-language mappings. It consumes [Schema 3.0](schema.md) JSON files produced by probe tools. Located in `baif/scip-callgraph/`.
+A web UI application (separate from the probe tools) that visualizes call graphs, verification status, and cross-language mappings. It consumes [Schema 3.0](schema.md) JSON files produced by probe tools. Located in `baif/probegraph/`.
 
 ## verilib-cli
 
@@ -161,7 +161,7 @@ The initial set of [code-names](#code-name) from which a [projection](#projectio
 
 ## focus-set
 
-A JSON file produced by `probe project --emit-focus`, containing an array of [code-names](#code-name) (`focus_nodes`) representing the [projected](#projection) subgraph. Compatible with scip-callgraph's `?focus=` URL parameter for highlighting or filtering nodes in the viewer. See [probe-project.md](../tools/probe-project.md#focus-set-emission).
+A JSON file produced by `probe project --emit-focus`, containing an array of [code-names](#code-name) (`focus_nodes`) representing the [projected](#projection) subgraph. Compatible with probegraph's `?focus=` URL parameter for highlighting or filtering nodes in the viewer. See [probe-project.md](../tools/probe-project.md#focus-set-emission).
 
 ## probe-extract-check
 

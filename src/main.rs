@@ -71,7 +71,7 @@ enum Commands {
         #[arg(short, long, default_value = "projected.json")]
         output: PathBuf,
 
-        /// Also emit a focus-set JSON for scip-callgraph ?focus= param.
+        /// Also emit a focus-set JSON for probegraph ?focus= param.
         #[arg(long)]
         emit_focus: bool,
     },

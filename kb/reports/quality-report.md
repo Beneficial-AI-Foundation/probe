@@ -33,5 +33,5 @@ None — all warnings from initial audit have been fixed:
 
 ### [I3] Output schema semantics for single-tool input
 - **Location**: `cmd_project()` always emits `probe/merged-atoms`
-- **Issue**: Semantically imprecise for single-tool input, but intentional for scip-callgraph compatibility
+- **Issue**: Semantically imprecise for single-tool input, but intentional for probegraph compatibility
 - **Recommendation**: Disambiguated by `tool.command: "project"` — document this in KB

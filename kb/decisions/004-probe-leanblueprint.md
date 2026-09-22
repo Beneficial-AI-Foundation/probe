@@ -31,7 +31,7 @@ Sub-decisions:
 ## Alternatives considered
 
 - **Extend probe-lean with a thin blueprint wrapper.** Rejected: probe-lean is written in Lean (language mismatch for a LaTeX/JSON adapter), it would couple a complementary doc layer into the generic extractor, and it contradicts the KB positioning of blueprint as doc-authoritative.
-- **A blueprint-native tool disconnected from probe-lean.** Rejected: it would force brand-new ingestion logic in every downstream consumer (verilib, scip-callgraph) and fragment the shared atom model. Emitting Schema 3.0 with blueprint data as extensions means schema-driven consumers need zero changes.
+- **A blueprint-native tool disconnected from probe-lean.** Rejected: it would force brand-new ingestion logic in every downstream consumer (verilib, probegraph) and fragment the shared atom model. Emitting Schema 3.0 with blueprint data as extensions means schema-driven consumers need zero changes.
 
 ## Consequences
 

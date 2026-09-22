@@ -151,7 +151,7 @@ Target Projects (Rust, Lean, Verus)
             │
             └── probe project ───→ projected_atoms.json (subgraph via mapping seeds)
 
-All JSON → scip-callgraph (web UI consumer)
+All JSON → probegraph (web UI consumer)
 ```
 
 ## Why separate directories

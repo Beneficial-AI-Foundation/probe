@@ -57,7 +57,7 @@ The probe ecosystem extracts structured data from multi-language verification pr
 All tools produce JSON conforming to [Schema 3.0](../engineering/schema.md). Every output file is self-describing via its metadata envelope.
 
 Primary consumers:
-- **scip-callgraph** — web UI for visualizing call graphs, verification status, and cross-language mappings
+- **probegraph** — web UI for visualizing call graphs, verification status, and cross-language mappings
 - **verilib-cli** — orchestration tool that coordinates probe runs
 
 ## Users

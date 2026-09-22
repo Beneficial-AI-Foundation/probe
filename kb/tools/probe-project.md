@@ -13,7 +13,7 @@ status: draft
 
 `probe project` takes a Schema 3.0 atom file and a [mappings file](../engineering/schema.md#mappings-file-format), uses all mapping endpoints (`from` + `to` code-names) as seeds, then expands via BFS in both directions with separate depth controls. The output is a trimmed atom file containing only the projected subgraph.
 
-This is the server-side complement to scip-callgraph's client-side source/sink filtering. It produces reusable, shareable JSON artifacts suitable for CI pipelines, demos, or focused analysis.
+This is the server-side complement to probegraph's client-side source/sink filtering. It produces reusable, shareable JSON artifacts suitable for CI pipelines, demos, or focused analysis.
 
 See [architecture.md](../engineering/architecture.md) for how this fits into the data flow.
 
@@ -50,7 +50,7 @@ Iterate all atoms to build a "who depends on me?" map: `BTreeMap<String, BTreeSe
 
 ### Step 5: Write output
 
-- Reuses `probe/merged-atoms` schema (compatible with scip-callgraph without viewer changes)
+- Reuses `probe/merged-atoms` schema (compatible with probegraph without viewer changes)
 - Carries provenance from input (`inputs` for merged, wrapped `source` for single-tool)
 - Adds `projection` metadata block with seeds, depths, atom counts, trimmed dep count
 
@@ -71,7 +71,7 @@ Iterate all atoms to build a "who depends on me?" map: `BTreeMap<String, BTreeSe
 probe merge lean.json rust.json --mappings map.json -o merged.json
 probe project merged.json --mappings map.json --forward-depth 3 -o focused.json --emit-focus
 
-# Load directly in scip-callgraph
+# Load directly in probegraph
 # or use ?focus=focused_focus.json with the full merged graph
 ```
 
@@ -88,7 +88,7 @@ probe project merged.json --mappings map.json --forward-depth 3 -o focused.json 
 
 ## Focus-set emission
 
-When `--emit-focus` is set, writes a companion `<stem>_focus.json` compatible with scip-callgraph's `?focus=<url>` parameter:
+When `--emit-focus` is set, writes a companion `<stem>_focus.json` compatible with probegraph's `?focus=<url>` parameter:
 
 ```json
 {
