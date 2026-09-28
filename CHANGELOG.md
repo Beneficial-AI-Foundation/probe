@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Spec**: P23 restated as a single path-based definition (enrichment recomputes rather than upgrades; merge re-enriches; `trusted` is a whole-atom boundary unless marked; missing-status atoms transparent by construction). P4/P5 restated on the carrier with the μ/F_M factoring and the mapping-compatibility law. P13 rewritten from existence-checked edge injection to unconditional record attachment. P8 extended to code-name-bearing extension arrays and mapping endpoints. P15 scoped to atoms carrying categorized subsets and required to survive transformations. P16 Lean status table replaced with the kernel-based evidence contract. P9 defines provenance as a deduplicated source inventory with structural composed detection. Hub schema-version 3.1 (minor, hub-side only).
 - Aligned `docs/merge-algorithm.md`, `docs/mappings-spec.md`, `docs/SCHEMA.md`, `docs/categorical-framework.md`, glossary, and all `kb/tools/` pages with ADR-006.
+- Single-sourced the interchange docs on the KB (#64): `docs/SCHEMA.md` reduced to a pointer to the normative `kb/engineering/schema.md` plus per-tool delegation and design rationale; `docs/merge-algorithm.md` and `docs/mappings-spec.md` folded into `kb/tools/probe-merge.md` / `kb/engineering/schema.md#mappings-file-format` and archived under `docs/archive/`; `docs/categorical-framework.md` moved to `kb/engineering/categorical-framework.md`; `docs/consumer-guide.md` and all remaining links repointed at the KB.
+
+### Fixed
+- `probe merge --mappings` CLI help no longer claims mappings "add cross-language dependency edges"; it now states records are attached per ADR-006. Fixed the stale `P26` reference in `kb/engineering/schema.md` (migrated to probe-leanblueprint by ADR-005).
 
 ## [0.4.0] - 2026-08-04
 

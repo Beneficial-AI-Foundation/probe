@@ -11,15 +11,21 @@ This repository contains:
 
 ## Documentation
 
+The normative specifications live in the knowledge base: start at
+[kb/index.md](kb/index.md). In particular
+[kb/engineering/schema.md](kb/engineering/schema.md) (Schema 3.x interchange
+format, merge algorithm, mappings file format) and
+[kb/engineering/properties.md](kb/engineering/properties.md) (invariants).
+
+Reference docs in this repo:
+
 - [docs/consumer-guide.md](docs/consumer-guide.md) -- **Start here**: how to use all probe tools, examples, and working with the data
-- [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format (Schema 3.0)
+- [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format: pointer to the normative spec, per-tool extension docs, design rationale
 - [docs/schema-validation.md](docs/schema-validation.md) -- Validating probe output against the JSON Schema (Rust, Lean, CI)
 - [docs/ui-views.md](docs/ui-views.md) -- How a UI should implement language toggles, call graph / file map / crate map views
 - [docs/testing-guide.md](docs/testing-guide.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
-- [docs/merge-algorithm.md](docs/merge-algorithm.md) -- Merge algorithm specification
-- [docs/mappings-spec.md](docs/mappings-spec.md) -- Cross-language mapping file format
-- [docs/categorical-framework.md](docs/categorical-framework.md) -- Categorical/algebraic structure of probe merge
+- [kb/engineering/categorical-framework.md](kb/engineering/categorical-framework.md) -- Categorical/algebraic structure of probe merge
 - [docs/extract-check-design.md](docs/extract-check-design.md) -- Design of the extract-check validation tool
 - [probe-extract-check/TESTING.md](probe-extract-check/TESTING.md) -- Test guide for probe-extract-check
 - [schemas/atom-envelope.schema.json](schemas/atom-envelope.schema.json) -- JSON Schema
@@ -30,7 +36,7 @@ Each probe repo has `docs/USAGE.md` (command reference) and `docs/SCHEMA.md` (JS
 
 | Repo | Usage | Schema | Schema scope |
 |------|-------|--------|-------------|
-| **[probe](https://github.com/Beneficial-AI-Foundation/probe)** | -- | [`docs/SCHEMA.md`](docs/SCHEMA.md) | Interchange spec: core fields, common optional fields, code-name conventions |
+| **[probe](https://github.com/Beneficial-AI-Foundation/probe)** | -- | [`kb/engineering/schema.md`](kb/engineering/schema.md) | Interchange spec: core fields, common optional fields, code-name conventions |
 | **[probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/docs/SCHEMA.md) | Rust-specific fields |
 | **[probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md) | Lean-specific fields |
 | **[probe-leanblueprint](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/SCHEMA.md) | Lean blueprint progress fields |

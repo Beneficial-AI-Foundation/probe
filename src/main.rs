@@ -37,8 +37,9 @@ enum Commands {
         /// Mappings file for cross-language atom matching.
         ///
         /// Maps code-names between languages (e.g., Rust ↔ Lean) so that
-        /// the merge can add cross-language dependency edges. See
-        /// docs/mappings-spec.md for the file format.
+        /// the merge can attach maps-to/mapped-from correspondence records
+        /// (never dependency edges). See kb/engineering/schema.md
+        /// § Mappings file format.
         #[arg(short, long)]
         mappings: Option<PathBuf>,
     },

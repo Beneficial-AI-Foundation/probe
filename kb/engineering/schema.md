@@ -199,7 +199,7 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `blueprint-decl-missing` — `true` when **all** bound Lean decls are absent from the atom set (synthetic planned node)
 - `blueprint-missing-decls` — for a bound node, the subset of `\lean{...}` decls absent from the atom set (partial miss; recorded on the present atom(s))
 
-Blueprint fields are additive: `verification-status` remains probe-lean's machine value (P26).
+Blueprint fields are additive: `verification-status` remains probe-lean's machine value (a probe-leanblueprint invariant, see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo)).
 
 ### Correspondence records (maps-to, mapped-from)
 
@@ -328,9 +328,24 @@ Schema: `probe/mappings`. Contains bidirectional mappings between code-names acr
 }
 ```
 
-Confidence levels: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`.
+The `sources` block describes each side of the mappings (`schema`, `package`, `package-version`). `from`/`to` are generic source/target roles — they assign no implementation/formal roles (a Lean→Rust file is legal). Multiple entries with the same `from` key are allowed (1-to-many): one implementation may correspond to several formal constructs.
 
-See also: [mappings-spec.md](../../docs/mappings-spec.md) for the full format specification, [ADR-003](../decisions/003-mappings-design.md) for generation rationale, and [ADR-006](../decisions/006-correspondence-records.md) for application semantics (correspondence records).
+Each mapping entry carries a required `confidence` and an optional `method` (a finer description of the matching method, e.g. `"rust-qualified-name"`, `"file+display-name"`):
+
+| Confidence | Meaning |
+|------------|---------|
+| `exact` | Matched via `rust-qualified-name` or equivalent deterministic key |
+| `exact-disambiguated` | Matched via `rust-qualified-name` with file/line disambiguation |
+| `file-and-name` | Matched via same source file + display-name overlap |
+| `file-and-lines` | Matched via same source file + overlapping line ranges |
+| `heuristic` | Matched via fuzzy heuristics (lower confidence) |
+| `manual` | Manually authored mapping |
+
+**Folder convention**: mappings files live in `.verilib/mappings/`, named `<from_tool>_<from_package>__<to_tool>_<to_package>.json` (e.g. `lean_SecureMessaging__rust_libsignal-protocol.json`).
+
+**Generation**: any tool with access to both probe outputs can generate a mappings file — probe-aeneas `translate` (three-strategy matching for Aeneas-transpiled projects), manual authoring (cross-language linking without a transpilation relationship), `rust-qualified-name` joins, or file + line matching.
+
+See [ADR-003](../decisions/003-mappings-design.md) for generation rationale and [ADR-006](../decisions/006-correspondence-records.md) for application semantics ([correspondence records](#correspondence-records-maps-to-mapped-from), attached per the [merge rules](#cross-language-mappings) above).
 
 ## Projection metadata
 

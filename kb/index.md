@@ -29,6 +29,7 @@ How the system is built. Architecture, schema contract, invariants.
 - **[schema.md](engineering/schema.md)** — Schema 3.1 interchange specification: envelope format, atom fields, code-name URIs, merge output
 - **[properties.md](engineering/properties.md)** — Invariants and correctness constraints that all implementations must preserve
 - **[glossary.md](engineering/glossary.md)** — Precise definitions of domain terms used across the ecosystem
+- **[categorical-framework.md](engineering/categorical-framework.md)** — Non-normative reference: the categorical/algebraic structure of the merge operator
 
 ### [Tools](tools/index.md)
 Full docs for the hub subcommands; a catalog stub per external probe (role + hub

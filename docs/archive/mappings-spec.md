@@ -1,5 +1,9 @@
 # Probe Mappings Specification
 
+> **Archived 2026-09-28.** Superseded by
+> [kb/engineering/schema.md § Mappings file format](../../kb/engineering/schema.md#mappings-file-format)
+> (normative). Kept for historical reference; not updated.
+
 Version: draft
 Date: 2026-09-28
 Parent document: [SCHEMA.md](SCHEMA.md)

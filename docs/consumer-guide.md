@@ -13,8 +13,8 @@ family.
 | **probe-verus** | Rust/Verus | Call graph + specs + verification status | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) |
 | **probe-aeneas** | Rust + Lean | Cross-language merged graph (Aeneas projects) | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) |
 
-They all produce JSON files conforming to the Schema 3.0 envelope format
-defined in [`probe/docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md).
+They all produce JSON files conforming to the Schema 3.x envelope format
+defined in [`kb/engineering/schema.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/kb/engineering/schema.md).
 
 ## Running extract
 
@@ -93,30 +93,23 @@ atom:
 }
 ```
 
-**Core fields** (present on every atom from every tool):
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `display-name` | string | Human-readable name |
-| `dependencies` | array | Code-names of referenced atoms |
-| `code-module` | string | Module/namespace path |
-| `code-path` | string | Relative file path (empty for stubs); can be used to reconstruct the project's folder structure |
-| `code-text` | object | `{ "lines-start": N, "lines-end": N }` (both 0 for stubs) |
-| `kind` | string | Declaration kind (language-specific) |
-| `language` | string | Source language of the atom; see [SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md#language-string) for the value set |
+**Core fields** (present on every atom from every tool): `display-name`,
+`dependencies`, `code-module`, `code-path`, `code-text`, `kind`, `language`.
+The field-by-field reference — types, semantics, and the `language` value set —
+is [schema.md § Core fields](https://github.com/Beneficial-AI-Foundation/probe/blob/main/kb/engineering/schema.md#core-fields-required-for-all-languages).
 
 **Common optional fields.** Beyond the core fields, atoms may carry
 `primary-spec`, `verification-status`, `trusted-reason`, `untracked`, `specs`,
 and tool-specific extension fields (e.g. probe-leanblueprint's `blueprint-*`
 progress fields). The authoritative list — field names, types, value sets, and
 which tool populates each — is
-[SCHEMA.md § Common Optional Fields](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md#common-optional-fields),
+[schema.md § Common optional fields](https://github.com/Beneficial-AI-Foundation/probe/blob/main/kb/engineering/schema.md#common-optional-fields),
 with per-tool detail in each tool's own `SCHEMA.md`.
 
 ### Kind values
 
 `kind` values are language-specific. See
-[SCHEMA.md § Kind Values](https://github.com/Beneficial-AI-Foundation/probe/blob/main/docs/SCHEMA.md#kind-values)
+[schema.md § Kind values](https://github.com/Beneficial-AI-Foundation/probe/blob/main/kb/engineering/schema.md#kind-values)
 for the full set per language.
 
 ### Stubs
