@@ -1,10 +1,18 @@
 ---
 title: "ADR-003: Cross-language mappings"
-last-updated: 2026-06-03
-status: accepted
+last-updated: 2026-09-28
+status: accepted (application semantics superseded by ADR-006)
 ---
 
 # ADR-003: Cross-language mappings
+
+> **Partially superseded**: this ADR's *application* semantics — merge adds
+> cross-language dependency edges — are superseded by
+> [ADR-006](006-correspondence-records.md): `probe merge --mappings` attaches
+> correspondence records (`maps-to`/`mapped-from`) and never modifies
+> `dependencies`. Mapping *generation* (probe-aeneas strategies, 1-to-1
+> generation, 1-to-many acceptance, bidirectional files, the file format)
+> remains as decided here.
 
 ## Context
 

@@ -28,7 +28,7 @@ a probe-aeneas extraction), the UI should offer:
 |------|---------------|
 | **Rust view** | Only atoms where `language == "rust"`. Dependency edges are restricted to Rust-to-Rust. |
 | **Lean view** | Only atoms where `language == "lean"`. Dependency edges are restricted to Lean-to-Lean. |
-| **Combined view** | All atoms. Cross-language edges (created by `probe merge --mappings`) are visible. |
+| **Combined view** | All atoms. Cross-language correspondence links (from `maps-to`/`mapped-from` records attached by `probe merge --mappings`) are visible, styleable/filterable by confidence. |
 
 Switching modes is a client-side filter on the loaded JSON -- no re-fetching. The toggle
 should be prominent (e.g. a segmented control in the toolbar), since the two views are

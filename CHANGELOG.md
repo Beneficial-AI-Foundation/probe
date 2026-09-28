@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- [ADR-006](kb/decisions/006-correspondence-records.md): correspondence records and the verification evidence contract (spec only — implementation lands in follow-up PRs). `probe merge --mappings` is specified to attach `maps-to`/`mapped-from` correspondence records instead of injecting cross-language dependency edges; new `status-origin` marker (`translation`, `kernel-taint`) with blocker-seed semantics; per-producer version gate with reserved contract-release thresholds (probe-lean 0.16.0, probe-aeneas 0.21.0, probe-leanblueprint 0.11.0, probe-vcvio 0.2.0, probe 0.5.0–1.0.0 interval + `merge-atoms` command rejection); `probe/projected-atoms` schema with projection rejection at recomputation boundaries; `probe summary` `imported-verified` list and blueprint-language exclusion. New properties P27 (record union/inertness); new KB page `kb/tools/probe-vcvio.md`.
+- §3b producer trust audit (probe-verus, probe-lean, probe-leanblueprint) recorded in ADR-006 Decision 4; whole-atom trust adopted for code atoms with the body/closure split as documented fallback.
+
+### Changed
+- **Spec**: P23 restated as a single path-based definition (enrichment recomputes rather than upgrades; merge re-enriches; `trusted` is a whole-atom boundary unless marked; missing-status atoms transparent by construction). P4/P5 restated on the carrier with the μ/F_M factoring and the mapping-compatibility law. P13 rewritten from existence-checked edge injection to unconditional record attachment. P8 extended to code-name-bearing extension arrays and mapping endpoints. P15 scoped to atoms carrying categorized subsets and required to survive transformations. P16 Lean status table replaced with the kernel-based evidence contract. P9 defines provenance as a deduplicated source inventory with structural composed detection. Hub schema-version 3.1 (minor, hub-side only).
+- Aligned `docs/merge-algorithm.md`, `docs/mappings-spec.md`, `docs/SCHEMA.md`, `docs/categorical-framework.md`, glossary, and all `kb/tools/` pages with ADR-006.
+
 ## [0.4.0] - 2026-08-04
 
 ### Changed

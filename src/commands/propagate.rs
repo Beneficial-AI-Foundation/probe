@@ -1,5 +1,5 @@
 // @kb: kb/engineering/properties.md#p14-deterministic-output
-// @kb: kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination
+// @kb: kb/engineering/properties.md#p23-transitive-verification
 
 use crate::types::Atom;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};

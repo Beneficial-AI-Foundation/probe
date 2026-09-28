@@ -1,12 +1,14 @@
 ---
-title: Schema 3.0 Interchange Specification
-last-updated: 2026-07-21
+title: Schema 3.1 Interchange Specification
+last-updated: 2026-09-28
 status: draft
 ---
 
-# Schema 3.0 Interchange Specification
+# Schema 3.1 Interchange Specification
 
 This is the authoritative specification for the JSON interchange format shared by all probe tools. Per-tool `docs/SCHEMA.md` files document tool-specific details; this file defines the contract they all share.
+
+The current version is **3.1** (hub-side minor bump: correspondence records and `status-origin`, see the [version history](#version-history)). 3.x is additive — producers may keep emitting `3.0`; consumers accept any `3.x`.
 
 ## Envelope
 
@@ -68,7 +70,9 @@ When `probe merge` produces output, `source` is replaced by `inputs`:
 }
 ```
 
-When a previously merged file is used as input, its `inputs` entries are flattened into the new output — provenance is carried forward recursively.
+When a previously merged file is used as input, its `inputs` entries are flattened into the new output — provenance is carried forward recursively. Provenance is a **deduplicated source inventory**: the `inputs` array records *which* sources were composed, not how many times ([P9](properties.md#p9-provenance-is-preserved)).
+
+**Composed-provenance detection is structural**, not schema-string-based: an envelope with an `inputs` array is composed, one with a `source` object is single-tool. Producers other than the hub may emit composed envelopes under their own schema strings (e.g. `probe-aeneas/extract` with `inputs: [Rust, Lean]` and no `source`); loaders must preserve their inventories ([ADR-006](../decisions/006-correspondence-records.md)).
 
 ### Registered schema values
 
@@ -78,11 +82,15 @@ When a previously merged file is used as input, its `inputs` entries are flatten
 - `probe-lean/extract`, `probe-lean/viewify`
 - `probe-aeneas/extract`
 - `probe-leanblueprint/extract`
+- `probe-vcvio/extract`
 
 Note: Legacy schema values `probe-lean/atoms`, `probe-lean/enriched-atoms`, `probe-lean/specs`, `probe-lean/proofs`, `probe-lean/stubs` exist from Schema 1.x and may appear in older files or as input sources in merged envelopes. Current probe-lean only produces `probe-lean/extract` and `probe-lean/viewify`.
 
 **Merged schemas**:
 - `probe/merged-atoms`, `probe/merged-specs`, `probe/merged-proofs`
+
+**Projected views**:
+- `probe/projected-atoms` — output of `probe project`. A projection is a **view** of an authoritative graph, not an authoritative artifact: its `dependencies` are trimmed to the included set, so recomputing enrichment over it would launder truncated views into stronger labels. `probe merge` and `probe enrich` **reject** any input carrying this schema — or, for legacy projections, the `probe/merged-atoms` schema plus a `projection` envelope field ([ADR-006](../decisions/006-correspondence-records.md), [P23](properties.md#p23-transitive-verification)). Read-only consumers (`probe summary`, `probe project`, probegraph) accept it; `detect_category` classifies it as atoms.
 
 **Analysis**:
 - `probe/summary`
@@ -97,7 +105,7 @@ The `schema` field implicitly identifies the data category:
 
 | Category | Matches | Merge strategy |
 |----------|---------|---------------|
-| **Atoms** | `*/atoms`, `*/enriched-atoms`, `*/extract`, `probe/merged-atoms` | First-wins with stub replacement |
+| **Atoms** | `*/atoms`, `*/enriched-atoms`, `*/extract`, `probe/merged-atoms`, `probe/projected-atoms` (read-only consumers; rejected by merge/enrich) | First-wins with stub replacement |
 | **Specs** | `*/specs`, `probe/merged-specs` | Last-wins |
 | **Proofs** | `*/proofs`, `probe/merged-proofs` | Last-wins |
 
@@ -146,8 +154,10 @@ The derivation rule and its rationale are owned by probe-verus:
 | Field | Type | Tools | Description |
 |-------|------|-------|-------------|
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification text (verus) or code-name of primary spec theorem (lean) |
-| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment (P23): `"transitively-verified"` = all transitive deps verified/trusted; `"verified"` = locally verified only. |
+| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment ([P23](properties.md#p23-transitive-verification)): `"transitively-verified"` = locally verified and no **seed** (explicit `"failed"`/`"unverified"` atom, or any `status-origin`-bearing atom) is reachable along a dependency path that does not pass through a trusted boundary; `"verified"` = locally verified only. Labels assert consistency with the graph they were computed on; they are not proof re-validation. |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
+| `status-origin` | string | probe-aeneas, probe-lean | Evidence marker on `verification-status`: `"translation"` (status copied from a corresponding atom in another language — imported evidence) or `"kernel-taint"` (probe-lean: the kernel-level taint walk found reachable taint the emitted graph cannot express). Enrichment treats every bearing atom as a **blocker seed**: never promoted to `"transitively-verified"`, unconditionally demoted from an imported `"transitively-verified"`, and blocking promotion of atoms that reach it along a non-trusted path. A `"trusted"` atom carrying `status-origin` is **not** a trust boundary. See [ADR-006](../decisions/006-correspondence-records.md). |
+| `maps-to` / `mapped-from` | array of records | probe (merge) | Correspondence records attached by `probe merge --mappings`; see [Correspondence records](#correspondence-records-maps-to-mapped-from). |
 | `untracked` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
 | `specs` | array of strings | probe-lean | Theorem atoms referencing this atom |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data: `{code-name, location, line}` |
@@ -190,6 +200,32 @@ Extensions are stored in a flat `extensions` map in Rust types but serialized as
 - `blueprint-missing-decls` — for a bound node, the subset of `\lean{...}` decls absent from the atom set (partial miss; recorded on the present atom(s))
 
 Blueprint fields are additive: `verification-status` remains probe-lean's machine value (P26).
+
+### Correspondence records (maps-to, mapped-from)
+
+Attached by `probe merge --mappings` ([ADR-006](../decisions/006-correspondence-records.md), superseding the edge-injection semantics of [ADR-003](../decisions/003-mappings-design.md)). A *correspondence* ("there is a mappings-file entry linking these names, with this confidence") is a different relation from a *dependency* (calls, or proof-uses) and is never written into `dependencies`.
+
+Extension fields are flattened, so the records appear as top-level atom fields. On the mapping's `from` atom:
+
+```json
+{
+  "code-name": "probe:crate/1.0/mod/g()",
+  "maps-to": [
+    { "target": "probe:Pkg.Mod.ga", "confidence": "exact", "method": "rust-qualified-name" }
+  ]
+}
+```
+
+On the `to` atom, the mirror field `mapped-from` with `"target"` pointing back.
+
+- **Record fields**: `target` (required), `confidence` (required, the mappings-file vocabulary: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`), `method` (optional; omitted when absent).
+- **Direction**: the mappings file's `from`/`to` are generic source/target — they assign no implementation/formal roles. `maps-to` goes on the `from` atom, `mapped-from` on the `to` atom, whichever languages the sides are.
+- **Determinism** ([P14](properties.md#p14-deterministic-output)): arrays sorted by `(target, confidence, method)`, absent `method` ordering as the empty string. Record identity is the same triple; duplicates collapse. Records with the same target but different confidence/method are distinct assertions and both kept.
+- **Attachment is unconditional and key-local** ([P13](properties.md#p13-correspondence-records-attach-unconditionally)): a record attaches whether or not its target exists in the invocation's key set (dangling target ⇒ warning, not skip).
+- **Union through conflicts** ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): on every equal-key merge resolution the surviving atom carries the set union of both sides' records.
+- **Inert to enrichment**: correspondence records never participate in contamination/promotion BFS ([P23](properties.md#p23-transitive-verification)).
+- **Mirrors are best-effort**: the correspondence relation is defined as the union over both fields; a missing mirror (target absent at attachment time) loses no information. Regenerating the merge restores mirrors.
+- Cross-language *resolution* (treating `g` and `ga` as one node) is a derived consumer view over the records; a derived `verified-by-translation` status is deferred to a future ADR.
 
 **probe-rust extensions**:
 - `rust-qualified-name` — Charon-derived fully qualified name (optional, with Charon enrichment: `--with-charon` or `--translation`)
@@ -253,16 +289,24 @@ See [properties.md](properties.md) for the invariants merge must satisfy.
 
 ### Cross-language mappings
 
-When `--mappings <file>` is provided to `probe merge`:
-- For each atom's dependencies, if a dependency has a mapping, the mapped code-name(s) are added as additional dependencies
-- Both directions are checked (from→to and to→from)
-- A single source may map to multiple targets (1-to-many)
-- Each target must exist in the merged key set
-- Each target must not already be a dependency
+When `--mappings <file>` is provided to `probe merge`, mappings attach [correspondence records](#correspondence-records-maps-to-mapped-from) — they never modify `dependencies`:
+- For each mapping entry `from → to`, the `from` atom (if present in the merged map) gets a `maps-to` record and the `to` atom (if present) gets a `mapped-from` record
+- Attachment is unconditional and key-local ([P13](properties.md#p13-correspondence-records-attach-unconditionally)): a dangling target is warned about, never skipped
+- A single source may map to multiple targets (1-to-many); each target yields its own record
+- Mapping-file endpoints are normalized ([P8](properties.md#p8-code-name-normalization)) before lookup
+
+### Authority validation and re-enrichment
+
+`probe merge` and `probe enrich` validate every input envelope's authority before recomputing over it ([ADR-006](../decisions/006-correspondence-records.md)):
+
+- **Projection rejection**: inputs carrying `probe/projected-atoms`, or the legacy form (`probe/merged-atoms` plus a `projection` envelope field), are errors — projections are views; deleting edges must not improve assurance.
+- **Version gate**: atoms envelopes whose `tool.name` is in the per-producer gate table with `tool.version` below that producer's contract threshold are errors (pre-contract artifacts can carry unmarked imported or graph-inexpressible evidence). The `probe` entry is an interval (`threshold ≤ version < 1.0.0`) and additionally rejects `tool.command: "merge-atoms"` at any version. `probe summary` and `probe project` run the version-gate component too.
+
+After combining all inputs, merge **re-enriches** the atoms category via the shared enrichment recomputation ([P23](properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged output labels are recomputed, never inherited.
 
 ### Normalization
 
-Before merging, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact).
+Per input, before conflict resolution, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact). Normalization covers code-name-bearing extension arrays and mapping endpoints ([P8](properties.md#p8-code-name-normalization)). The per-input ordering is semantic: it decides which atom wins a post-normalization collision before evidence from other inputs is considered.
 
 ## Mappings file format
 
@@ -284,13 +328,13 @@ Schema: `probe/mappings`. Contains bidirectional mappings between code-names acr
 }
 ```
 
-Confidence levels: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`.
+Confidence levels: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`.
 
-See also: [mappings-spec.md](../../docs/mappings-spec.md) for the full format specification and [ADR-003](../decisions/003-mappings-design.md) for design rationale.
+See also: [mappings-spec.md](../../docs/mappings-spec.md) for the full format specification, [ADR-003](../decisions/003-mappings-design.md) for generation rationale, and [ADR-006](../decisions/006-correspondence-records.md) for application semantics (correspondence records).
 
 ## Projection metadata
 
-When `probe project` produces output, it reuses the `probe/merged-atoms` schema but adds a `projection` metadata block at the envelope level:
+`probe project` writes the distinct `probe/projected-atoms` schema (see [Registered schema values](#registered-schema-values)) and adds a `projection` metadata block at the envelope level:
 
 ```json
 {
@@ -306,7 +350,7 @@ When `probe project` produces output, it reuses the `probe/merged-atoms` schema 
 }
 ```
 
-This field is accommodated by `additionalProperties: true` on the merged envelope and is ignored by consumers that don't know about it. See [probe-project.md](../tools/probe-project.md) for full details.
+The distinct schema string is an **authority boundary**, not a hint: `probe merge` and `probe enrich` error on projected inputs (in both the new and the legacy `probe/merged-atoms`+`projection` form), so a consumer routing through envelope validation fails loudly instead of silently treating a view as authoritative. Verification labels inside a projection describe the **original** graph: `probe project` recomputes enrichment on the full authoritative input graph *before* trimming, and never recomputes from the trimmed view (already-projected inputs stay readable with labels untouched). See [probe-project.md](../tools/probe-project.md) and [ADR-006](../decisions/006-correspondence-records.md).
 
 ## Versioning
 
@@ -321,6 +365,7 @@ This field is accommodated by `additionalProperties: true` on the merged envelop
 | 2.0 | all | Initial Schema 2.0 envelope format |
 | 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
 | 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0`. |
+| 3.1 | probe (hub) | Added optional `maps-to`/`mapped-from` correspondence records and the `status-origin` marker; added the `probe/projected-atoms` schema. Hub-side only — producers keep emitting 3.0; the behavioral change (no cross-language edges in `dependencies`) is coordinated through the [ADR-006](../decisions/006-correspondence-records.md) rollout, not the schema number. |
 
 ### Bumping the interchange schema-version (major)
 

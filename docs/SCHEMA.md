@@ -38,9 +38,11 @@ The `schema` field identifies the producing tool and data type. Format: `<tool>/
 | `probe-aeneas/extract` | Cross-language Rust+Lean merged atoms (Aeneas projects) | Atoms |
 | `probe-leanblueprint/extract` | probe-lean atoms enriched with blueprint progress | Atoms |
 | `probe-leanblueprint/summary` | Two-axis blueprint progress counts (sidecar; never merged) | Analysis |
+| `probe-vcvio/extract` | probe-lean atoms annotated with security-protocol classification | Atoms |
 | `probe/merged-atoms` | Merged atoms from multiple tools | Atoms |
 | `probe/merged-specs` | Merged specs from multiple tools | Specs |
 | `probe/merged-proofs` | Merged proofs from multiple tools | Proofs |
+| `probe/projected-atoms` | Projected view of an atom file (`probe project`); readable, rejected by merge/enrich | Atoms (view) |
 | `probe/summary` | Verified-atom partitioning summary (sidecar; never merged) | Analysis |
 | `probe/mappings` | Cross-language code-name mappings | Special |
 
@@ -193,8 +195,10 @@ use the names and semantics defined here. All are omitted when not applicable.
 | Field | Type | Producers | Description |
 |-------|------|-----------|-------------|
 | `primary-spec` | string | probe-verus, probe-lean | The primary specification for this atom. In probe-verus: concatenated requires+ensures text (empty string = analyzed but no spec). In probe-lean: code-name of the primary specification theorem. |
-| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment: `"transitively-verified"` = all transitive deps verified/trusted; `"verified"` = locally verified only. Absent when verification was skipped. |
-| `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
+| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment recomputation ([P23](../kb/engineering/properties.md#p23-transitive-verification)): `"transitively-verified"` = locally verified with no seed (explicit `"failed"`/`"unverified"`, or any `status-origin`-bearing atom) reachable along a non-trusted dependency path; `"verified"` = locally verified only. Labels assert graph consistency, not proof re-validation. Absent when verification was skipped. |
+| `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`, `"externally_verified"`. |
+| `status-origin` | string | probe-aeneas, probe-lean | Evidence marker: `"translation"` (status copied from a corresponding atom in another language) or `"kernel-taint"` (producer-known taint the emitted graph cannot express). Bearing atoms are blocker seeds in enrichment — never promoted to `"transitively-verified"`; see [ADR-006](../kb/decisions/006-correspondence-records.md). |
+| `maps-to` / `mapped-from` | array of records | probe (merge) | Correspondence records `{target, confidence, method?}` attached by `probe merge --mappings`; never dependency edges. See [kb/engineering/schema.md](../kb/engineering/schema.md#correspondence-records-maps-to-mapped-from). |
 | `untracked` | bool | probe-verus, probe-rust, probe-aeneas | `false` if the function is in scope for analysis; `true` otherwise. Semantics vary by tool. |
 | `specs` | array of strings | probe-lean | Code-names of theorem atoms that reference this atom as a dependency (reverse spec edges). Absent when empty. |
 | `dependencies-with-locations` | array of objects | probe-verus, probe-rust | Per-call location data (see below). |
@@ -315,12 +319,19 @@ languages. The mappings file format is specified in
 
 ### Projection metadata
 
-`probe project` reuses the `probe/merged-atoms` schema but adds a `projection`
-block at the envelope level recording the projection parameters and statistics
-(`mappings-file`, `seeds`, `forward-depth`, `reverse-depth`, `atoms-in`,
-`atoms-out`, `deps-trimmed`). It is accommodated by `additionalProperties: true`
-on the merged envelope and ignored by consumers that don't recognize it. See
-[kb/tools/probe-project.md](../kb/tools/probe-project.md) for details.
+`probe project` writes the distinct `probe/projected-atoms` schema and adds a
+`projection` block at the envelope level recording the projection parameters
+and statistics (`mappings-file`, `seeds`, `forward-depth`, `reverse-depth`,
+`atoms-in`, `atoms-out`, `deps-trimmed`).
+
+The distinct schema string is an **authority boundary**: a projection is a
+view of an authoritative graph, and `probe merge`/`probe enrich` **reject**
+projected inputs — both the new schema string and the legacy form
+(`probe/merged-atoms` plus a `projection` field). Verification labels inside a
+projection describe the original graph (recomputed on the full input before
+trimming); read-only consumers (summary, probegraph) accept projections. See
+[kb/tools/probe-project.md](../kb/tools/probe-project.md) and
+[ADR-006](../kb/decisions/006-correspondence-records.md).
 
 ## Complete Example
 

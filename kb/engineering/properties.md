@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-09-09
+last-updated: 2026-09-28
 status: draft
 ---
 
@@ -31,17 +31,30 @@ An atom is a [stub](glossary.md#stub) if and only if ALL three conditions hold:
 
 No other heuristic (e.g. checking `dependencies: []`) determines stub status. This is implemented in `probe/src/types.rs::Atom::is_stub()`.
 
-## P4. Merge associativity
+## P4. Merge associativity (on the carrier)
 
-`merge(merge(A, B), C) = merge(A, merge(B, C))`
+Merge factors into two operations ([ADR-006](../decisions/006-correspondence-records.md)):
 
-Merging is independent of grouping. This enables recursive merging of previously merged files. Provenance flattening makes this transparent.
+- **`μ(A, B)`** — plain merge: normalize **each input** ([P8](#p8-code-name-normalization), before conflict resolution — the ordering selects evidence), union with the category's conflict rule ([P6](#p6-atom-merge-is-first-wins-with-stub-replacement) atoms, [P7](#p7-specsproofs-merge-is-last-wins) specs/proofs), then enrichment recomputation ([P23](#p23-transitive-verification)) once after all inputs are combined.
+- **`F_M(A)`** — attachment: for fixed mappings M, attach correspondence records ([P13](#p13-correspondence-records-attach-unconditionally), [P27](#p27-correspondence-records-are-unioned-and-inert)) to the atoms of A.
 
-## P5. Merge identity
+`probe merge` without `--mappings` computes `μ`; with `--mappings` it computes `F_M ∘ μ`.
 
-`merge(A, empty) = A`
+**Carrier**: the laws hold on the set of normalized, enrichment-consistent atom maps. The carrier is a *precondition established by normalization + enrichment*, not an automatic property of tool outputs (P23 permits `--skip-enrich`, so even modern extractor output can be off-carrier); μ's own normalize+enrich brings any authoritative input onto it. Projected artifacts are excluded from μ's domain entirely — rejected, not normalized ([ADR-006](../decisions/006-correspondence-records.md)). Every merge output is a fixed point.
 
-Merging with an empty atom map is a no-op.
+**Laws**:
+
+1. **Associativity**: `μ(μ(A, B), C) = μ(A, μ(B, C))` on the carrier. The argument is not enrichment idempotence alone: enrichment preserves graph structure, stub classification, and the recoverable base statuses (it only rewrites `verified` ↔ `transitively-verified`), so enriching an intermediate merge never changes which atom a later conflict selects.
+2. **Commutativity for disjoint keys**: `μ(A, B) = μ(B, A)` when keys are disjoint. Stub-vs-real also resolves order-independently (real wins either way); the genuine order-dependence is real-vs-real (P6) and spec/proof key overlap (P7) — deliberate: argument order is the user's freshness knob.
+3. **Mapping compatibility** (replaces "functoriality holds naturally"): `F_M(μ(A, B)) = μ(F_M(A), F_M(B))` and `F_M(F_M(A)) = F_M(A)`. Holds because attachment is unconditional, set-like, and key-local (P13, P27).
+
+Laws are stated modulo envelope meta (`timestamp`, `tool` — merge writes fresh values) and over provenance as a deduplicated source inventory ([P9](#p9-provenance-is-preserved)).
+
+## P5. Merge identity (exact on the carrier)
+
+`μ(A, ∅) = A` exactly on the carrier. A legacy (off-carrier) input is first brought onto the carrier: `μ(A, ∅) = enrich(normalize(A))`.
+
+Identity does **not** hold for the mapped merge: `F_M(μ(A, ∅)) = F_M(A) ≠ A` when A lacks records — correct behavior, not a bug; the law F_M satisfies is idempotence ([P4](#p4-merge-associativity-on-the-carrier), law 3).
 
 ## P6. Atom merge is first-wins with stub replacement
 
@@ -62,28 +75,40 @@ This is appropriate because re-running `specify` or `verify` should override sta
 
 ## P8. Code-name normalization
 
-Before any merge operation, all code-name keys and dependency references are normalized: trailing `.` characters are stripped. This handles a legacy verus-analyzer artifact.
+Normalization strips trailing `.` characters (a legacy verus-analyzer artifact). In merge it runs **per input, before conflict resolution** ([P4](#p4-merge-associativity-on-the-carrier) — the ordering selects evidence: it decides which atom wins a post-normalization collision before evidence from other inputs is considered). Unary recomputation boundaries (`probe enrich`, `probe project`) apply the same normalization to their input before enrichment, seed matching, or trimming.
 
 Normalization is applied to:
 - Dictionary keys
 - All entries in `dependencies` arrays
-- `code-name` fields in `dependencies-with-locations` extension arrays
+- All code-name-bearing extension arrays: `requires-dependencies`, `ensures-dependencies`, `body-dependencies`, `type-dependencies`, `term-dependencies`, and `code-name` fields in `dependencies-with-locations`
+- `maps-to` / `mapped-from` record targets ([P27](#p27-correspondence-records-are-unioned-and-inert))
+- Mapping-file endpoints (`from`/`to`), before any lookup — atom keys and mapping endpoints are normalized by the same rule on both sides of every lookup
 
 ## P9. Provenance is preserved
 
 Every merged output records the provenance of its inputs in the `inputs` array. When a previously merged file is used as input, its `inputs` entries are flattened into the new output — provenance is never lost across recursive merges.
 
+Provenance is a **deduplicated source inventory**: the `inputs` array records *which* sources were composed, not how many times or in what order — identical entries are deduplicated, which gives envelope-level merge idempotence up to metadata ([P4](#p4-merge-associativity-on-the-carrier)). It is not a record of the composition process or its conflict decisions.
+
+**Composed detection is structural**: an envelope with an `inputs` array is composed, one with a `source` object is single-tool — never keyed on a schema-string prefix. Producers may emit composed envelopes under their own schema strings (e.g. `probe-aeneas/extract` with two `inputs` and no `source`); their inventories must survive loading and re-merge.
+
+Scope note: the inventory guarantee currently extends to inventory-preserving producers; probe-leanblueprint emits a single-`source` envelope over a composed base until its [ADR-006](../decisions/006-correspondence-records.md) rollout lands.
+
 ## P10. Extensions are preserved through merge
 
 Tool-specific extension fields (any JSON key/value not part of the core atom schema) MUST be preserved through merge operations. The `extensions` BTreeMap in the Rust `Atom` struct captures these via `#[serde(flatten)]`.
 
-## P13. Cross-language edges require existence
+## P13. Correspondence records attach unconditionally
 
-When applying mappings during merge:
-- A mapped dependency is added only if the target code-name exists in the merged key set
-- A mapped dependency is not added if it's already present in the atom's dependencies
-- Both mapping directions (from→to and to→from) are checked
-- When a single source maps to multiple targets (1-to-many), each target is checked independently
+When applying mappings during merge (`--mappings`), correspondence records ([`maps-to`/`mapped-from`](schema.md#correspondence-records-maps-to-mapped-from)) are attached to atoms; `dependencies` is never modified ([ADR-006](../decisions/006-correspondence-records.md), superseding the edge-injection semantics this property previously described):
+
+- **Unconditional**: an atom gets its record whether or not the record's target is present in this invocation's key set. A dangling target is warned about, never skipped — it is no worse than a dangling dependency (already tolerated: warned, treated as trusted). An existence check would make attachment depend on the surrounding key set and break the mapping-compatibility law ([P4](#p4-merge-associativity-on-the-carrier), law 3).
+- **Key-local**: attachment depends only on the atom's own code-name.
+- **Set-like**: record identity is the `(target, confidence, method)` triple; re-application is a no-op ([P27](#p27-correspondence-records-are-unioned-and-inert)).
+- Records attach only to atoms present in the merged map (`maps-to` on the `from` atom, `mapped-from` on the `to` atom); 1-to-many mappings yield one record per target.
+- Endpoints are normalized before lookup ([P8](#p8-code-name-normalization)).
+
+Cross-language *resolution* is a derived consumer view over the records, never computed at merge time.
 
 ## P14. Deterministic output
 
@@ -107,6 +132,10 @@ Similarly for probe-lean: `dependencies` = deduplicated union of `type-dependenc
 
 The `dependencies` field MUST always equal the union of its categorized subsets. It is never a superset or subset.
 
+**Scope**: the decomposition equality applies to atoms that carry categorized subsets — plain Rust atoms (probe-rust) carry none, and the equality is vacuous there.
+
+**Preservation**: every transformation (merge, project) must preserve the decomposition where present. In particular, when `probe project` trims `dependencies` to the projected set, it trims the categorized extension arrays with the same filter.
+
 ## P16. Verification status mapping
 
 The `verification-status` field has five possible values: `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, `"trusted"` (or absent for atoms with no verification status — both out-of-scope atoms (`untracked: true`) and the in-scope backlog (`untracked: false`, spec-less)).
@@ -115,25 +144,19 @@ For probe-verus, Verus verification output maps to `verification-status` as:
 
 | Verus status | `verification-status` |
 |---|---|
-| `success` | `"verified"` (upgraded to `"transitively-verified"` after enrichment if all transitive deps are clean) |
+| `success` | `"verified"` (relabelled `"transitively-verified"` by enrichment recomputation when clean — [P23](#p23-transitive-verification)) |
 | `failure` | `"failed"` |
 | `sorries` | `"unverified"` |
 | `warning` | `"unverified"` |
 
-This mapping applies only to **spec-bearing** functions. A spec-less in-scope function receives **no** `verification-status`.
+This mapping applies only to **spec-bearing** functions. A spec-less in-scope function receives **no** `verification-status`. Note that Verus `spec` functions are structurally excluded from verification reporting (they have no proof obligations of their own), so spec atoms are always status-less.
 
-For probe-lean, verification status is determined by sorry detection and trust-base classification:
+For probe-lean, statuses are **kernel-based**, not warning-based: trust and taint are computed over the kernel environment (a taint walk over compiler-elaborated terms), not from build warnings or file paths alone. Classification detail is normative in probe-lean's own [docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/docs/SCHEMA.md); the hub's evidence contract is:
 
-| Condition | `verification-status` |
-|---|---|
-| `kind == "axiom"` or `code-path` ends with `External.lean` | `"trusted"` |
-| No sorry warnings | `"verified"` |
-| Has sorry warnings | `"unverified"` |
-| Build failure | `"failed"` |
+- `"trusted"` marks the trust base: axioms (`trusted-reason: "axiom"`), declarations tagged `@[externally_verified]` (`"externally_verified"`), and **non-proof** declarations in `*External` modules (`"external"`) — External-module trust excludes proofs: a theorem in an External file is `unverified`, not trusted.
+- `"verified"` = locally proved but kernel-reachable taint exists; `"transitively-verified"` = clean per the kernel walk. The kernel walk can see taint the emitted dependency graph cannot express (e.g. through compiler-generated proof auxiliaries that are not atoms). Whenever the taint pass runs (including under `--skip-enrich`), probe-lean stamps `status-origin: "kernel-taint"` on atoms whose `"verified"` reflects graph-inexpressible taint; such atoms are blocker seeds ([P23](#p23-transitive-verification)). An **unmarked** `"verified"` atom is safely promotable by hub enrichment.
 
-**Precedence**: `"trusted"` overrides sorry-based status — an axiom or `*External.lean` declaration is always `"trusted"` regardless of build output.
-
-**Enrichment** (P23): After initial status assignment, the enrichment step (reverse-BFS contamination) upgrades `"verified"` → `"transitively-verified"` for atoms whose entire transitive closure is verified or trusted. This is run automatically as the last step of `probe-verus extract` and `probe-aeneas extract` (or manually via `probe enrich`).
+**Enrichment** ([P23](#p23-transitive-verification)): the enrichment step **recomputes** the `"verified"`/`"transitively-verified"` split as a function of the final graph and base statuses — it sets labels fresh, never merely upgrades. It runs automatically as the last step of `probe-verus extract` and `probe-aeneas extract` (or via `probe enrich`), and `probe merge` re-enriches its output.
 
 ## P17. Schema category consistency
 
@@ -172,27 +195,41 @@ Each probe tool emits tool-specific `trusted-reason` values that reflect the sou
 | `axiom` | `"admit"` | `"axiom"` | Property assumed without proof |
 | `external` | `"external-body"` | `"external"` | Implementation trusted without checking |
 | `assumed spec` | `"assume-specification"` | — | External function whose declared spec is not proved |
+| `attested` | — | `"externally_verified"` | Proof discharged outside Lean; a human vouches via the `@[externally_verified]` attribute |
+
+probe-leanblueprint extends the vocabulary additively on its synthetic node atoms (`"declared"`, `"upstream-proved"` — claims, not attestations; see the code-atom scoping in [P23](#p23-transitive-verification) and [ADR-006](../decisions/006-correspondence-records.md)).
 
 Tools must NOT rename their `trusted-reason` values to match another tool — the values are part of each tool's public contract. Normalization happens in consumers (e.g., `scripts/summarize_extract.py`).
 
 **Implemented in**: `probe/scripts/summarize_extract.py` (`TRUST_LABELS` mapping and `TOOL_CONFIG` per-tool configuration).
 
-## P23. Transitive verification is computed by reverse-BFS contamination
+## P23. Transitive verification
 
-The `probe enrich` command (and the `enrich_verification_status` library function) upgrades `verification-status` from `"verified"` to `"transitively-verified"` on atoms whose entire transitive dependency closure is verified or trusted:
+One executable, path-based definition ([ADR-006](../decisions/006-correspondence-records.md); this *replaces* the earlier "every transitively reachable dependency is verified or trusted" wording):
 
-- **`"transitively-verified"`**: the atom is verified AND every transitively reachable dependency is also verified or trusted.
-- **`"verified"`** (after enrichment): the atom is verified but at least one transitively reachable dependency is not verified and not trusted (locally verified only).
+> A locally verified atom is `"transitively-verified"` iff no **seed** — an explicit `"failed"`/`"unverified"` atom, or any atom carrying `status-origin` — is reachable from it along a dependency path that does not pass through a **trusted boundary** (a zero-length path counts: a seed is never promoted). A `"trusted"` atom is a boundary only when it carries no `status-origin`: `trusted_boundary(atom) = status == "trusted" AND status-origin absent`. Seeds keep their own base status, so blocking never downgrades below `"verified"`.
 
-The algorithm uses **reverse-BFS contamination**: build a reverse dependency index, seed contamination from atoms with explicit `"unverified"` or `"failed"` status, and propagate backwards through callers. This correctly handles cycles (all cycle members receive the same scope) without requiring SCC computation.
+**Enrichment recomputes rather than upgrades.** One reverse BFS from the one seed set; then, for every atom whose status is `"verified"` or `"transitively-verified"`, the label is set fresh: reaches a seed along a non-trusted path, or is itself a seed → `"verified"`; otherwise → `"transitively-verified"`. A contaminated atom arriving with a `transitively-verified` label is downgraded; a `status-origin`-bearing atom arriving as `transitively-verified` is rewritten to `verified` **unconditionally**, not only when contaminated. Recomputation makes the result a function of the final graph and base statuses only — the property that makes merge re-enrichment and the merge algebra ([P4](#p4-merge-associativity-on-the-carrier)) sound.
 
 Key rules:
-- **Only explicit `"unverified"` / `"failed"` contaminates** — atoms with missing `verification-status` are transparent and do not affect transitive scope. This covers both out-of-scope atoms (`untracked: true`, [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) and the in-scope backlog (spec-less, `untracked: false`) — e.g. plain Rust functions or Verus spec functions.
-- **`trusted` does not block transitive** — trusted atoms are intentional axioms, not incomplete work.
+
+- **Missing-status atoms are transparent by construction** — contamination flows through them; they are never labelled themselves. This covers out-of-scope atoms (`untracked: true`, [P25](#p25-atoms-not-in-the-verification-build-are-out-of-scope)) and the in-scope backlog (spec-less, `untracked: false`).
+- **`trusted` is a trust boundary — whole-atom trust**: trusting an atom trusts its entire dependency closure; what is behind a trusted atom is irrelevant to its consumers. Enrichment traverses the unified `dependencies` set (the body/spec/type split is not available on plain atoms). This is a deliberate semantic decision recorded with the producer-audit findings in [ADR-006](../decisions/006-correspondence-records.md); the body-trust/closure-trust split is the documented fallback if a producer case emerges that markers cannot express.
+- **`status-origin`-bearing atoms are blocker seeds, never boundaries** ([ADR-006](../decisions/006-correspondence-records.md)): never promoted, unconditionally demoted from an imported `transitively-verified`, and blocking promotion of every atom that reaches them along a non-trusted path. On a locally verified atom, blocking and contamination are the same operation (the label is set to `"verified"`). A copied `trusted` + `status-origin` seeds like any other marked atom — copied trust must not shield callers.
+- **Correspondence records never contaminate** — `maps-to`/`mapped-from` ([P27](#p27-correspondence-records-are-unioned-and-inert)) are not dependencies and do not participate in the BFS.
 - **Missing deps are treated as trusted** — dependencies not present in the atom map (e.g., external stdlib functions) do not block transitive status. A warning is logged for each.
-- **Non-verified atoms are untouched** — only atoms with `verification-status: "verified"` are candidates for upgrade.
-- **Deterministic** — uses `BTreeMap`/`BTreeSet` throughout (P14).
-- **Idempotent** — running enrichment on already-enriched output produces the same result.
+- **Non-candidates are untouched** — `"failed"`/`"unverified"`/`"trusted"` base statuses are never rewritten.
+- **Deterministic** ([P14](#p14-deterministic-output)) and **idempotent** — enrichment output is a fixed point.
+
+**Merge re-enriches.** Plain merge alone can invalidate labels (stub resolution replaces a transparent status-less stub with a real `unverified` atom), so the shared merge implementation runs enrichment recomputation on the atoms category once after all inputs are combined; every public entry point inherits it. A raw staging primitive for multi-step pipelines defers recomputation but still validates input authority; its output is documented as carrying potentially stale derived statuses.
+
+**Authority boundary.** Merge and enrich reject projected inputs (both formats) and pre-contract envelopes (per-producer version gate) — see [schema.md § Authority validation](schema.md#authority-validation-and-re-enrichment) and [ADR-006](../decisions/006-correspondence-records.md). The carrier ([P4](#p4-merge-associativity-on-the-carrier)) is a precondition: `--skip-enrich` outputs are off-carrier until re-enriched.
+
+**Scope caveats**:
+
+- Recomputed labels assert consistency with the *selected merged graph and the retained base statuses*. They do not re-validate proofs — a `verified` status extracted against one implementation of a dependency is carried over unchanged when merge selects another.
+- Labels inside a projection describe the **original** graph: `probe project` recomputes enrichment on the full authoritative input before trimming, never from the trimmed view; already-projected inputs keep their labels untouched.
+- The assurance contract — including the trusted-boundary reading — is stated over **code atoms**: synthetic `language: "blueprint"` statuses are presentation aggregates, never trust-boundary assertions ([ADR-006](../decisions/006-correspondence-records.md)).
 
 **Integrated into extractors**: probe-verus and probe-aeneas call `enrich_verification_status` as the final step of their `extract` command (skippable via `--skip-enrich`). The `probe enrich` CLI command remains available for re-processing or standalone use.
 
@@ -263,6 +300,16 @@ Causes (1) and (2) are about whether rustc compiles the item at all; (3) is abou
 - As with Verus, a status-bearing atom is never untracked (P24): every reclassification above applies only to atoms that would otherwise be backlog.
 - The **configuration-independent** causes (2) and (3) are judged from source structure alone, so they apply even when the feature set cannot be resolved and cfg classification is skipped.
 
+## P27. Correspondence records are unioned and inert
+
+`maps-to`/`mapped-from` records ([schema.md § Correspondence records](schema.md#correspondence-records-maps-to-mapped-from)):
+
+- **Union through every equal-key resolution**: on stub replacement, real-vs-real first-wins, stub-vs-stub, and post-normalization collisions within a single input, the surviving atom's `maps-to`/`mapped-from` arrays are the set union of both sides'. This is a narrow, decidable carve-out from whole-atom conflict semantics ([P6](#p6-atom-merge-is-first-wins-with-stub-replacement), [P10](#p10-extensions-are-preserved-through-merge)), specific to correspondence records — they cannot be re-derived without the mappings file. General extension union remains undecided.
+- **Identity and order**: record identity is `(target, confidence, method)` with absent `method` ordering as the empty string; arrays are sorted by the same triple ([P14](#p14-deterministic-output)); duplicates collapse. Same target with different confidence/method = distinct assertions, both kept.
+- **Normalized**: record targets are covered by [P8](#p8-code-name-normalization).
+- **Inert**: records never participate in the contamination/promotion BFS ([P23](#p23-transitive-verification)) and are never traversed by projection BFS.
+- **Mirrors are best-effort**: the correspondence relation is the union over both fields; consumers index both and derive reverse lookups. A missing mirror (target absent at attachment time) loses no information; regeneration restores it. Mapping corrections and withdrawals take effect only by regenerating from extracts + the corrected mappings file — attachment never removes a record.
+
 ## Single-probe invariants (owned by each probe's repo)
 
 Per [ADR-005](../decisions/005-doc-ownership-boundary.md), invariants specific to
@@ -271,7 +318,7 @@ one probe live in that probe's own repo, not in this shared file:
 - Mapping generation is 1-to-1 and strategy-priority-ordered → **probe-aeneas**
   ([docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md),
   [docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md)).
-  The hub's merge accepts 1-to-many mappings ([P13](#p13-cross-language-edges-require-existence)).
+  The hub's merge accepts 1-to-many mappings ([P13](#p13-correspondence-records-attach-unconditionally)).
 - `language` is derived from `kind`, not lexical scope → **probe-verus**
   ([docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md#language-assignment)).
   The resulting `kind → language` value convention is recorded in the shared

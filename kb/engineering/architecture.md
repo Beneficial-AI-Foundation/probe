@@ -27,7 +27,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 **Role**: Defines the canonical [Schema 3.0](schema.md) types and the universal `merge` operator.
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
-- `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--mappings`
+- `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, post-merge enrichment recomputation, optional correspondence-record attachment via `--mappings`
 - `src/commands/project.rs` — Graph projection: BFS expansion from mapping seeds with separate forward/reverse depth
 - `src/commands/summary.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies
 - `probe-extract-check/` — Validator that checks extract JSON against actual source code

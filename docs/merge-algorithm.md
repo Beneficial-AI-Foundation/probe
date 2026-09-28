@@ -1,8 +1,9 @@
 # Probe Merge Algorithm
 
 Version: draft
-Date: 2026-03-06
+Date: 2026-09-28
 Parent document: [SCHEMA.md](SCHEMA.md)
+Normative spec: [kb/engineering/schema.md](../kb/engineering/schema.md), [kb/engineering/properties.md](../kb/engineering/properties.md), [ADR-006](../kb/decisions/006-correspondence-records.md)
 
 The algorithm for `probe merge`, which combines data files from multiple `probe-*` tools
 into one. It handles three categories -- **atoms**, **specs**, and **proofs** -- each
@@ -25,25 +26,39 @@ probe merge <file1> <file2> [file3...] -o merged.json
 
 ## Algorithm
 
-### Phase 1: Load and Validate
+### Phase 1: Load and Validate Authority
 
 For each input file:
 
 1. Parse the JSON and extract the envelope fields.
-2. Validate that `schema-version` has a compatible major version (currently `2`).
+2. Validate that `schema-version` has a compatible major version (currently `3`).
    Reject files with an incompatible major version with a clear error.
-3. Detect the **schema category** from the `schema` field:
-   - **Atoms**: `*/atoms`, `*/enriched-atoms`, `probe/merged-atoms`
+3. **Reject projections**: any input carrying the `probe/projected-atoms` schema,
+   or the legacy form (`probe/merged-atoms` plus a `projection` envelope field),
+   is an error — projections are views; re-enriching or merging them would
+   launder truncated graphs into stronger labels (ADR-006).
+4. **Reject pre-contract envelopes**: atoms envelopes whose `tool.name` is in
+   the per-producer version-gate table with `tool.version` below that
+   producer's contract threshold are errors. The `probe` entry is an interval
+   (`threshold ≤ version < 1.0.0`) and additionally rejects
+   `tool.command: "merge-atoms"` at any version.
+5. Detect the **schema category** from the `schema` field:
+   - **Atoms**: `*/atoms`, `*/enriched-atoms`, `*/extract`, `probe/merged-atoms`
    - **Specs**: `*/specs`, `probe/merged-specs`
    - **Proofs**: `*/proofs`, `probe/merged-proofs`
    Reject unrecognized schemas.
-4. Validate that all inputs belong to the **same category**. Error on mismatch.
-5. Extract the `data` dictionary.
-6. Record provenance: for single-tool files, capture the `source` and `schema`; for
-   previously merged files, flatten the `inputs` array so provenance is carried forward
-   across recursive merges.
+6. Validate that all inputs belong to the **same category**. Error on mismatch.
+7. Extract the `data` dictionary.
+8. Record provenance **structurally**: an envelope with an `inputs` array is
+   composed — flatten its entries; an envelope with a `source` is single-tool —
+   wrap it. Deduplicate identical entries (provenance is a source inventory).
 
-### Phase 2: Normalize
+Steps 3–4 are one shared authority validator, invoked at every envelope
+boundary (`cmd_merge`, `merge_atom_files`, `cmd_enrich`, the raw staging
+primitive). The bare-map library API cannot check authority; callers own the
+envelope boundary.
+
+### Phase 2: Normalize (per input, before conflict resolution)
 
 For each entry in each loaded data dictionary:
 
@@ -52,11 +67,20 @@ For each entry in each loaded data dictionary:
 
 For **atom** files only:
 
-2. Apply the same normalization to all entries in the atom's `dependencies` array and
-   any `code-name` fields in `dependencies-with-locations`.
+2. Apply the same normalization to all entries in the atom's `dependencies` array,
+   every code-name-bearing extension array (`requires-dependencies`,
+   `ensures-dependencies`, `body-dependencies`, `type-dependencies`,
+   `term-dependencies`), `code-name` fields in `dependencies-with-locations`,
+   and `maps-to`/`mapped-from` record targets. Mapping-file endpoints are
+   normalized by the same rule before lookup.
 3. **Handle intra-file duplicates.** If normalization causes two keys within the same
    file to collide, apply stub-vs-real resolution (see Phase 3 rules). If both are real
-   atoms, keep the first and warn.
+   atoms, keep the first and warn (counted in `conflicts`). Correspondence records
+   are unioned across the collision (P27).
+
+Normalization runs per input, **before** conflict resolution — the ordering is
+semantic: it decides which atom wins a collision before evidence from other
+inputs is considered.
 
 ### Phase 3: Merge
 
@@ -89,6 +113,30 @@ An atom is a **stub** when all three conditions hold:
 Specs and proofs have no stub concept. When the same code-name appears in multiple
 inputs, the **last** one wins. This is appropriate because re-running `specify` or
 `verify` should override stale results.
+
+On every equal-key atom resolution (stub replacement, real-vs-real, stub-vs-stub),
+the surviving atom's `maps-to`/`mapped-from` correspondence arrays are the set
+union of both sides' (P27).
+
+### Phase 3b: Attach Correspondence Records (optional, `--mappings`)
+
+For each mapping entry `from → to` (endpoints normalized): attach a `maps-to`
+record `{target, confidence, method?}` to the `from` atom if present in the
+merged map, and a mirror `mapped-from` record to the `to` atom if present.
+`dependencies` is never modified; a dangling target is warned about, never
+skipped; records are sorted and deduplicated by `(target, confidence, method)`.
+See [mappings-spec.md](mappings-spec.md) and ADR-006.
+
+### Phase 3c: Re-enrich (atoms only)
+
+After all inputs are combined, run enrichment recomputation
+([P23](../kb/engineering/properties.md#p23-transitive-verification)) over the
+merged atom map — one reverse BFS from the unified seed set (explicit
+`failed`/`unverified` atoms plus every `status-origin`-bearing atom), labels
+set fresh. Stub resolution can invalidate labels computed at extract time, so
+merged labels are recomputed, never inherited. A raw staging primitive for
+multi-step pipelines defers this pass (but not authority validation); its
+output carries potentially stale derived statuses.
 
 ### Phase 4: Write Output
 
@@ -140,7 +188,8 @@ After merging, the tool reports:
 | Stubs remaining | Yes | -- | Stubs still present after all merges |
 | New entries added | Yes | Yes | New entries (not in base) added from subsequent files |
 | Keys normalized | Yes | Yes | Code-names that had trailing `.` stripped |
-| Conflicts | Yes | Yes | Collisions: for atoms, real-vs-real (base kept); for specs/proofs, overrides (incoming kept) |
+| Conflicts | Yes | Yes | Collisions: for atoms, real-vs-real (base kept) and post-normalization intra-file collisions; for specs/proofs, overrides (incoming kept) |
+| Records attached | Yes | -- | `maps-to`/`mapped-from` records attached (if `--mappings`), plus dangling-target warnings |
 
 ## Cross-Language Considerations
 
@@ -153,24 +202,19 @@ When merging atoms from different languages:
 - Same-language stub resolution works identically regardless of language: matching is
   purely by code-name string equality.
 
-- **Cross-language stub resolution** (e.g., resolving a Lean stub that corresponds to a
-  Rust atom via Aeneas transpilation) requires a cross-language mapping file. If a
-  `--mappings <file>` argument is provided, the merge tool loads the mapping and
-  uses it to add cross-language dependency edges between atoms that represent the same
-  logical function. The mappings file format is specified in
-  [mappings-spec.md](mappings-spec.md).
+- **Cross-language correspondence** requires a cross-language mapping file. If a
+  `--mappings <file>` argument is provided, the merge tool attaches
+  `maps-to`/`mapped-from` correspondence records to the mapped atoms (Phase 3b) —
+  it never adds cross-language dependency edges, and it never resolves a stub in
+  one language against an atom in another (the two are distinct atoms linked by a
+  record). Cross-language resolution is a derived consumer view over the records.
+  The mappings file format is specified in [mappings-spec.md](mappings-spec.md).
 
 ## Relationship to probe-verus merge-atoms
 
-This algorithm generalizes probe-verus's `merge-atoms` command. The key differences:
-
-| Aspect | probe-verus merge-atoms | probe merge |
-|--------|------------------------|-------------|
-| Input format | Bare JSON dictionaries (no envelope) | Schema 3.0 enveloped files |
-| Output format | Bare JSON dictionary | Schema 3.0 envelope with `probe/merged-*` |
-| Data categories | Atoms only | Atoms, specs, and proofs |
-| Languages | Rust only | Any language |
-| Provenance | None | `inputs` array in output envelope |
-| Cross-language | N/A | Same-language by default; cross-language mappings supported |
-
-The atom merge rules (stub resolution, conflict handling, normalization) are identical.
+probe-verus's `merge-atoms` is a legacy, independent merge implementation slated
+for retirement or reimplementation as a caller of this algorithm (ADR-006). Its
+outputs masquerade as the hub (`tool.name: "probe"` at probe-verus's own
+version) and silently drop verification statuses, `status-origin` markers, and
+correspondence records. The hub rejects them at any version via the `probe` gate
+interval and the `tool.command: "merge-atoms"` check (Phase 1, step 4).
