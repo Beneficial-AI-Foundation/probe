@@ -388,7 +388,7 @@ The `schema-version` major is a **cross-repo contract**: every producer stamps i
 
 Checklist for a major bump (N → N+1):
 
-1. **Hub (this repo).** Move the gate to `starts_with("N+1.")` in `src/types.rs` and `src/commands/propagate.rs`; bump the version emitted by `merge`/`summary`/`project`; update this file, `docs/SCHEMA.md`, and the version-history table above. Cut a **tagged release** — downstream pins tags, not `main`.
+1. **Hub (this repo).** Move the gate to `starts_with("N+1.")` in `src/types.rs` and `src/commands/propagate.rs`; bump the version emitted by `merge`/`summary`/`project`; update this file and the version-history table above. Cut a **tagged release** — downstream pins tags, not `main`.
 2. **Producers** (`probe-rust`, `probe-lean`, `probe-verus`, `probe-leanblueprint`, `probe-aeneas`). Change the emitted `schema-version` to N+1; pin the hub dep to the new tag; relock; cut a **tagged release** each.
 3. **Consumers** (`probe-aeneas`, `probe-verus`). Pin the hub tag — this is the validator — and ensure the sub-extractors they invoke emit N+1 (probe-aeneas installs `probe-rust`/`probe-lean` unpinned, see [probe-aeneas#53](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/53)); relock; release.
 4. **Images / verilib.** Rebuild every ECR image from the new releases, repoint verilib, and build `--locked` so a dependency can't silently float.

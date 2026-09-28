@@ -45,7 +45,7 @@ For each tool repo (probe-verus, probe-lean, etc.), verify docs reflect the curr
 - **CLI flags**: option lists and examples don't reference deprecated flags
 - **Output filenames**: documented filenames match what the code actually produces
 - **Schema names**: envelope `"schema"` values match current implementation
-- **Schema doc version header**: `docs/SCHEMA.md` version tracks the package version
+- **Schema doc version header**: the schema doc's stated version tracks the current schema version (per-tool repos: `docs/SCHEMA.md`; hub: `kb/engineering/schema.md` — the hub's `docs/SCHEMA.md` is a pointer and carries no version)
 - **Docker/Action docs**: entrypoint command, flags, and output format examples match current CLI
 
 Common staleness pattern: a breaking rename (command, flag, schema) gets updated in the main README and SCHEMA.md but missed in Docker README, Action README, HOW_IT_WORKS, or format.md.
