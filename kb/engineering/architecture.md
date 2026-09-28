@@ -127,6 +127,18 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 
 See [tools/probe-leanblueprint.md](../tools/probe-leanblueprint.md) and [ADR-004](../decisions/004-probe-leanblueprint.md).
 
+### probe-vcvio
+
+**Role**: Security-protocol classification annotator over probe-lean extracts.
+
+**Pipeline**: accept an existing `probe-lean/extract` envelope (`--lean`), annotate atoms with protocol classification, re-emit everything — verification statuses included — as `probe-vcvio/extract` under its own tool identity.
+
+**Key insight**: it is a composer of shape (ii) under the [ADR-006](../decisions/006-correspondence-records.md) composer rule — re-emitting foreign verification evidence under its own identity conceals the evidence's origin from a gate keyed on the original producer's name, so it must run the version-gate component on its input before re-stamping. It reuses the hub's `Atom` type, so `status-origin` markers and correspondence records survive its round-trip.
+
+**Subcommands**: `extract`
+
+See [tools/probe-vcvio.md](../tools/probe-vcvio.md).
+
 ## Data flow
 
 ```
@@ -146,6 +158,10 @@ Target Projects (Rust, Lean, Verus)
     │       │                            (enrich probe-lean atoms with blueprint status)
     │       ├─ runs probe-lean extract (or --lean)
     │       └─ reads Verso manifest / Massot plasTeX
+    │
+    ├── probe-vcvio extract ─────→ vcvio_atoms.json    (annotate a probe-lean
+    │                                                   extract with protocol
+    │                                                   classification)
     │
     └── probe merge ─────────────→ merged_atoms.json   (generic cross-tool merge)
             │

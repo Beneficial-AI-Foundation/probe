@@ -113,7 +113,10 @@ Enrichment treats every `status-origin`-bearing atom uniformly as a
   any other marked atom.
 
 The two values differ only in *whose evidence* the status is — imported vs
-local — which matters to consumers (Decision 8), not to enrichment.
+local — which matters to consumers (Decision 9), not to enrichment. On
+blueprint presentation aggregates (Decision 5), a propagated marker means
+"the aggregate contains evidence of that class", not "this status was
+copied verbatim" — the aggregate reading is part of the value definitions.
 
 ## Decision 3: Enrichment recomputes; merge re-enriches
 
@@ -133,7 +136,7 @@ combined**. All public entry points inherit this. A **raw staging
 primitive** exists for multi-step pipelines (probe-aeneas mutates statuses
 after merging and must enrich exactly once at the end): it defers
 recomputation but applies the **same authority validation** as the public
-entry points (Decisions 5–6) — raw means skip recomputation, not skip
+entry points (Decisions 6–7) — raw means skip recomputation, not skip
 validation. Its output is documented as carrying potentially stale derived
 statuses.
 
@@ -210,12 +213,25 @@ against code and shipped artifacts):
   no code atom depends on a node atom.
 
 **Resolution**: whole-atom trust is adopted for **code atoms**. The
-statement/spec-position hole is a shared producer-level limitation, closed
-producer-side and expressed through `status-origin` markers when it makes
-a verdict graph-inexpressible. The mechanical body-trust/closure-trust
-split (separate traversal of spec/type dependencies) is the **documented
-fallback**, to be built only if a real, artifact-realizable case emerges
-that markers cannot express.
+statement/spec-position hole is a shared producer-level limitation and
+remains **open** until producers ship detection. The `kernel-taint` marker
+gives it an expression channel — a statement-taint demotion is
+graph-inexpressible under whole-atom trust and flows to the hub as a
+blocker seed — but marker *capability* is not statement-taint *detection*:
+probe-lean's walk stops at trusted declarations today, and its contract
+release in the Decision 7 gate table guarantees only the marker.
+Statement-taint detection (a type-closure check, with direct and multi-hop
+regression fixtures and a caller pinned non-transitive) is tracked in the
+probe-lean rollout issue; until it lands, this ADR records the shape as a
+known assurance limitation, not as remediated.
+
+The fallback trigger is deliberately narrower than the plan's original
+wording ("if the audit surfaces a real counterexample"): the mechanical
+body-trust/closure-trust split (separate traversal of spec/type
+dependencies) is the **documented fallback**, to be built only if a real,
+artifact-realizable case emerges **that markers cannot express**. The
+audit's counterexample is marker-expressible, which is why
+detection-plus-marker — not the split — is the chosen remediation.
 
 ## Decision 5: The assurance contract is stated over code atoms
 
@@ -225,7 +241,13 @@ reading — quantifies over **code atoms**. Synthetic
 trust-boundary assertions. This is a scoping of the claim, not a
 laundering fix: blueprint emits no code→node dependencies, so a blueprint
 aggregate can shield only other presentation atoms, and `probe summary`
-excludes blueprint-language atoms from every partition (Decision 8).
+excludes blueprint-language atoms from every partition (Decision 9). The
+containment is **structural per blueprint's emitted graph shape** (its own
+SCHEMA.md documents the no-code→node property, with the same escape
+clause) and is not re-validated for arbitrary merged input; an input that
+fabricates trusted atoms defeats status semantics regardless of
+`language`, which is why the enrichment boundary predicate stays
+blueprint-unaware.
 
 A marker-free counterexample makes scoping (not marker propagation) the
 necessary resolution: a graph-contaminated `verified` theorem carries no
@@ -235,11 +257,19 @@ propagation could qualify.
 
 **Blueprint synthesis rule** (its rollout): `derive_synthetic_verification`
 propagates contributors' `status-origin` markers — a binding over marked
-evidence never synthesizes an unmarked `trusted`/`verified`. Exact
-precedence is recorded in the blueprint rollout issue alongside the audit
-findings; the marker-free case above is legal precisely because blueprint
-statuses sit outside the code-atom assurance contract, and is pinned by
-test.
+evidence never synthesizes an unmarked `trusted`/`verified`. Marker
+precedence on the synthetic status: a node carries a marker iff any
+contributing decl carries one; when contributors carry different values,
+use `"translation"` if any contributor has `"translation"`, otherwise
+`"kernel-taint"`. This is a deliberately **lossy presentation convention**,
+not an assurance ordering — the two values are different dimensions
+(origin vs. known hidden taint), enrichment blocks identically on either,
+and blueprint atoms appear in no summary partition, so the only
+information lost is that kernel taint *also* contributed to a
+translation-marked aggregate (see the aggregate reading in Decision 2).
+The marker-free case above is legal precisely because blueprint statuses
+sit outside the code-atom assurance contract, and is pinned by test in the
+blueprint rollout.
 
 ## Decision 6: Projections are views — rejected at recomputation boundaries
 
@@ -320,6 +350,18 @@ artifacts are rejected at the outer envelope, and a post-threshold
 composed artifact was produced by a tool that itself validates authority
 (Decision 8), so "composer output is built only from contract-compliant
 inputs" holds by induction with no provenance change.
+
+Two scope statements make the induction honest. (a) It quantifies over the
+**audited producer population**: unknown `tool.name`s pass at any version
+by design — an openness trade-off, not an oversight — and a new composer
+joins the table via its own rollout under Decision 8's obligation. (b) One
+legacy exception is **accepted rather than gated**: a pre-fix probe-verus
+`--skip-atomize` run can consume a projection (whose provenance it erases)
+and emit an ordinary, ungated `probe-verus/extract` with unrepairably
+truncated dependencies. No artifact of this class is known to exist, a
+gate entry would reject every ordinary Verus extract to catch it, and the
+Decision 10 regeneration policy covers any suspect file — so the guarantee
+is stated net of this documented exception, not unconditionally.
 
 ## Decision 8: The composer rule
 

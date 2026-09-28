@@ -42,7 +42,7 @@ Implemented as `SchemaCategory` enum in `probe/src/types.rs`.
 
 ## merge
 
-The composition operation that combines data from multiple probe tools into a single output. For [atoms](#atom): first-wins with [stub](#stub) replacement. For specs/proofs: last-wins. Implemented as `probe merge` subcommand.
+The composition operation that combines data from multiple probe tools into a single output. For [atoms](#atom): first-wins with [stub](#stub) replacement, followed by enrichment recomputation over the combined map ([P23](properties.md#p23-transitive-verification)) — merged labels are recomputed, never inherited. For specs/proofs: last-wins. Implemented as `probe merge` subcommand.
 
 See [schema.md](schema.md#merge-algorithm) and [properties.md](properties.md#p4-merge-associativity-on-the-carrier).
 
