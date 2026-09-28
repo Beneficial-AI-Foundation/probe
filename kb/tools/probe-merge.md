@@ -7,12 +7,12 @@ status: draft
 # probe (merge operator)
 
 **Directory**: `baif/probe/`
-**Role**: Central hub — defines [Schema 3.0](../engineering/schema.md) types and the universal merge operator.
+**Role**: Central hub — defines [Schema 3.x](../engineering/schema.md) types and the universal merge operator.
 **Subcommands**: `merge`, `project`, `enrich`, `summary`
 
 ## What this tool does
 
-`probe merge` takes two or more Schema 3.0 JSON files and produces a single merged output. It is the only composition operator in the ecosystem — all tools that need to combine data go through it.
+`probe merge` takes two or more Schema 3.x JSON files and produces a single merged output. It is the only composition operator in the ecosystem — all tools that need to combine data go through it.
 
 See [architecture.md](../engineering/architecture.md) for how this fits into the data flow.
 

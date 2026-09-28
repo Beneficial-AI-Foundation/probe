@@ -60,7 +60,19 @@ A `maps-to` or `mapped-from` entry on an [atom](#atom), attached by `probe merge
 
 ## status-origin
 
-An enumerated atom extension marking whose evidence a `verification-status` is: `"translation"` (imported — copied from a corresponding atom in another language, probe-aeneas) or `"kernel-taint"` (local, but reflecting a producer-known negative finding the emitted graph cannot express, probe-lean). Enrichment treats every bearing atom as a blocker seed: never promoted to `transitively-verified`, unconditionally demoted from an imported `transitively-verified`, blocking promotion of atoms that reach it along a non-trusted path, and never a trusted boundary. See [ADR-006](../decisions/006-correspondence-records.md) and [P23](properties.md#p23-transitive-verification).
+An enumerated atom extension marking whose evidence a `verification-status` is: `"translation"` (imported — copied from a corresponding atom in another language, probe-aeneas) or `"kernel-taint"` (local, but reflecting a producer-known negative finding the emitted graph cannot express, probe-lean). Enrichment treats every bearing atom as a [blocker seed](#blocker-seed). See [ADR-006](../decisions/006-correspondence-records.md) and [P23](properties.md#p23-transitive-verification).
+
+## blocker seed
+
+A seed of the enrichment BFS ([P23](properties.md#p23-transitive-verification)): an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom. A locally verified atom that reaches a blocker seed along a dependency path with no trusted boundary is labelled `"verified"`, not `"transitively-verified"`; a seed itself is never promoted and keeps its own base status. Not to be confused with a projection's [seed set](#seed-set), which selects atoms for `probe project` and has no verification semantics.
+
+## carrier
+
+The set of normalized, enrichment-consistent atom maps — the domain on which the merge laws hold ([P4](properties.md#p4-merge-associativity-on-the-carrier), [P5](properties.md#p5-merge-identity-exact-on-the-carrier)). A precondition established by normalization + enrichment, not an automatic property of tool outputs (`--skip-enrich` output is off-carrier). Projected artifacts are outside the carrier and outside merge's domain entirely.
+
+## version gate
+
+The per-producer authority check run by `probe merge`, `probe enrich`, `probe summary`, and `probe project`: an atoms envelope whose `tool.name` is in the gate table with `tool.version` below that producer's contract-release threshold is rejected — pre-contract artifacts can carry unmarked imported or graph-inexpressible evidence. The `probe` entry is an interval (`threshold ≤ version < 1.0.0`) plus a `tool.command: "merge-atoms"` rejection. Thresholds are reserved constants recorded in [ADR-006](../decisions/006-correspondence-records.md).
 
 ## SCIP
 
@@ -112,7 +124,7 @@ A derived projection computed from raw probe output. Views live in `.verilib/vie
 
 ## probegraph
 
-A web UI application (separate from the probe tools) that visualizes call graphs, verification status, and cross-language mappings. It consumes [Schema 3.0](schema.md) JSON files produced by probe tools. Located in `baif/probegraph/`.
+A web UI application (separate from the probe tools) that visualizes call graphs, verification status, and cross-language mappings. It consumes [Schema 3.x](schema.md) JSON files produced by probe tools. Located in `baif/probegraph/`.
 
 ## verilib-cli
 
@@ -136,7 +148,7 @@ Abbreviation for `rust-qualified-name` — a [Charon](#charon)-derived fully qua
 
 ## trusted (verification-status)
 
-A `verification-status` value (see [P16](properties.md#p16-verification-status-mapping) and [probe-lean tool doc](../tools/probe-lean.md)) indicating that a declaration is assumed correct without formal proof. Applies to Lean [axioms](#kind) and declarations in `*External.lean` files (Aeneas convention for hand-written models of external Rust functions/types). These form the **trust base** of a verified project — assumptions the rest of the proofs rely on.
+A `verification-status` value (see [P16](properties.md#p16-verification-status-mapping) and [probe-lean tool doc](../tools/probe-lean.md)) indicating that a declaration is assumed correct without formal proof. Applies to Lean [axioms](#kind), `@[externally_verified]` declarations, and non-proof declarations in `*External.lean` files (Aeneas convention for hand-written models of external Rust functions/types). These form the **trust base** of a verified project — assumptions the rest of the proofs rely on.
 
 When `verification-status` is `"trusted"`, a `trusted-reason` field is also present:
 - `"axiom"` — Lean `axiom` keyword (probe-lean)
@@ -160,7 +172,7 @@ Labels assert consistency with the graph they were computed on, not proof re-val
 
 ## trust base
 
-The set of declarations in a verified project that are assumed correct without proof. In probe-lean: axioms and hand-written models in `*External.lean` files. In probe-verus: `admit()` axioms, `#[verifier::external_body]` functions, and `assume_specification` targets. Both tools mark these with `verification-status: "trusted"` and a `trusted-reason` for classification. Everything outside the trust base must be proven (or is `"unverified"` / `"failed"`).
+The set of declarations in a verified project that are assumed correct without proof. In probe-lean: axioms, `@[externally_verified]` declarations, and hand-written non-proof models in `*External.lean` files. In probe-verus: `admit()` axioms, `#[verifier::external_body]` functions, and `assume_specification` targets. Both tools mark these with `verification-status: "trusted"` and a `trusted-reason` for classification. Everything outside the trust base must be proven (or is `"unverified"` / `"failed"`).
 
 ## projection
 

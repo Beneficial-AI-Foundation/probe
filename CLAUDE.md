@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Central hub of the probe ecosystem: defines Schema 3.0 types and the universal `merge` operator for composing call graph data across tools and languages.
+Central hub of the probe ecosystem: defines Schema 3.x types (currently 3.1) and the universal `merge` operator for composing call graph data across tools and languages.
 
 ## Build and Test
 

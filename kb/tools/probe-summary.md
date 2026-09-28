@@ -40,7 +40,7 @@ All verified Rust `exec` atoms that are **not** entrypoints. This includes depen
 
 ## Verified lemmas
 
-All verified Verus `proof`/`spec` atoms.
+All verified non-(Rust `exec`) code atoms — Verus `proof`/`spec` atoms and Lean declarations (`language: "blueprint"` atoms excluded, see Scope).
 
 ## Partition property
 
@@ -67,7 +67,7 @@ All arrays are sorted by code-name ([P14](../engineering/properties.md#p14-deter
 probe summary <INPUT> [-o <OUTPUT>]
 ```
 
-- `INPUT` — Schema 3.0 atom file (required)
+- `INPUT` — Schema 3.x atom file (required)
 - `-o OUTPUT` — Write envelope to file (defaults to `summary_<package>_<version>.json`)
 
 Summary statistics are always printed to stderr.

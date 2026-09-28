@@ -6,7 +6,7 @@ status: draft
 
 # Architecture
 
-The probe ecosystem is a multi-language code analysis pipeline. Each tool targets a specific language, extracts structured data (call graphs, specs, verification status), and outputs JSON conforming to the [Schema 3.0](schema.md) envelope format. A central merge operator composes outputs across tools and languages.
+The probe ecosystem is a multi-language code analysis pipeline. Each tool targets a specific language, extracts structured data (call graphs, specs, verification status), and outputs JSON conforming to the [Schema 3.x](schema.md) envelope format. A central merge operator composes outputs across tools and languages.
 
 ## Components
 
@@ -24,7 +24,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 
 ### probe (central hub)
 
-**Role**: Defines the canonical [Schema 3.0](schema.md) types and the universal `merge` operator.
+**Role**: Defines the canonical [Schema 3.x](schema.md) types and the universal `merge` operator.
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
 - `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, post-merge enrichment recomputation, optional correspondence-record attachment via `--mappings`
@@ -76,7 +76,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 **Pipeline** (unified `extract` command):
 1. Build target project via `lake build`
 2. Walk Lean environment, extract declarations and dependencies (type vs term)
-3. Detect sorry warnings from build output
+3. Compute trust and sorry taint over the kernel environment (kernel-based, not warning-based — [P16](properties.md#p16-verification-status-mapping))
 4. Compute specs (reverse dependency edges from theorems)
 5. Wrap in Schema 3.0 envelope
 

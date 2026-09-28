@@ -50,6 +50,7 @@ TRUST_LABELS = {
     "assume-specification": "assumed spec",
     "axiom": "axiom",
     "external": "external",
+    "externally_verified": "attested",
 }
 
 # Maps `kind` values to human-readable labels. An atom is not always a "rust
