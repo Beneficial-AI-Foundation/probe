@@ -5,7 +5,8 @@ Executes the findings of `kb/reports/docs-report.md` (docs-auditor,
 it has the evidence and exact line references; this plan only adds
 execution order, grouping, and the decisions that need a human.
 
-Status: NOT STARTED.
+Status: PR A done — issue #66, draft PR #67 (branch `la/docs-cleanup-pr-a`,
+stacked on #65). Next: PR B.
 Context: written on branch `la/docs-single-source` (draft PR #65, stacked
 on PR #63). Start after #65 merges, or stack on it the same way.
 
