@@ -71,12 +71,19 @@ pub enum AuthorityScope {
 /// with purely numeric components. Anything else (including pre-release
 /// suffixes) is unparsable — rejected on gated tool names, fail-closed.
 fn parse_version(s: &str) -> Option<Version> {
+    // Digits only: `u64::from_str` alone would also accept a leading `+`.
+    fn component(p: &str) -> Option<u64> {
+        if p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        p.parse().ok()
+    }
     let mut parts = s.split('.');
-    let major = parts.next()?.parse().ok()?;
-    let minor = parts.next()?.parse().ok()?;
+    let major = component(parts.next()?)?;
+    let minor = component(parts.next()?)?;
     let patch = match parts.next() {
         None => 0,
-        Some(p) => p.parse().ok()?,
+        Some(p) => component(p)?,
     };
     if parts.next().is_some() {
         return None;
@@ -227,7 +234,11 @@ mod tests {
     fn projected_schema_rejected_on_recompute() {
         let mut raw = envelope("probe/projected-atoms", tool("probe", "0.5.0", "project"));
         // projected envelopes are composed-shape
-        raw["inputs"] = json!([]);
+        raw["inputs"] = json!([{
+            "schema": "probe-rust/extract",
+            "source": {"repo": "r", "commit": "c", "language": "rust",
+                       "package": "p", "package-version": "1.0"}
+        }]);
         raw.as_object_mut().unwrap().remove("source");
         let err = validate(&raw, AuthorityScope::Recompute).unwrap_err();
         assert!(err.contains("projected input"), "{err}");
@@ -236,7 +247,11 @@ mod tests {
     #[test]
     fn legacy_projection_field_rejected_on_recompute() {
         let mut raw = envelope("probe/merged-atoms", tool("probe", "0.5.0", "project"));
-        raw["inputs"] = json!([]);
+        raw["inputs"] = json!([{
+            "schema": "probe-rust/extract",
+            "source": {"repo": "r", "commit": "c", "language": "rust",
+                       "package": "p", "package-version": "1.0"}
+        }]);
         raw.as_object_mut().unwrap().remove("source");
         raw["projection"] = json!({"mappings-file": "m.json", "seeds": 1,
             "forward-depth": 2, "reverse-depth": 0,
@@ -248,7 +263,11 @@ mod tests {
     #[test]
     fn projection_null_counts_as_present() {
         let mut raw = envelope("probe/merged-atoms", tool("probe", "0.5.0", "merge"));
-        raw["inputs"] = json!([]);
+        raw["inputs"] = json!([{
+            "schema": "probe-rust/extract",
+            "source": {"repo": "r", "commit": "c", "language": "rust",
+                       "package": "p", "package-version": "1.0"}
+        }]);
         raw.as_object_mut().unwrap().remove("source");
         raw["projection"] = json!(null);
         let err = validate(&raw, AuthorityScope::Recompute).unwrap_err();
@@ -258,7 +277,11 @@ mod tests {
     #[test]
     fn projections_readable_by_read_only_consumers() {
         let mut raw = envelope("probe/projected-atoms", tool("probe", "0.5.0", "project"));
-        raw["inputs"] = json!([]);
+        raw["inputs"] = json!([{
+            "schema": "probe-rust/extract",
+            "source": {"repo": "r", "commit": "c", "language": "rust",
+                       "package": "p", "package-version": "1.0"}
+        }]);
         raw.as_object_mut().unwrap().remove("source");
         raw["projection"] = json!(null);
         assert!(validate(&raw, AuthorityScope::ReadOnly).is_ok());
@@ -333,7 +356,14 @@ mod tests {
 
     #[test]
     fn unparsable_version_on_gated_name_rejected() {
-        for version in ["0.16.0-rc1", "v0.16.0", "0.16.0.1", "sixteen"] {
+        for version in [
+            "0.16.0-rc1",
+            "v0.16.0",
+            "0.16.0.1",
+            "sixteen",
+            "+0.16.0",
+            "0.+16.0",
+        ] {
             let raw = envelope("probe-lean/extract", tool("probe-lean", version, "extract"));
             let err = validate(&raw, AuthorityScope::Recompute).unwrap_err();
             assert!(err.contains("unparsable"), "{version}: {err}");

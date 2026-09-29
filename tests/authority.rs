@@ -165,8 +165,11 @@ fn merge_and_enrich_reject_projected_atoms_schema() {
     projected["projection"] = projection_block();
     let path = write_json(tmp.path(), "projected.json", &projected);
 
-    assert_merge_rejects(tmp.path(), &path, "projected");
-    assert_enrich_rejects(tmp.path(), &path, "projected");
+    // Message-specific needles: the fixture path itself contains "projected",
+    // so a generic substring could not attribute the rejection to the
+    // projection predicate.
+    assert_merge_rejects(tmp.path(), &path, "projected input (schema");
+    assert_enrich_rejects(tmp.path(), &path, "projected input (schema");
 }
 
 #[test]
@@ -183,8 +186,11 @@ fn merge_and_enrich_reject_legacy_projection_format() {
     legacy["projection"] = projection_block();
     let path = write_json(tmp.path(), "legacy_projection.json", &legacy);
 
-    assert_merge_rejects(tmp.path(), &path, "projection");
-    assert_enrich_rejects(tmp.path(), &path, "projection");
+    // Message-specific needles: the fixture path itself contains
+    // "projection", so a generic substring could not attribute the rejection
+    // to the legacy-projection predicate.
+    assert_merge_rejects(tmp.path(), &path, "legacy projection rejected");
+    assert_enrich_rejects(tmp.path(), &path, "legacy projection rejected");
 }
 
 // ---------------------------------------------------------------------------
@@ -509,6 +515,56 @@ fn project_reads_an_already_projected_input() {
 }
 
 // ---------------------------------------------------------------------------
+// Loader provenance shape: ambiguous and empty inventories are rejected
+// ---------------------------------------------------------------------------
+
+#[test]
+fn merge_rejects_envelope_with_both_source_and_inputs() {
+    let tmp = TempDir::new().unwrap();
+    // Post-threshold tool, so the rejection is attributable to the ambiguous
+    // provenance shape alone (the executable schema's branches match neither).
+    let mut ambiguous = composed_envelope(
+        "probe-aeneas/extract",
+        json!({ "name": "probe-aeneas", "version": "0.21.0", "command": "extract" }),
+        "probe:a/1.0/f()",
+    );
+    ambiguous["source"] = source("rust", "pkg");
+    let path = write_json(tmp.path(), "ambiguous.json", &ambiguous);
+
+    assert_merge_rejects(tmp.path(), &path, "ambiguous provenance");
+    assert_enrich_rejects(tmp.path(), &path, "ambiguous provenance");
+}
+
+#[test]
+fn project_rejects_empty_inputs_inventory() {
+    let tmp = TempDir::new().unwrap();
+    // An empty composed inventory must fail at load — previously it passed
+    // through and produced output violating the schema's `inputs` minItems.
+    let mut empty = composed_envelope(
+        "probe/merged-atoms",
+        json!({ "name": "probe", "version": "0.5.0", "command": "merge" }),
+        "probe:a/1.0/f()",
+    );
+    empty["inputs"] = json!([]);
+    let path = write_json(tmp.path(), "empty_inputs.json", &empty);
+
+    let mappings = mappings_file(tmp.path());
+    let out = tmp.path().join("projected.json");
+    let (ok, stderr) = run_probe(&[
+        "project",
+        path.to_str().unwrap(),
+        "-m",
+        mappings.to_str().unwrap(),
+        "-o",
+        out.to_str().unwrap(),
+    ]);
+    assert!(!ok, "project should reject an empty inputs inventory");
+    assert!(stderr.contains("empty \"inputs\""), "{stderr}");
+
+    assert_merge_rejects(tmp.path(), &path, "empty \"inputs\"");
+}
+
+// ---------------------------------------------------------------------------
 // Projected output carries the distinct schema and validates
 // ---------------------------------------------------------------------------
 
@@ -557,6 +613,9 @@ fn project_output_uses_projected_atoms_schema_and_validates() {
     );
 
     // And the projection is rejected if fed back into merge/enrich.
-    assert_merge_rejects(tmp.path(), &out, "projected");
-    assert_enrich_rejects(tmp.path(), &out, "projected");
+    // Message-specific needles: the output path contains "projected", and
+    // this build's output is also gate-rejected (pre-contract tool version),
+    // so only the exact projection-predicate message attributes the rejection.
+    assert_merge_rejects(tmp.path(), &out, "projected input (schema");
+    assert_enrich_rejects(tmp.path(), &out, "projected input (schema");
 }

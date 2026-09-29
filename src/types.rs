@@ -213,7 +213,9 @@ pub struct EnvelopeMeta {
 /// provenance. Composed-provenance detection is **structural**: an envelope
 /// with an `inputs` array is composed (its inventory is preserved regardless
 /// of schema string, e.g. `probe-aeneas/extract`), one without is single-tool
-/// and wraps its `source` into one provenance entry.
+/// and wraps its `source` into one provenance entry. An envelope carrying
+/// both `source` and `inputs` is rejected as ambiguous, and a composed
+/// envelope's `inputs` must be a non-empty well-formed array.
 pub fn parse_envelope(raw: &serde_json::Value, origin: &str) -> Result<EnvelopeMeta, String> {
     let schema_version = raw
         .get("schema-version")
@@ -232,7 +234,7 @@ pub fn parse_envelope(raw: &serde_json::Value, origin: &str) -> Result<EnvelopeM
 
     let category = detect_category(schema).ok_or_else(|| {
         format!(
-            "{origin}: unsupported schema \"{schema}\" (expected */atoms, */enriched-atoms, */specs, */proofs, or probe/merged-*)"
+            "{origin}: unsupported schema \"{schema}\" (expected */atoms, */enriched-atoms, */extract, */specs, */proofs, probe/merged-*, or probe/projected-atoms)"
         )
     })?;
 
@@ -242,10 +244,25 @@ pub fn parse_envelope(raw: &serde_json::Value, origin: &str) -> Result<EnvelopeM
         .clone();
 
     let provenance = if let Some(inputs) = raw.get("inputs") {
+        // Provenance shape is the composed/single-tool discriminator (P9);
+        // an envelope carrying both is ambiguous and matches neither branch
+        // of the executable schema.
+        if raw.get("source").is_some() {
+            return Err(format!(
+                "{origin}: ambiguous provenance — envelope carries both \"source\" and \"inputs\""
+            ));
+        }
         // P9: a composed envelope's inventory must survive loading — a
-        // malformed `inputs` array is an error, not an empty inventory.
-        serde_json::from_value::<Vec<InputProvenance>>(inputs.clone())
-            .map_err(|e| format!("{origin}: malformed \"inputs\" provenance: {e}"))?
+        // malformed or empty `inputs` array is an error, not an empty
+        // inventory.
+        let inventory = serde_json::from_value::<Vec<InputProvenance>>(inputs.clone())
+            .map_err(|e| format!("{origin}: malformed \"inputs\" provenance: {e}"))?;
+        if inventory.is_empty() {
+            return Err(format!(
+                "{origin}: empty \"inputs\" provenance — a composed envelope must list at least one source"
+            ));
+        }
+        inventory
     } else {
         let source = raw
             .get("source")
@@ -301,6 +318,11 @@ pub type LoadResult = (BTreeMap<String, Atom>, Vec<InputProvenance>);
 /// Load a Schema 3.0 atom file (convenience wrapper around [`load_envelope`]).
 ///
 /// Returns typed `Atom` entries. Errors if the file is not an atoms-category schema.
+///
+/// Performs **no authority validation** (ADR-006): projections and
+/// pre-contract envelopes load without error. Library callers at an envelope
+/// boundary should use [`crate::authority::load_validated_atom_file`] with
+/// the appropriate [`crate::authority::AuthorityScope`] instead.
 pub fn load_atom_file(path: &std::path::Path) -> Result<LoadResult, String> {
     let meta = load_envelope(path)?;
     if meta.category != SchemaCategory::Atoms {
@@ -426,6 +448,41 @@ mod tests {
         });
         let err = parse_envelope(&not_an_array, "test-input").unwrap_err();
         assert!(err.contains("malformed \"inputs\""), "{err}");
+    }
+
+    /// Provenance shape is the composed/single-tool discriminator: an
+    /// envelope carrying both `source` and `inputs` is ambiguous and must be
+    /// rejected (never `inputs`-wins with `source` silently dropped), and an
+    /// empty `inputs` inventory is an error (never propagated into output
+    /// that violates the executable schema's `minItems: 1`).
+    #[test]
+    fn parse_envelope_rejects_ambiguous_and_empty_provenance() {
+        let both = serde_json::json!({
+            "schema": "probe-lean/extract",
+            "schema-version": "3.0",
+            "tool": {"name": "probe-lean", "version": "0.16.0", "command": "extract"},
+            "source": {"repo": "r", "commit": "c", "language": "lean",
+                       "package": "p", "package-version": "1.0"},
+            "inputs": [
+                {"schema": "probe-lean/extract", "source": {"repo": "r", "commit": "c",
+                 "language": "lean", "package": "p", "package-version": "1.0"}}
+            ],
+            "timestamp": "2026-01-01T00:00:00Z",
+            "data": {}
+        });
+        let err = parse_envelope(&both, "test-input").unwrap_err();
+        assert!(err.contains("ambiguous provenance"), "{err}");
+
+        let empty = serde_json::json!({
+            "schema": "probe/merged-atoms",
+            "schema-version": "3.0",
+            "tool": {"name": "probe", "version": "0.5.0", "command": "merge"},
+            "inputs": [],
+            "timestamp": "2026-01-01T00:00:00Z",
+            "data": {}
+        });
+        let err = parse_envelope(&empty, "test-input").unwrap_err();
+        assert!(err.contains("empty \"inputs\""), "{err}");
     }
 
     /// Composed detection is structural (P9): an `inputs` array marks a
