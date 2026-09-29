@@ -8,7 +8,7 @@ status: draft
 
 Read-only analysis subcommand of the probe hub. Partitions verified atoms into four disjoint lists: three local-evidence partitions plus `imported-verified`.
 
-Input authority: summary runs the **version-gate component** of the shared validator ([ADR-006](../decisions/006-correspondence-records.md)) at its load boundary — an unmarked pre-contract `verified` is indistinguishable from local evidence, so the consumer contract below is enforceable only behind the gate. Projections remain readable (views with inherited labels); summary reports the artifact's own labels and never recomputes enrichment.
+Input authority: summary runs the **version-gate component** of the shared validator ([ADR-006](../decisions/006-correspondence-records.md)) at its load boundary — an unmarked pre-contract `verified` is indistinguishable from local evidence, so the consumer contract below is enforceable only behind the gate. Atoms carrying a `status-origin` outside the two-value enum are rejected at the same boundary (fail-closed): an unknown origin proves neither local nor imported evidence, so it must not be silently classified into the local partitions. Projections remain readable (views with inherited labels); summary reports the artifact's own labels and never recomputes enrichment.
 
 ## Scope: code atoms only
 
@@ -22,7 +22,7 @@ Membership: `status-origin == "translation"` **AND** status ∈ {`verified`, `tr
 
 ## Entrypoints
 
-Verified, non-stub, non-test, Rust `exec` atoms whose code-name never appears in any non-test atom's `dependencies` array. These represent the API surface of the project — functions that are verified but not called by other verified functions in the graph.
+Verified, non-stub, non-test, Rust `exec` atoms whose code-name never appears in any non-test **code** atom's `dependencies` array (blueprint atoms are excluded, see Scope). These represent the API surface of the project — verified functions not called by any other non-test code atom in the graph, whatever that caller's status.
 
 Criteria (all must hold):
 
@@ -32,7 +32,7 @@ Criteria (all must hold):
 | Non-stub | `is_stub() == false` ([P3](../engineering/properties.md#p3-stub-detection-is-structural)) |
 | Non-test | `code_module` and `display_name` do not contain `"test"` |
 | Rust exec | `language == "rust"` and `kind == "exec"` ([schema.md § Language assignment for Verus atoms](../engineering/schema.md#language-assignment-for-verus-atoms)) |
-| Not depended upon | code-name does not appear in any non-test atom's `dependencies` |
+| Not depended upon | code-name does not appear in any non-test code atom's `dependencies` |
 
 ## Verified functions
 

@@ -312,6 +312,47 @@ fn single_tool_vcvio_extract_with_status_origin_is_valid() {
 }
 
 #[test]
+fn status_origin_outside_the_enum_is_rejected() {
+    // status-origin is an enum over exactly "translation" and "kernel-taint"
+    // (ADR-006 Decision 2); any other value must fail validation.
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+
+    let doc = json!({
+        "schema": "probe-lean/extract",
+        "schema-version": "3.0",
+        "tool": { "name": "probe-lean", "version": "0.16.0", "command": "extract" },
+        "source": {
+            "repo": "https://github.com/org/proj",
+            "commit": "abcdef",
+            "language": "lean",
+            "package": "Proj",
+            "package-version": "0.1.0"
+        },
+        "timestamp": "2026-03-17T12:00:00Z",
+        "data": {
+            "probe:Proj.thm": {
+                "display-name": "thm",
+                "dependencies": [],
+                "code-module": "Proj",
+                "code-path": "Proj/Basic.lean",
+                "code-text": { "lines-start": 3, "lines-end": 9 },
+                "kind": "theorem",
+                "language": "lean",
+                "verification-status": "verified",
+                "status-origin": "graph-taint"
+            }
+        }
+    });
+
+    let result = validator.validate(&doc);
+    assert!(
+        result.is_err(),
+        "a status-origin value outside the two-value enum must be rejected"
+    );
+}
+
+#[test]
 fn projected_atoms_envelope_is_valid() {
     let schema = load_schema();
     let validator = Validator::new(&schema).expect("valid schema");

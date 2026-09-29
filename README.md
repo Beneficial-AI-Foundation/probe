@@ -57,12 +57,12 @@ probe merge verus_atoms.json lean_atoms.json -o merged.json
 # default 0); add --emit-focus for a probegraph focus-set file
 probe project merged.json --mappings mappings.json -o projected.json
 
-# Enrich verification status (upgrade "verified" → "transitively-verified"
-# for atoms with no failed/unverified atom reachable along a dependency
-# path that doesn't pass through a trusted boundary — see P23)
+# Recompute verification labels (P23): transitive labels are set fresh
+# from one seed set (explicitly failing statuses plus status-origin-
+# bearing atoms), with contamination stopping only at trusted boundaries
 probe enrich extract_output.json -o enriched.json
 
-# Summarize verified atoms (entrypoints, functions, lemmas)
+# Summarize verified atoms (entrypoints, functions, lemmas, imported)
 probe summary merged.json -o summary.json
 
 # Run tests

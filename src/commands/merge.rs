@@ -7,9 +7,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 // @kb: kb/engineering/properties.md#p8-code-name-normalization
-/// Strip trailing `.` from a code-name (legacy verus-analyzer artifact).
+/// Strip all trailing `.` characters from a code-name (legacy verus-analyzer
+/// artifact). Stripping every trailing dot makes normalization a fixed point,
+/// so one pass suffices and the collision guard cannot be evaded by a
+/// repeated suffix (`"g().."` and `"g()"` collide immediately).
 fn normalize_code_name(name: &str) -> String {
-    name.strip_suffix('.').unwrap_or(name).to_string()
+    name.trim_end_matches('.').to_string()
 }
 
 /// Merge statistics reported after the operation.
@@ -28,10 +31,19 @@ pub struct MergeStats {
 // ---------------------------------------------------------------------------
 
 /// Normalize all keys and dependency references in an atom map.
-/// Returns the normalized map and a count of keys that changed.
-fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, usize) {
+/// Returns the normalized map, a count of keys that changed, and the
+/// post-normalization collisions that discarded a *distinct real* atom, as
+/// `(discarded original key, surviving normalized key)` pairs. Discarding a
+/// stub or an identical duplicate is benign and not reported (P8).
+/// Shared with the unary recomputation boundaries via `prepare_atoms`
+/// (ADR-006 carrier preparation): merge warns on collisions (first-wins
+/// evidence selection, P6/P8), the unary enrich boundary rejects them.
+pub(crate) fn normalize_atoms(
+    atoms: BTreeMap<String, Atom>,
+) -> (BTreeMap<String, Atom>, usize, Vec<(String, String)>) {
     let mut out: BTreeMap<String, Atom> = BTreeMap::new();
     let mut changed = 0;
+    let mut dropped: Vec<(String, String)> = Vec::new();
 
     for (key, mut atom) in atoms {
         let norm_key = normalize_code_name(&key);
@@ -62,14 +74,33 @@ fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, us
             Some(existing) if existing.is_stub() && !atom.is_stub() => {
                 out.insert(norm_key, atom);
             }
-            Some(_) => {}
+            Some(existing) => {
+                // First-wins. Silently collapsing a stub or an identical
+                // duplicate is benign; discarding a distinct real atom loses
+                // evidence and must be surfaced to the caller (P8).
+                if !atom.is_stub() && *existing != atom {
+                    dropped.push((key, norm_key));
+                }
+            }
             None => {
                 out.insert(norm_key, atom);
             }
         }
     }
 
-    (out, changed)
+    (out, changed, dropped)
+}
+
+/// Surface normalization collisions on the merge path: first-wins stands
+/// (P6/P8 evidence selection), but a silently discarded real atom must be
+/// visible.
+fn warn_dropped_atoms(dropped: &[(String, String)]) {
+    for (discarded, kept) in dropped {
+        eprintln!(
+            "Warning: normalization collision: atom {discarded:?} discarded \
+             (a distinct atom already occupies {kept:?}, first-wins per P8)"
+        );
+    }
 }
 
 // @kb: kb/engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement
@@ -101,12 +132,16 @@ pub fn merge_atom_maps(
 
     let mut maps_iter = maps.into_iter();
     let first = maps_iter.next().unwrap_or_default();
-    let (mut base, norm_count) = normalize_atoms(first);
+    let (mut base, norm_count, dropped) = normalize_atoms(first);
     stats.keys_normalized += norm_count;
+    stats.conflicts += dropped.len();
+    warn_dropped_atoms(&dropped);
 
     for incoming in maps_iter {
-        let (incoming, norm_count) = normalize_atoms(incoming);
+        let (incoming, norm_count, dropped) = normalize_atoms(incoming);
         stats.keys_normalized += norm_count;
+        stats.conflicts += dropped.len();
+        warn_dropped_atoms(&dropped);
 
         for (key, incoming_atom) in incoming {
             match base.get(&key) {
@@ -587,6 +622,118 @@ mod tests {
         assert_eq!(stats.stubs_replaced, 1);
         assert!(merged.contains_key("probe:a/1.0/mod/f()"));
         assert!(!merged.contains_key("probe:a/1.0/mod/f()."));
+    }
+
+    // P8: a post-normalization collision that discards a distinct real atom
+    // is reported; collapsing a stub or an identical duplicate is benign.
+    #[test]
+    fn test_normalization_collision_reporting() {
+        // Two distinct real atoms whose keys collide after normalization.
+        let mut atoms = BTreeMap::new();
+        atoms.insert(
+            "probe:a/1.0/g()".to_string(),
+            make_real_atom("g", "src/lib.rs", "rust", "exec"),
+        );
+        atoms.insert(
+            "probe:a/1.0/g().".to_string(),
+            make_real_atom("g", "src/other.rs", "rust", "exec"),
+        );
+        let (out, changed, dropped) = normalize_atoms(atoms);
+        assert_eq!(out.len(), 1);
+        assert_eq!(changed, 1);
+        assert_eq!(
+            dropped,
+            vec![(
+                "probe:a/1.0/g().".to_string(),
+                "probe:a/1.0/g()".to_string()
+            )]
+        );
+
+        // A colliding stub is absorbed silently (stub replacement / drop).
+        let mut atoms = BTreeMap::new();
+        atoms.insert(
+            "probe:a/1.0/g()".to_string(),
+            make_real_atom("g", "src/lib.rs", "rust", "exec"),
+        );
+        atoms.insert("probe:a/1.0/g().".to_string(), make_stub("g", "rust"));
+        let (_, _, dropped) = normalize_atoms(atoms);
+        assert!(dropped.is_empty());
+
+        // Identical duplicates collapse silently (dedup, no evidence lost).
+        let mut atoms = BTreeMap::new();
+        atoms.insert(
+            "probe:a/1.0/g()".to_string(),
+            make_real_atom("g", "src/lib.rs", "rust", "exec"),
+        );
+        atoms.insert(
+            "probe:a/1.0/g().".to_string(),
+            make_real_atom("g", "src/lib.rs", "rust", "exec"),
+        );
+        let (_, _, dropped) = normalize_atoms(atoms);
+        assert!(dropped.is_empty());
+
+        // Through merge, an intra-input distinct-real collision is counted in
+        // `conflicts` (kb/tools/probe-merge.md Phase 2) — in the first input
+        // and in subsequent inputs alike; a benign merge counts zero.
+        let colliding = || {
+            let mut m = BTreeMap::new();
+            m.insert(
+                "probe:a/1.0/g()".to_string(),
+                make_real_atom("g", "src/lib.rs", "rust", "exec"),
+            );
+            m.insert(
+                "probe:a/1.0/g().".to_string(),
+                make_real_atom("g", "src/other.rs", "rust", "exec"),
+            );
+            m
+        };
+        let partner = || {
+            let mut m = BTreeMap::new();
+            m.insert(
+                "probe:a/1.0/h()".to_string(),
+                make_real_atom("h", "src/lib.rs", "rust", "exec"),
+            );
+            m
+        };
+        let (_, stats) = merge_atom_maps(vec![colliding(), partner()], None);
+        assert_eq!(stats.conflicts, 1);
+        let (_, stats) = merge_atom_maps(vec![partner(), colliding()], None);
+        assert_eq!(stats.conflicts, 1);
+        let mut other = BTreeMap::new();
+        other.insert(
+            "probe:a/1.0/i()".to_string(),
+            make_real_atom("i", "src/lib.rs", "rust", "exec"),
+        );
+        let (_, stats) = merge_atom_maps(vec![partner(), other], None);
+        assert_eq!(stats.conflicts, 0);
+    }
+
+    // P8: normalization strips *all* trailing dots, so it is a fixed point —
+    // a repeated-dot alias ("g()..") collides with "g()" in the same pass and
+    // cannot smuggle a distinct atom past the collision guard.
+    #[test]
+    fn test_repeated_trailing_dots_normalize_in_one_pass() {
+        assert_eq!(normalize_code_name("g().."), "g()");
+        assert_eq!(normalize_code_name("g()"), "g()");
+
+        let mut atoms = BTreeMap::new();
+        atoms.insert(
+            "probe:a/1.0/g()".to_string(),
+            make_real_atom("g", "src/lib.rs", "rust", "exec"),
+        );
+        atoms.insert(
+            "probe:a/1.0/g()..".to_string(),
+            make_real_atom("g", "src/other.rs", "rust", "exec"),
+        );
+        let (out, _, dropped) = normalize_atoms(atoms);
+        assert_eq!(out.len(), 1);
+        assert_eq!(
+            dropped,
+            vec![(
+                "probe:a/1.0/g()..".to_string(),
+                "probe:a/1.0/g()".to_string()
+            )]
+        );
     }
 
     #[test]

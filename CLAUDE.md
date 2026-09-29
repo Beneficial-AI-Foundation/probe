@@ -108,7 +108,7 @@ src/
     merge.rs       # Merge algorithm, normalization, translation application
     project.rs     # Graph projection from mapping seeds (probe/projected-atoms output)
     propagate.rs   # Enrichment: verified/transitively-verified via reverse BFS
-    summary.rs     # Verified-atom partitioning: entrypoints, functions, lemmas
+    summary.rs     # Verified-atom partitioning: entrypoints, functions, lemmas, imported
 probe-extract-check/  # Validator for extract output vs source code
 kb/                   # Knowledge base (source of truth)
 docs/                 # Design documents (reference, not normative)

@@ -42,7 +42,7 @@ Authority validation (steps 3–4) is one shared validator invoked at every enve
 
 Strip trailing `.` from all code-name keys, dependency references, code-name-bearing extension arrays, and mapping endpoints ([P8](../engineering/properties.md#p8-code-name-normalization)). Per-input ordering is semantic: it selects which atom wins a post-normalization collision before evidence from other inputs is considered.
 
-If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules); if both are real atoms, the first is kept with a warning (counted in `conflicts`). Correspondence records are unioned across the collision ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
+If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules); if both are real atoms and differ, the first is kept with a warning (counted in `conflicts`); identical duplicates collapse silently ([P8](../engineering/properties.md#p8-code-name-normalization)). Correspondence records are unioned across the collision ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
 
 ### Phase 3: Merge
 

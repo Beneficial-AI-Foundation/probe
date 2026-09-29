@@ -85,22 +85,25 @@ enum Commands {
         emit_focus: bool,
     },
 
-    /// Enrich verification status through the dependency graph.
+    /// Recompute verification labels through the dependency graph.
     ///
-    /// Reads a Schema 3.0 atom file, walks the dependency graph, and
-    /// upgrades `verification-status` from "verified" to
-    /// "transitively-verified" on atoms with no failed/unverified atom
+    /// Reads a Schema 3.x atom file, normalizes code-names (P8), and sets
+    /// every "verified"/"transitively-verified" label fresh (P23): an atom
+    /// is "transitively-verified" iff no seed — an explicit
+    /// failed/unverified atom, or any status-origin-bearing atom — is
     /// reachable along a dependency path that doesn't pass through a
-    /// trusted boundary (P23). Atoms that remain "verified" are only
-    /// locally verified (such a blocker is reachable).
+    /// trusted boundary. Atoms that come out "verified" are only locally
+    /// verified (such a seed is reachable, or the atom is itself a seed);
+    /// stale "transitively-verified" labels are downgraded.
     ///
     /// The input must pass authority validation (ADR-006): projections in
     /// either format and pre-contract envelopes are rejected.
     ///
-    /// The output preserves the input envelope structure exactly.
+    /// The output preserves the input envelope structure exactly, up to
+    /// normalized code-names.
     // @kb: kb/engineering/properties.md#p23-transitive-verification
     Enrich {
-        /// Input atom file (Schema 3.0).
+        /// Input atom file (Schema 3.x).
         #[arg(required = true)]
         input: PathBuf,
 
@@ -109,17 +112,22 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
-    /// Summarize verified atoms: entrypoints, functions, and lemmas.
+    /// Summarize verified atoms: entrypoints, functions, lemmas, imported.
     ///
-    /// Reads a Schema 3.0 atom file and partitions all atoms with
-    /// "verification-status": "verified" into three lists:
+    /// Reads a Schema 3.x atom file and partitions all verified code atoms
+    /// (language "blueprint" excluded) into four lists:
     ///
-    /// Entrypoints — verified, non-stub, non-test, Rust `exec` atoms whose
-    /// code-name never appears in any non-test atom's dependency list.
+    /// Entrypoints — locally verified, non-stub, non-test, Rust `exec`
+    /// atoms whose code-name never appears in any non-test code atom's
+    /// dependency list.
     ///
-    /// Verified functions — remaining verified Rust `exec` atoms.
+    /// Verified functions — remaining locally verified Rust `exec` atoms.
     ///
-    /// Verified lemmas — verified Verus `proof`/`spec` atoms.
+    /// Verified lemmas — locally verified non-(Rust exec) code atoms.
+    ///
+    /// Imported verified — atoms whose verified status carries
+    /// "status-origin": "translation" (evidence copied from another
+    /// language); never presented as a local result.
     ///
     /// The input must pass the per-producer version gate (ADR-006): a
     /// pre-contract verified status is indistinguishable from local
@@ -127,7 +135,7 @@ enum Commands {
     ///
     /// Output is a Schema 3.0 envelope with schema "probe/summary".
     Summary {
-        /// Input atom file (Schema 3.0).
+        /// Input atom file (Schema 3.x).
         #[arg(required = true)]
         input: PathBuf,
 

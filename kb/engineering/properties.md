@@ -77,6 +77,8 @@ This is appropriate because re-running `specify` or `verify` should override sta
 
 Normalization strips trailing `.` characters (a legacy verus-analyzer artifact). In merge it runs **per input, before conflict resolution** ([P4](#p4-merge-associativity-on-the-carrier) — the ordering selects evidence: it decides which atom wins a post-normalization collision before evidence from other inputs is considered). Unary recomputation boundaries (`probe enrich`, `probe project`) apply the same normalization to their input before enrichment, seed matching, or trimming.
 
+Normalization is not injective, so a post-normalization key collision can discard an atom. Collapsing a stub or an identical duplicate is benign; discarding a **distinct real atom** loses evidence and must be surfaced: merge warns and keeps first-wins (the evidence selection above), while the unary `probe enrich` boundary rejects the input fail-closed — a single input offering two distinct atoms for one code-name is producer error, and silently selecting one can launder contamination ([P23](#p23-transitive-verification)).
+
 Normalization is applied to:
 - Dictionary keys
 - All entries in `dependencies` arrays
