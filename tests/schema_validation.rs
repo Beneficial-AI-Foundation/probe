@@ -541,3 +541,150 @@ fn missing_required_field_is_rejected() {
     let result = validator.validate(&doc);
     assert!(result.is_err(), "Missing 'language' should be rejected");
 }
+
+/// PR 3b (ADR-006): a merged envelope produced by the real merge operation —
+/// correspondence records attached, labels re-enriched — validates against the
+/// executable schema (envelope-level, not only map-level algebra).
+#[test]
+fn merged_envelope_with_correspondence_records_is_valid() {
+    use probe::commands::merge::merge_atom_maps;
+    use probe::types::{Atom, InputProvenance, Mapping, MergedAtomEnvelope, Source, Tool};
+    use std::collections::BTreeMap;
+
+    let atom = |code_path: &str, language: &str, kind: &str| -> Atom {
+        serde_json::from_value(json!({
+            "display-name": "add",
+            "dependencies": [],
+            "code-module": "m",
+            "code-path": code_path,
+            "code-text": { "lines-start": 1, "lines-end": 5 },
+            "kind": kind,
+            "language": language,
+            "verification-status": "verified"
+        }))
+        .unwrap()
+    };
+
+    let mut rust_atoms = BTreeMap::new();
+    rust_atoms.insert(
+        "probe:dalek/4.1.3/scalar/add()".to_string(),
+        atom("src/scalar.rs", "rust", "exec"),
+    );
+    let mut lean_atoms = BTreeMap::new();
+    lean_atoms.insert(
+        "probe:DalekLean.Scalar.add".to_string(),
+        atom("DalekLean/Scalar.lean", "lean", "def"),
+    );
+
+    let mappings = vec![Mapping {
+        from: "probe:dalek/4.1.3/scalar/add()".to_string(),
+        to: "probe:DalekLean.Scalar.add".to_string(),
+        confidence: "manual".to_string(),
+        method: Some("hand-written".to_string()),
+    }];
+
+    let (merged, stats) =
+        merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&mappings)).expect("merge succeeds");
+    assert_eq!(stats.mappings_applied, 2);
+
+    let source = |language: &str, package: &str| Source {
+        repo: "https://github.com/org/project".to_string(),
+        commit: "abc123".to_string(),
+        language: language.to_string(),
+        package: package.to_string(),
+        package_version: "1.0".to_string(),
+        extensions: BTreeMap::new(),
+    };
+    let envelope = MergedAtomEnvelope {
+        schema: "probe/merged-atoms".to_string(),
+        schema_version: "3.1".to_string(),
+        tool: Tool {
+            name: "probe".to_string(),
+            version: "0.5.0".to_string(),
+            command: "merge".to_string(),
+        },
+        inputs: vec![
+            InputProvenance {
+                schema: "probe-verus/atoms".to_string(),
+                source: source("rust", "dalek"),
+            },
+            InputProvenance {
+                schema: "probe-lean/extract".to_string(),
+                source: source("lean", "DalekLean"),
+            },
+        ],
+        timestamp: "2026-09-29T12:00:00Z".to_string(),
+        data: merged,
+    };
+
+    let doc = serde_json::to_value(&envelope).expect("serializes");
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+    let result = validator.validate(&doc);
+    assert!(
+        result.is_ok(),
+        "merged envelope with records should validate: {result:?}"
+    );
+
+    // The records really are in the serialized output.
+    let rust_atom = &doc["data"]["probe:dalek/4.1.3/scalar/add()"];
+    assert_eq!(
+        rust_atom["maps-to"],
+        json!([{ "target": "probe:DalekLean.Scalar.add",
+                 "confidence": "manual", "method": "hand-written" }])
+    );
+    let lean_atom = &doc["data"]["probe:DalekLean.Scalar.add"];
+    assert_eq!(
+        lean_atom["mapped-from"],
+        json!([{ "target": "probe:dalek/4.1.3/scalar/add()",
+                 "confidence": "manual", "method": "hand-written" }])
+    );
+}
+
+/// The executable schema constrains correspondence records: an out-of-enum
+/// confidence, a missing target, and extra fields are all rejected.
+#[test]
+fn malformed_correspondence_records_are_rejected() {
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+
+    let envelope_with_record = |record: serde_json::Value| {
+        json!({
+            "schema": "probe-verus/atoms",
+            "schema-version": "3.0",
+            "tool": { "name": "probe-verus", "version": "2.0.0", "command": "atomize" },
+            "source": {
+                "repo": "r", "commit": "c", "language": "rust",
+                "package": "p", "package-version": "1.0"
+            },
+            "timestamp": "2026-03-05T14:30:00Z",
+            "data": {
+                "probe:a/1.0/f()": {
+                    "display-name": "f",
+                    "dependencies": [],
+                    "code-module": "",
+                    "code-path": "src/lib.rs",
+                    "code-text": { "lines-start": 1, "lines-end": 2 },
+                    "kind": "exec",
+                    "language": "rust",
+                    "maps-to": [record]
+                }
+            }
+        })
+    };
+
+    let good = envelope_with_record(json!({"target": "probe:Pkg.f", "confidence": "exact"}));
+    assert!(validator.validate(&good).is_ok());
+
+    for bad in [
+        json!({"target": "probe:Pkg.f", "confidence": "high"}),
+        json!({"confidence": "exact"}),
+        json!({"target": "probe:Pkg.f", "confidence": "exact", "extra": 1}),
+    ] {
+        let doc = envelope_with_record(bad.clone());
+        assert!(
+            validator.validate(&doc).is_err(),
+            "record {bad} should be rejected"
+        );
+    }
+}

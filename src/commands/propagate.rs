@@ -214,10 +214,10 @@ pub struct PrepareStats {
 /// must run first.
 ///
 /// Normalization is not injective, so it can collide keys even within a
-/// single input; a collision that would discard a distinct real atom is
-/// reported in [`PrepareStats::dropped_atoms`] (the CLI boundary rejects it
-/// fail-closed — with one input there is no second source to arbitrate the
-/// evidence).
+/// single input; a collision between distinct real atoms is reported in
+/// [`PrepareStats::dropped_atoms`] and the CLI boundary rejects it
+/// fail-closed — the same P8 rule merge applies to each of its inputs
+/// (silently selecting one atom's evidence can launder contamination).
 pub fn prepare_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, PrepareStats) {
     let (mut atoms, keys_normalized, dropped_atoms) =
         crate::commands::merge::normalize_atoms(atoms);

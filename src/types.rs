@@ -65,6 +65,15 @@ pub struct InputProvenance {
     pub source: Source,
 }
 
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
+/// Strip all trailing `.` characters from a code-name (legacy verus-analyzer
+/// artifact). Stripping every trailing dot makes normalization a fixed point,
+/// so one pass suffices and the collision guard cannot be evaded by a
+/// repeated suffix (`"g().."` and `"g()"` collide immediately).
+pub(crate) fn normalize_code_name(name: &str) -> String {
+    name.trim_end_matches('.').to_string()
+}
+
 fn deserialize_code_text<'de, D>(deserializer: D) -> Result<CodeText, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -124,7 +133,8 @@ impl Atom {
 ///
 /// The executable schema constrains the marker, but the runtime load paths do
 /// not schema-validate, so the recomputation and summary boundaries
-/// (`cmd_enrich`, `summarize_atoms`) call this: an out-of-contract marker
+/// (`cmd_merge`/`merge_atom_files`, `cmd_enrich`, `summarize_atoms`) call
+/// this: an out-of-contract marker
 /// fails closed here instead of silently reading as absent (non-string
 /// values) or being presented as local evidence (unknown strings). The error
 /// names the offending atom; callers prefix their input context.
@@ -396,14 +406,15 @@ pub struct MappingsFile {
     pub mappings: Vec<Mapping>,
 }
 
-/// Load a mappings file and build bidirectional lookup maps.
+// @kb: kb/engineering/schema.md#mappings-file-format
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
+/// Load a mappings file as full [`Mapping`] records.
 ///
-/// Returns two maps: `from → [to₁, to₂, …]` and `to → [from₁, from₂, …]`.
-/// A single `from` key may map to multiple `to` targets (1-to-many).
-#[allow(clippy::type_complexity)]
-pub fn load_mappings(
-    path: &std::path::Path,
-) -> Result<(HashMap<String, Vec<String>>, HashMap<String, Vec<String>>), String> {
+/// `confidence`/`method` are preserved (they become correspondence-record
+/// fields, ADR-006). Endpoints are normalized at load (P8: mapping-file
+/// endpoints are normalized before any lookup, by the same rule as atom
+/// keys). A single `from` key may map to multiple `to` targets (1-to-many).
+pub fn load_mappings(path: &std::path::Path) -> Result<Vec<Mapping>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read mappings {}: {e}", path.display()))?;
 
@@ -418,10 +429,29 @@ pub fn load_mappings(
         ));
     }
 
+    Ok(file
+        .mappings
+        .into_iter()
+        .map(|m| Mapping {
+            from: normalize_code_name(&m.from),
+            to: normalize_code_name(&m.to),
+            confidence: m.confidence,
+            method: m.method,
+        })
+        .collect())
+}
+
+/// Build bidirectional endpoint lookup maps from mapping records:
+/// `from → [to₁, to₂, …]` and `to → [from₁, from₂, …]` (used by
+/// `probe project` for seed matching).
+#[allow(clippy::type_complexity)]
+pub fn endpoint_lookup_maps(
+    mappings: &[Mapping],
+) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
     let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
     let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
 
-    for mapping in &file.mappings {
+    for mapping in mappings {
         from_to
             .entry(mapping.from.clone())
             .or_default()
@@ -432,7 +462,7 @@ pub fn load_mappings(
             .push(mapping.from.clone());
     }
 
-    Ok((from_to, to_from))
+    (from_to, to_from)
 }
 
 /// Load any Schema 3.0 data file as opaque JSON entries.

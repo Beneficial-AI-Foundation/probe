@@ -21,7 +21,7 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 | File | Purpose |
 |------|---------|
 | `src/types.rs` | `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, `load_envelope()`, `load_mappings()` |
-| `src/commands/merge.rs` | `merge_atom_maps()`, `merge_generic_maps()`, `normalize_atoms()`, `cmd_merge()` |
+| `src/commands/merge.rs` | `merge_atom_maps()` / `merge_atom_files()` (re-enriching), `merge_atom_maps_raw()` / `merge_atom_files_raw()` (staging, stale statuses), `merge_generic_maps()`, `normalize_atoms()`, `cmd_merge()` |
 | `src/main.rs` | CLI: `probe merge <file1> <file2> [--output] [--mappings]` |
 
 ## Merge algorithm detail
@@ -36,13 +36,13 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 6. Validate all inputs belong to the same category
 7. Flatten provenance from all inputs — composed shape detected structurally (`inputs` vs `source`), entries deduplicated ([P9](../engineering/properties.md#p9-provenance-is-preserved))
 
-Authority validation (steps 3–4) is one shared validator invoked at every envelope boundary: `cmd_merge`, `merge_atom_files`, `cmd_enrich`, the raw staging primitive; `probe summary`/`probe project` run the version-gate component. The bare-map library API (`merge_atom_maps`) cannot check authority — callers own the envelope boundary.
+Authority validation (steps 3–4) is one shared validator invoked at every envelope boundary: `cmd_merge`, `merge_atom_files`, `cmd_enrich`, and the raw staging entry point `merge_atom_files_raw` (raw means skip recomputation, never skip validation); `probe summary`/`probe project` run the version-gate component. All file-level merge paths also fail closed on out-of-enum `status-origin` markers (ADR-006 Decision 2). The bare-map library API (`merge_atom_maps`) cannot check authority — callers own the envelope boundary.
 
 ### Phase 2: Normalize (per input, before conflict resolution)
 
 Strip trailing `.` from all code-name keys, dependency references, code-name-bearing extension arrays, and mapping endpoints ([P8](../engineering/properties.md#p8-code-name-normalization)). Per-input ordering is semantic: it selects which atom wins a post-normalization collision before evidence from other inputs is considered.
 
-If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules); if both are real atoms and differ, the first is kept with a warning (counted in `conflicts`); identical duplicates collapse silently ([P8](../engineering/properties.md#p8-code-name-normalization)). Correspondence records are unioned across the collision ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
+If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules) and identical-modulo-records duplicates collapse; if both are real atoms and differ beyond their correspondence records, the merge **errors** — a single input offering two distinct atoms for one code-name is producer error, and merge re-enriches (Phase 5), so silently selecting one atom's evidence would launder contamination; the same rule the unary `probe enrich` boundary applies ([P8](../engineering/properties.md#p8-code-name-normalization)). Correspondence records are unioned across benign collisions ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
 
 ### Phase 3: Merge
 
@@ -57,7 +57,7 @@ When `--mappings <file>` is provided, each mapping entry attaches a `maps-to` re
 
 ### Phase 5: Re-enrich
 
-After all inputs are combined, the atoms category runs enrichment recomputation ([P23](../engineering/properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged labels are recomputed, never inherited. A raw staging primitive for multi-step pipelines (probe-aeneas) defers this single enrichment pass but still validates authority; its output carries potentially stale derived statuses.
+After all inputs are combined, the atoms category runs enrichment recomputation ([P23](../engineering/properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged labels are recomputed, never inherited. The raw staging primitives (`merge_atom_maps_raw`/`merge_atom_files_raw`) for multi-step pipelines (probe-aeneas) defer this single enrichment pass but still validate authority; their output carries potentially stale derived statuses.
 
 ### Phase 6: Write output
 
@@ -74,8 +74,9 @@ After merging, the tool prints:
 | Stubs remaining | yes | — |
 | New entries added | yes | yes |
 | Keys normalized | yes | yes |
-| Conflicts | yes (real-vs-real, base kept; post-normalization collisions counted) | yes (overrides, incoming kept) |
+| Conflicts | yes (cross-input real-vs-real, base kept; intra-input distinct-real collisions are errors, not counts) | yes (overrides, incoming kept) |
 | Records attached | yes (if `--mappings`: `maps-to`/`mapped-from` counts, dangling-target warnings) | — |
+| Enrichment | yes (transitively-verified / locally-scoped verified counts from the Phase 5 recomputation) | — |
 
 ## Categorical framework
 
