@@ -3,7 +3,8 @@
 // @kb: kb/engineering/properties.md#p14-deterministic-output
 // @kb: kb/engineering/schema.md#language-assignment-for-verus-atoms
 
-use crate::types::{load_atom_file, Atom, InputProvenance, Tool};
+use crate::authority::{load_validated_atom_file, AuthorityScope};
+use crate::types::{Atom, InputProvenance, Tool};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -104,8 +105,14 @@ fn default_output_name(provenance: &[InputProvenance]) -> String {
 }
 
 /// CLI entry point: load atom file, compute summary, emit envelope.
+///
+/// The input passes the version-gate component of the authority validator
+/// (ADR-006 Decision 7): a pre-contract `verified` is indistinguishable from
+/// local evidence, so summary must not describe it. Projections stay
+/// readable — views with inherited labels are legitimate to read.
+// @kb: kb/engineering/schema.md#authority-validation-and-re-enrichment
 pub fn cmd_summary(input: &Path, output: Option<&Path>) {
-    let (atoms, provenance) = match load_atom_file(input) {
+    let (atoms, provenance) = match load_validated_atom_file(input, AuthorityScope::ReadOnly) {
         Ok(result) => result,
         Err(e) => {
             eprintln!("Error: {e}");

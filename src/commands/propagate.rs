@@ -169,6 +169,11 @@ pub fn enrich_verification_status(
 }
 
 /// CLI entry point: load atom file, enrich verification status, write JSON.
+///
+/// The input passes the envelope schema check and the shared authority
+/// validator (projection rejection + version gate, ADR-006) before any
+/// recomputation. The output preserves the input envelope structure exactly.
+// @kb: kb/engineering/schema.md#authority-validation-and-re-enrichment
 pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
     let content = std::fs::read_to_string(input).unwrap_or_else(|e| {
         eprintln!("Error reading {}: {e}", input.display());
@@ -180,25 +185,29 @@ pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
         std::process::exit(1);
     });
 
-    let schema_version = raw
-        .get("schema-version")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    if !schema_version.starts_with("3.") {
+    let origin = input.display().to_string();
+    let meta = crate::types::parse_envelope(&raw, &origin).unwrap_or_else(|e| {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    });
+    if meta.category != crate::types::SchemaCategory::Atoms {
         eprintln!(
-            "Error: {}: incompatible schema-version \"{schema_version}\" (expected 3.x)",
-            input.display()
+            "Error: {origin}: expected atoms schema, got {} (\"{}\")",
+            meta.category, meta.schema
         );
         std::process::exit(1);
     }
-
-    let data_value = raw.get("data").cloned().unwrap_or_else(|| {
-        eprintln!("Error: {}: missing \"data\" field", input.display());
+    if let Err(e) = crate::authority::validate_authority(
+        &meta,
+        &origin,
+        crate::authority::AuthorityScope::Recompute,
+    ) {
+        eprintln!("Error: {e}");
         std::process::exit(1);
-    });
+    }
 
     let mut atoms: BTreeMap<String, Atom> =
-        serde_json::from_value(data_value).unwrap_or_else(|e| {
+        serde_json::from_value(meta.data_value).unwrap_or_else(|e| {
             eprintln!("Error deserializing atoms from {}: {e}", input.display());
             std::process::exit(1);
         });

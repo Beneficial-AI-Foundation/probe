@@ -1,6 +1,7 @@
 // @kb: kb/tools/probe-project.md — graph projection from mapping seeds
 
-use crate::types::{load_atom_file, load_mappings, Atom, InputProvenance, Tool};
+use crate::authority::{load_validated_atom_file, AuthorityScope};
+use crate::types::{load_mappings, Atom, InputProvenance, Tool, PROJECTED_ATOMS_SCHEMA};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
@@ -139,8 +140,10 @@ pub fn project_atoms(
     (result, stats)
 }
 
-/// Envelope for projected output — uses `probe/merged-atoms` schema with
-/// an extra `projection` metadata block.
+// @kb: kb/engineering/schema.md#projection-metadata
+/// Envelope for projected output — the distinct `probe/projected-atoms`
+/// schema (a projection is a view; merge/enrich reject it, ADR-006) with a
+/// `projection` metadata block.
 #[derive(serde::Serialize)]
 struct ProjectedEnvelope {
     schema: String,
@@ -190,9 +193,14 @@ pub fn cmd_project(
     output: PathBuf,
     emit_focus: bool,
 ) {
-    // Load atoms
+    // Load atoms. The input passes the version-gate component of the
+    // authority validator (ADR-006 Decision 7): project re-stamps its output
+    // at the current hub version, which would conceal a pre-contract origin.
+    // Already-projected inputs stay readable (gate only, no projection
+    // rejection).
+    // @kb: kb/engineering/schema.md#authority-validation-and-re-enrichment
     eprintln!("  Loading {}...", input.display());
-    let (atoms, provenance) = match load_atom_file(&input) {
+    let (atoms, provenance) = match load_validated_atom_file(&input, AuthorityScope::ReadOnly) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error: {e}");
@@ -245,8 +253,8 @@ pub fn cmd_project(
     let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
 
     let envelope = ProjectedEnvelope {
-        schema: "probe/merged-atoms".to_string(),
-        schema_version: "3.0".to_string(),
+        schema: PROJECTED_ATOMS_SCHEMA.to_string(),
+        schema_version: "3.1".to_string(),
         tool,
         inputs: provenance,
         timestamp,
@@ -325,6 +333,7 @@ fn focus_path_from(output: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::load_atom_file;
 
     fn make_atom(name: &str, language: &str, kind: &str, deps: &[&str]) -> Atom {
         Atom {

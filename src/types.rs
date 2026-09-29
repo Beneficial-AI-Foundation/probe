@@ -122,6 +122,12 @@ impl Atom {
 // Schema categories
 // ---------------------------------------------------------------------------
 
+// @kb: kb/engineering/schema.md#registered-schema-values
+/// Schema string written by `probe project`. A projection is a *view* of an
+/// authoritative graph: read-only consumers accept it, recomputation
+/// boundaries (merge, enrich) reject it (ADR-006).
+pub const PROJECTED_ATOMS_SCHEMA: &str = "probe/projected-atoms";
+
 // @kb: kb/engineering/glossary.md#schema-category
 /// The three categories of data files the merge tool can handle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,6 +171,7 @@ pub fn detect_category(schema: &str) -> Option<SchemaCategory> {
         || schema.ends_with("/enriched-atoms")
         || schema.ends_with("/extract")
         || schema == "probe/merged-atoms"
+        || schema == PROJECTED_ATOMS_SCHEMA
     {
         Some(SchemaCategory::Atoms)
     } else if schema.ends_with("/specs") || schema == "probe/merged-specs" {
@@ -185,56 +192,56 @@ pub struct EnvelopeMeta {
     pub schema: String,
     pub category: SchemaCategory,
     pub provenance: Vec<InputProvenance>,
+    /// The envelope's `tool` metadata; `None` when absent or malformed.
+    /// Consumed by the authority validator ([`crate::authority`]), which
+    /// rejects atoms envelopes without well-formed tool metadata.
+    pub tool: Option<Tool>,
+    /// Whether the raw envelope carries a `projection` field (any value,
+    /// including `null`). Presence marks a legacy projection (ADR-006).
+    pub has_projection_field: bool,
     /// The raw `data` value, ready to be deserialized into the appropriate type.
     pub data_value: serde_json::Value,
 }
 
 // @kb: kb/engineering/properties.md#p1-envelope-completeness
 // @kb: kb/engineering/properties.md#p9-provenance-is-preserved
-/// Parse a Schema 3.0 envelope, extracting shared metadata.
+/// Parse an already-loaded Schema 3.x envelope value, extracting shared
+/// metadata. `origin` names the input in error messages (usually a path).
 ///
 /// Validates the schema-version, detects the [`SchemaCategory`], and extracts
-/// provenance (flattening `inputs` for previously merged files).
-pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
-
-    let raw: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse JSON in {}: {e}", path.display()))?;
-
+/// provenance. Composed-provenance detection is **structural**: an envelope
+/// with an `inputs` array is composed (its inventory is preserved regardless
+/// of schema string, e.g. `probe-aeneas/extract`), one without is single-tool
+/// and wraps its `source` into one provenance entry.
+pub fn parse_envelope(raw: &serde_json::Value, origin: &str) -> Result<EnvelopeMeta, String> {
     let schema_version = raw
         .get("schema-version")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     if !schema_version.starts_with("3.") {
         return Err(format!(
-            "{}: incompatible schema-version \"{schema_version}\" (expected 3.x)",
-            path.display()
+            "{origin}: incompatible schema-version \"{schema_version}\" (expected 3.x)"
         ));
     }
 
     let schema = raw
         .get("schema")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| format!("{}: missing \"schema\" field", path.display()))?;
+        .ok_or_else(|| format!("{origin}: missing \"schema\" field"))?;
 
     let category = detect_category(schema).ok_or_else(|| {
         format!(
-            "{}: unsupported schema \"{schema}\" (expected */atoms, */enriched-atoms, */specs, */proofs, or probe/merged-*)",
-            path.display()
+            "{origin}: unsupported schema \"{schema}\" (expected */atoms, */enriched-atoms, */specs, */proofs, or probe/merged-*)"
         )
     })?;
 
     let data_value = raw
         .get("data")
-        .ok_or_else(|| format!("{}: missing \"data\" field", path.display()))?
+        .ok_or_else(|| format!("{origin}: missing \"data\" field"))?
         .clone();
 
-    let is_merged = schema.starts_with("probe/merged-");
-    let provenance = if is_merged {
-        raw.get("inputs")
-            .and_then(|v| serde_json::from_value::<Vec<InputProvenance>>(v.clone()).ok())
-            .unwrap_or_default()
+    let provenance = if let Some(inputs) = raw.get("inputs") {
+        serde_json::from_value::<Vec<InputProvenance>>(inputs.clone()).unwrap_or_default()
     } else {
         let source = raw
             .get("source")
@@ -243,7 +250,7 @@ pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
                 repo: String::new(),
                 commit: String::new(),
                 language: String::new(),
-                package: path.file_stem().map_or_else(
+                package: std::path::Path::new(origin).file_stem().map_or_else(
                     || "unknown".to_string(),
                     |s| s.to_string_lossy().to_string(),
                 ),
@@ -256,12 +263,32 @@ pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
         }]
     };
 
+    let tool = raw
+        .get("tool")
+        .and_then(|v| serde_json::from_value::<Tool>(v.clone()).ok());
+    let has_projection_field = raw
+        .as_object()
+        .is_some_and(|o| o.contains_key("projection"));
+
     Ok(EnvelopeMeta {
         schema: schema.to_string(),
         category,
         provenance,
+        tool,
+        has_projection_field,
         data_value,
     })
+}
+
+/// Parse a Schema 3.x envelope file (read + JSON parse + [`parse_envelope`]).
+pub fn load_envelope(path: &std::path::Path) -> Result<EnvelopeMeta, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
+
+    let raw: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse JSON in {}: {e}", path.display()))?;
+
+    parse_envelope(&raw, &path.display().to_string())
 }
 
 /// Result of loading an atom file: data dictionary and provenance entries.
