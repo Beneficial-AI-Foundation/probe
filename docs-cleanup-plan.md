@@ -6,11 +6,12 @@ it has the evidence and exact line references; this plan only adds
 execution order, grouping, and the decisions that need a human.
 
 Status: PR A merged (issue #66, PR #67; the whole #63 → #65 → #67 stack
-landed on main 2026-09-29). PR B + housekeeping executed (issue #68,
-branch `la/docs-cleanup-pr-b`). Remaining: C+D combined, then the
-optional drift guard. No more stacking — the remaining PRs touch files
-disjoint from each other and from main-line work, so each branches off
-`main` independently. C and D are folded into one PR: they share
+landed on main 2026-09-29). PR B + housekeeping merged (issue #68,
+PR #69). PR C+D executed (issue #70, branch `la/docs-cleanup-pr-cd`);
+during it, W6's "verify again" check confirmed no sibling repo has
+added jsonschema validation, and `probe-vcvio/extract` was added to the
+unregistered-schema list alongside the report's five. Remaining: the
+optional drift guard. C and D were folded into one PR: they share
 `README.md`/`docs/consumer-guide.md` and the split was only by report
 finding IDs.
 
