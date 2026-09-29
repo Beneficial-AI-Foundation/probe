@@ -55,3 +55,41 @@ Checked on the changeset, at these locations:
 - **Executable schema** — `status-origin` constrained to exactly `{"translation", "kernel-taint"}` (schemas/atom-envelope.schema.json), with positive (probe-vcvio fixture, pre-existing) and new negative validation tests.
 - **Architecture** — recomputation logic stays in `propagate.rs`; summary remains read-only analysis (no enrichment on read, per the §10 settled decision); the bare-map API (`enrich_verification_status`, `prepare_atoms`) remains authority-unaware as documented, with authority validation staying at the envelope boundary (`cmd_enrich` validates before preparing).
 - **Docs** — CLI help (src/main.rs Enrich/Summary), README, CHANGELOG, consumer guide, testing guide, architecture module list, and CLAUDE.md agree with the code after the fixes above; `./scripts/check-kb-links.sh` and `scripts/check-enum-drift.py` pass.
+
+## Post-audit delta (2026-09-29, review commit e6a376e)
+
+The PR #79 cross-model review (codex-critique) landed fail-closed
+tightenings after this audit's pass — extensions of the audited behavior,
+verified against the amended KB text (spec and code moved together):
+
+- **P23 seed/boundary predicates are presence-based**
+  (src/commands/propagate.rs `has_status_origin`): a malformed non-string
+  `status-origin` seeds and disables a trusted boundary instead of
+  silently reading as absent — the executable match to P23's "any atom
+  *carrying* status-origin" quantifier, enforced at the bare-map API, not
+  only behind the CLI validation. Pinned by two unit tests.
+- **Marker-value validation at the load boundaries**
+  (src/types.rs `validate_status_origins`, called by `cmd_enrich` and
+  `cmd_summary`): out-of-enum or non-string `status-origin` values are
+  rejected before any recomputation or partitioning (ADR-006 Decision 2;
+  Decision 9's "never present imported/unknown evidence as local").
+  Placed in types.rs, not authority.rs — value validation is not
+  authority, and the shared-validator boundary stays single-purpose.
+  `probe project` intentionally does not call it (read-only trim, no
+  origin-based classification). Unit matrix + two CLI rejection tests.
+- **P8 collision handling** (src/commands/merge.rs `normalize_atoms` now
+  returns dropped-atom pairs): merge warns and counts distinct-real
+  collisions in `conflicts` (probe-merge.md Phase 2 — the count was
+  missing in the first cut of the fix and was caught by this loop's
+  ambiguity pass); `cmd_enrich` rejects with both keys named and writes
+  no output; stub drops and identical duplicates stay silent. The
+  misleading "no conflict resolution with a single input" comment on
+  `prepare_atoms` is corrected.
+- **P14** — the dropped-atom list is built in BTreeMap iteration order;
+  rejection/warning output is deterministic.
+- **P10** — validation only reads extensions; no pass-through change.
+- **Docs** — CLI help (Enrich/Summary input lines say Schema 3.x,
+  matching `parse_envelope`'s 3.x acceptance; output stamps untouched per
+  the §10 settled decision), testing guide (fail-closed rejections),
+  CHANGELOG, P8/schema.md/probe-summary.md amendments — all agree with
+  the code; `./scripts/check-kb-links.sh` and the enum drift guard pass.

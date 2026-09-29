@@ -150,7 +150,9 @@ Run with `cargo test` in the probe repo (counts are not maintained here
   end-to-end: transitive labels recomputed through dependency chains
   (stale labels downgraded), blockers (failing deps, `status-origin`
   seeds, cycles), trusted and missing deps, carrier preparation
-  (dotted-alias normalization), and envelope preservation.
+  (dotted-alias normalization), fail-closed rejections (normalization
+  collisions between distinct real atoms, out-of-enum `status-origin`
+  values), and envelope preservation.
 - **Unit tests** (`src/commands/`, plus a field-preservation test in
   `src/types.rs`) -- exercise each command's logic in isolation: merge
   (stub replacement and stub detection, real-vs-real conflict

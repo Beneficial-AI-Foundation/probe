@@ -103,3 +103,33 @@ here because they were KB-adjacent staleness:)
   consistent with the implementation landed here; no new undefined terms were
   introduced by this PR (its code comments use the glossary vocabulary).
 - `./scripts/check-kb-links.sh` and the enum drift guard pass.
+
+## Post-audit delta (2026-09-29, review commit e6a376e)
+
+The PR #79 cross-model review (codex-critique) landed fail-closed
+tightenings after this audit's pass — spec and code moved together:
+
+- **P8 gained the collision clause** (post-normalization collision that
+  discards a distinct real atom: merge warns + counts in `conflicts`,
+  the unary `probe enrich` boundary rejects; stub drops and identical
+  duplicates collapse silently). kb/tools/probe-merge.md Phase 2 already
+  specced the warn-and-count half since PR 1; the code now conforms, and
+  the phrase was tightened to "real atoms *and differ*" to match P8's
+  identical-duplicate carve-out. Found during this delta: the first
+  implementation of the review fix warned without counting, contradicting
+  probe-merge.md:45 — fixed in the same commit series.
+- **schema.md `status-origin` row** now records the enforcement contract:
+  presence-based enrichment predicates (matching P23's "any atom
+  *carrying* status-origin" quantifier — a malformed non-string marker
+  seeds instead of silently reading as absent) and load-boundary
+  rejection of out-of-enum values by `probe enrich`/`probe summary`
+  (`validate_status_origins`; the runtime does not schema-validate).
+- **kb/tools/probe-summary.md**: input-authority paragraph gains the
+  marker-rejection sentence; the Entrypoints prose/table now carry the
+  code-atom qualifier their own Scope section mandates, and no longer
+  claim entrypoints are "not called by other *verified* functions"
+  (the implementation checks dependencies of all non-test code atoms,
+  whatever the caller's status).
+- No new glossary terms introduced; docs/schema-validation.md remains
+  consistent (it describes optional external validation, matching the
+  "runtime does not schema-validate" premise of the boundary checks).

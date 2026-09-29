@@ -79,3 +79,38 @@ Acceptable; unchanged this branch.
 
 ### [I3] Mixed valid+ghost mapping seeds untested (carried over)
 `test_missing_seeds_skipped` covers all-ghost; no test mixes valid and invalid mapping keys. Projection-side; natural home is PR 3c's seed-matching work.
+
+## Post-audit delta (2026-09-29, review commit e6a376e)
+
+New coverage from the PR #79 cross-model review, all landed with the
+behavior it pins:
+
+- **P23 presence-based predicates** — propagate.rs unit tests
+  `test_non_string_status_origin_is_seed` (a `null` marker on a verified
+  leaf blocks its caller) and
+  `test_non_string_status_origin_disables_trusted_boundary` (a trusted
+  atom bearing a non-string marker no longer shields callers). Library
+  path; the CLI path can no longer reach the BFS with such input because
+  of the boundary rejection below, which is itself pinned.
+- **status-origin enum enforcement** — types.rs unit matrix
+  (`validate_status_origins_enforces_the_two_value_enum`: both values and
+  the absent marker pass; unknown string, empty string, `null`, number,
+  object reject with the atom named) plus two binary-level rejections:
+  tests/propagate.rs `test_enrich_rejects_invalid_status_origin`
+  (non-string) and tests/authority.rs
+  `summary_rejects_out_of_enum_status_origin` (unknown string) — both
+  assert no output file is written. Both malformed classes × both
+  boundaries covered across the four tests.
+- **P8 collision surfacing** — merge.rs
+  `test_normalization_collision_reporting`: distinct-real collision
+  reported as `(discarded key, surviving key)`, stub and
+  identical-duplicate collisions silent, and the `conflicts` count
+  asserted through `merge_atom_maps` (probe-merge.md Phase 2); propagate.rs
+  `test_prepare_reports_collision` (PrepareStats surface); tests/propagate.rs
+  `test_enrich_rejects_normalization_collision` (CLI rejection names both
+  keys, writes no output). Remaining gap, info-level: the merge-side
+  stderr warning text is unpinned (behavior is pinned via the stats
+  count); merge's first-wins output on collision is implied by the unit
+  merged-map assertions.
+- Updated totals: 102 unit tests, 55 binary-level integration tests
+  (tests/{merge,propagate,authority,schema_validation}.rs).

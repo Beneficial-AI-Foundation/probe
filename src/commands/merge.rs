@@ -131,11 +131,13 @@ pub fn merge_atom_maps(
     let first = maps_iter.next().unwrap_or_default();
     let (mut base, norm_count, dropped) = normalize_atoms(first);
     stats.keys_normalized += norm_count;
+    stats.conflicts += dropped.len();
     warn_dropped_atoms(&dropped);
 
     for incoming in maps_iter {
         let (incoming, norm_count, dropped) = normalize_atoms(incoming);
         stats.keys_normalized += norm_count;
+        stats.conflicts += dropped.len();
         warn_dropped_atoms(&dropped);
 
         for (key, incoming_atom) in incoming {
@@ -666,6 +668,25 @@ mod tests {
         );
         let (_, _, dropped) = normalize_atoms(atoms);
         assert!(dropped.is_empty());
+
+        // Through merge, an intra-input distinct-real collision is counted in
+        // `conflicts` (kb/tools/probe-merge.md Phase 2).
+        let mut colliding = BTreeMap::new();
+        colliding.insert(
+            "probe:a/1.0/g()".to_string(),
+            make_real_atom("g", "src/lib.rs", "rust", "exec"),
+        );
+        colliding.insert(
+            "probe:a/1.0/g().".to_string(),
+            make_real_atom("g", "src/other.rs", "rust", "exec"),
+        );
+        let mut partner = BTreeMap::new();
+        partner.insert(
+            "probe:a/1.0/h()".to_string(),
+            make_real_atom("h", "src/lib.rs", "rust", "exec"),
+        );
+        let (_, stats) = merge_atom_maps(vec![colliding, partner], None);
+        assert_eq!(stats.conflicts, 1);
     }
 
     #[test]
