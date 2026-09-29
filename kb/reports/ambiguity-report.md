@@ -103,3 +103,15 @@ Carried over (accepted: historical record behind a supersession banner).
   emitted `probe/projected-atoms` envelope (schema-version 3.1, projection
   block) and the executable schema's branches.
 - `./scripts/check-kb-links.sh` and the enum drift guard pass.
+
+## Post-audit delta (2026-09-29, review commit 9507b3c)
+
+- kb/engineering/schema.md structural-detection paragraph now records the
+  ambiguous-provenance and empty-`inputs` rejections (implemented and
+  tested in the same commit — spec and code moved together).
+- schema.md § Bumping the interchange schema-version repointed at
+  `parse_envelope` (`src/types.rs`): both references to the
+  `src/commands/propagate.rs` check were stale after PR 3a rerouted
+  `cmd_enrich` through the shared load path.
+- Rejected review suggestion (uniform 3.1 stamping of hub outputs)
+  recorded in merge-soundness-fix-plan.md §10 settled decisions.

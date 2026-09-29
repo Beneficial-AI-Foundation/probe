@@ -55,3 +55,20 @@ Checked on the changeset, at these locations:
 - **P24/P25** — untouched (producer-side).
 - **Architecture** — the validator is a single shared function invoked at every hub envelope boundary (no per-command reimplementation); bare-map APIs (`merge_atom_maps`, `enrich_verification_status`) remain authority-unaware as documented; read-only vs recomputation scopes match ADR-006 Decision 6/7.
 - **Docs** — CLI help (src/main.rs), CHANGELOG, kb/tools/probe-merge.md phases, kb/tools/probe-project.md output schema, and kb/engineering/schema.md registered values all agree with the code after the fixes above; `./scripts/check-kb-links.sh` passes.
+
+## Post-audit delta (2026-09-29, review commit 9507b3c)
+
+The PR #77 cross-model review (codex-critique) landed fail-closed
+tightenings after this audit's pass — extensions of the audited behavior,
+not regressions of it:
+
+- `parse_envelope` rejects ambiguous provenance (both `source` and
+  `inputs` present; previously `inputs` silently won and `source` was
+  dropped) and empty `inputs` inventories (previously propagated into
+  output violating the executable schema's `minItems: 1`). Specced in
+  schema.md's structural-detection paragraph, same commit.
+- The version-gate parser accepts ASCII-digit components only (a leading
+  `+`, tolerated by `u64::from_str`, no longer parses).
+- `load_atom_file` now documents that it bypasses authority validation.
+- I1 (single-tool missing-`source` fabrication) is unchanged — still
+  scheduled alongside PR 3c's provenance work.

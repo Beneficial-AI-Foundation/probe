@@ -80,3 +80,21 @@ The unit matrix hardcodes the ADR-006 numbers, so a threshold typo in `GATE_FLOO
 
 ### [I3] Mixed valid+ghost mapping seeds untested (carried over)
 `test_missing_seeds_skipped` covers all-ghost; no test mixes valid and invalid mapping keys.
+
+## Post-audit delta (2026-09-29, review commit 9507b3c)
+
+New coverage from the PR #77 cross-model review, all landed with the
+behavior they pin:
+
+- Ambiguous/empty provenance: types.rs
+  `parse_envelope_rejects_ambiguous_and_empty_provenance` (unit) plus
+  tests/authority.rs `merge_rejects_envelope_with_both_source_and_inputs`
+  and `project_rejects_empty_inputs_inventory` (binary-level — the
+  schema-validator fixtures alone did not exercise the production loader).
+- The three projection-rejection integration tests now assert
+  message-specific needles (`"projected input (schema"`,
+  `"legacy projection rejected"`): the old substring needles also matched
+  the fixture *filenames*, so any rejection of the file — including a pure
+  version-gate one — satisfied them. Closes that attribution gap.
+- Signed version components (`+0.16.0`, `0.+16.0`) added to the
+  unparsable-version rejection matrix.
