@@ -1,5 +1,13 @@
 # Probes: factual data about (verified) code
 
+> **Archived 2026-09-29.** July-2026 presentation deck. The colour/status
+> half of its content moved to the VeriLib engineering docs (see CHANGELOG
+> 0.4.0). Since then: `disabled` was renamed `untracked`, the
+> spec-less⇒disabled rule was decided the other way (see P24/P25 in
+> [kb/engineering/properties.md](../../kb/engineering/properties.md)), and
+> its status vocabulary is superseded by the single `verification-status`
+> contract there. Kept for historical reference; not updated.
+
 ---
 
 ## What the probes are

@@ -1,5 +1,11 @@
 # Web, CLI, Probe - Motivation
 
+> **Archived 2026-09-29.** Outcome: the plan items all shipped or were
+> dropped; the web/CLI/probe split it motivates is today's verilib +
+> verilib-cli + probe ecosystem. Its sibling `002_probe_lean.md` (legacy
+> `syncstatus` pipeline) was deleted in the ADR-005 sweep. Kept for
+> historical reference; not updated.
+
 ## Relationship between Web, CLI, Probe
 
 * Users can interact with VeriLib through two interfaces  - Web and CLI

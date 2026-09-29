@@ -1,5 +1,12 @@
 # Structure for Verification Projects - Implementation
 
+> **Archived 2026-09-29.** The "Schema of probe outputs" section is
+> superseded by [kb/engineering/schema.md](../../kb/engineering/schema.md):
+> it describes pre-envelope bare dicts, the `scip:` scheme, and
+> `specified`/boolean-`verified` fields — none of which exist in Schema 3.x.
+> Do not use it as a schema reference. Kept for historical reference; not
+> updated.
+
 A prototype with implementation details can be found at
 https://github.com/Beneficial-AI-Foundation/verilib-structure
 
