@@ -61,7 +61,7 @@ fn is_extracted_type_member(dep: &str, atoms: &BTreeMap<String, Atom>) -> bool {
 /// constructors/fields of an extracted `inductive`/`structure` are benign (the
 /// type is extracted, its members are not standalone atoms) and are excluded so
 /// real gaps are not lost in the noise.
-// @kb: kb/engineering/schema.md#verification-status-values
+// @kb: kb/engineering/schema.md#common-optional-fields — verification-status values
 pub fn enrich_verification_status(
     atoms: &mut BTreeMap<String, Atom>,
 ) -> (usize, usize, Vec<String>) {

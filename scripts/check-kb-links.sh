@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Validates cross-references between markdown files in kb/.
-# Checks: (1) relative file links resolve, (2) heading anchors exist in targets.
+# Checks: (1) relative file links resolve, (2) heading anchors exist in targets,
+# (3) `// @kb: kb/<path>#<anchor>` annotations in source code resolve.
 # Run from repo root: ./scripts/check-kb-links.sh
 
 set -euo pipefail
@@ -95,6 +96,33 @@ while IFS= read -r src_file; do
     done < <(grep -oP '\[[^\]!][^\]]*\]\(\K[^)]+' "$src_file" 2>/dev/null || true)
 
 done < <(find "$KB_DIR" -name '*.md' -type f | sort)
+
+# @kb: annotations in source code. The reference is the first
+# whitespace-delimited token after "@kb: " (trailing prose like
+# "— merged variant" is a comment, not part of the reference).
+while IFS=: read -r src_file line_no ref; do
+    ref="${ref%%[[:space:]]*}"
+    [[ -z "$ref" ]] && continue
+
+    if [[ "$ref" == *"#"* ]]; then
+        path="${ref%%#*}"
+        fragment="${ref#*#}"
+    else
+        path="$ref"
+        fragment=""
+    fi
+
+    if [ ! -e "$path" ]; then
+        echo "  ERROR: $src_file:$line_no -> $path (file not found, @kb:)" >> "$ERRFILE"
+        continue
+    fi
+
+    if [ -n "$fragment" ] && [ -f "$path" ]; then
+        if ! heading_exists "$path" "$fragment"; then
+            echo "  ERROR: $src_file:$line_no -> $path#$fragment (anchor not found, @kb:)" >> "$ERRFILE"
+        fi
+    fi
+done < <(grep -rnoP '@kb:\s*\K\S.*' src/ probe-extract-check/src/ tests/ 2>/dev/null || true)
 
 if [ -s "$ERRFILE" ]; then
     cat "$ERRFILE"
