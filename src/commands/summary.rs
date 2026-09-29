@@ -156,6 +156,14 @@ pub fn cmd_summary(input: &Path, output: Option<&Path>) {
         }
     };
 
+    // Fail closed on out-of-enum status-origin markers (ADR-006 Decision 2):
+    // an unknown origin proves neither local nor imported evidence, so it
+    // must not be silently classified into the local partitions.
+    if let Err(e) = crate::types::validate_status_origins(&atoms, &input.display().to_string()) {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+
     let result = summarize_atoms(&atoms);
 
     let total = result.verified_entrypoints.len()

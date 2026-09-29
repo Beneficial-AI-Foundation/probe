@@ -466,6 +466,34 @@ fn summary_and_project_reject_pre_threshold_aeneas_envelope() {
     assert!(stderr.contains("pre-contract"), "{stderr}");
 }
 
+// ADR-006 Decision 2 fail-closed at the summary boundary: an unknown
+// status-origin string proves neither local nor imported evidence, so it must
+// not be silently classified into the local partitions — reject instead.
+#[test]
+fn summary_rejects_out_of_enum_status_origin() {
+    let tmp = TempDir::new().unwrap();
+    let mut envelope = single_tool_envelope(
+        "probe-verus/atoms",
+        "probe-verus",
+        "2.0.0",
+        "probe:a/1.0/f()",
+    );
+    envelope["data"]["probe:a/1.0/f()"]["verification-status"] = json!("verified");
+    envelope["data"]["probe:a/1.0/f()"]["status-origin"] = json!("future-import");
+    let path = write_json(tmp.path(), "bad_origin.json", &envelope);
+
+    let out = tmp.path().join("summary.json");
+    let (ok, stderr) = run_probe(&[
+        "summary",
+        path.to_str().unwrap(),
+        "-o",
+        out.to_str().unwrap(),
+    ]);
+    assert!(!ok, "summary should reject an out-of-enum status-origin");
+    assert!(stderr.contains("invalid status-origin"), "{stderr}");
+    assert!(!out.exists(), "no output on rejection");
+}
+
 #[test]
 fn summary_reads_a_modern_projection() {
     let tmp = TempDir::new().unwrap();

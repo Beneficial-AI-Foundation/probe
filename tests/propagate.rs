@@ -16,6 +16,19 @@ fn run_enrich(input: &str, output_path: &std::path::Path) {
     assert!(status.success(), "enrich command failed for {input}");
 }
 
+/// Run `probe enrich` without asserting success; returns (success, stderr).
+fn run_enrich_raw(input: &str, output_path: &std::path::Path) -> (bool, String) {
+    let binary = env!("CARGO_BIN_EXE_probe");
+    let out = Command::new(binary)
+        .args(["enrich", input, "-o", output_path.to_str().unwrap()])
+        .output()
+        .expect("Failed to run probe");
+    (
+        out.status.success(),
+        String::from_utf8_lossy(&out.stderr).to_string(),
+    )
+}
+
 fn load_atoms(path: &std::path::Path) -> BTreeMap<String, Atom> {
     let content = std::fs::read_to_string(path).expect("Failed to read output");
     let raw: serde_json::Value = serde_json::from_str(&content).expect("Failed to parse output");
@@ -247,6 +260,62 @@ fn test_dotted_alias_contamination_end_to_end() {
         get_vs(atoms.get("probe:t/1.0/f()").unwrap()),
         Some("verified")
     );
+}
+
+// P8 fail-closed at the unary boundary: a normalization collision between two
+// distinct real atoms would silently discard one atom's evidence, so `probe
+// enrich` refuses the input instead of writing output.
+#[test]
+fn test_enrich_rejects_normalization_collision() {
+    let tmp = TempDir::new().unwrap();
+    let input = tmp.path().join("collision.json");
+    let out = tmp.path().join("output.json");
+
+    let envelope = envelope_with(serde_json::json!({
+        "probe:t/1.0/g()": atom_json(Some("verified"), &[]),
+        "probe:t/1.0/g().": atom_json(Some("failed"), &[]),
+        "probe:t/1.0/caller()": atom_json(Some("verified"), &["probe:t/1.0/g()."]),
+    }));
+    std::fs::write(&input, serde_json::to_string_pretty(&envelope).unwrap()).unwrap();
+
+    let (ok, stderr) = run_enrich_raw(input.to_str().unwrap(), &out);
+    assert!(
+        !ok,
+        "enrich must reject a distinct-atom collision: {stderr}"
+    );
+    assert!(
+        stderr.contains("probe:t/1.0/g().") && stderr.contains("probe:t/1.0/g()"),
+        "collision message should name both keys: {stderr}"
+    );
+    assert!(!out.exists(), "no output on rejection");
+}
+
+// ADR-006 Decision 2 fail-closed: a status-origin outside the two-value enum
+// (here a non-string, which would otherwise silently read as absent) is
+// rejected at the load boundary.
+#[test]
+fn test_enrich_rejects_invalid_status_origin() {
+    let tmp = TempDir::new().unwrap();
+    let input = tmp.path().join("badmarker.json");
+    let out = tmp.path().join("output.json");
+
+    let mut leaf = atom_json(Some("verified"), &[]);
+    leaf["status-origin"] = serde_json::json!(null);
+    let envelope = envelope_with(serde_json::json!({
+        "probe:t/1.0/leaf()": leaf,
+    }));
+    std::fs::write(&input, serde_json::to_string_pretty(&envelope).unwrap()).unwrap();
+
+    let (ok, stderr) = run_enrich_raw(input.to_str().unwrap(), &out);
+    assert!(
+        !ok,
+        "enrich must reject an out-of-enum status-origin: {stderr}"
+    );
+    assert!(
+        stderr.contains("invalid status-origin"),
+        "rejection should name the marker: {stderr}"
+    );
+    assert!(!out.exists(), "no output on rejection");
 }
 
 #[test]

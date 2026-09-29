@@ -11,10 +11,13 @@ fn get_verification_status(atom: &Atom) -> Option<&str> {
         .and_then(|v| v.as_str())
 }
 
-fn get_status_origin(atom: &Atom) -> Option<&str> {
-    atom.extensions
-        .get("status-origin")
-        .and_then(|v| v.as_str())
+/// Presence-based on purpose: P23 quantifies seeds over "any atom *carrying*
+/// `status-origin`", so a malformed non-string marker must fail closed as a
+/// seed rather than silently read as absent. Value validation happens at the
+/// load boundary ([`crate::types::validate_status_origins`]); this guards the
+/// bare-map API too.
+fn has_status_origin(atom: &Atom) -> bool {
+    atom.extensions.contains_key("status-origin")
 }
 
 fn is_verified(atom: &Atom) -> bool {
@@ -29,14 +32,14 @@ fn is_verified(atom: &Atom) -> bool {
 /// boundaries, not seeds.
 fn is_seed(atom: &Atom) -> bool {
     matches!(get_verification_status(atom), Some("unverified" | "failed"))
-        || get_status_origin(atom).is_some()
+        || has_status_origin(atom)
 }
 
 /// A "trusted" atom is a trust boundary only when it carries no
 /// `status-origin`: copied trust must not shield callers (ADR-006). The
 /// boundary covers the atom's entire dependency closure (whole-atom trust).
 fn is_trusted_boundary(atom: &Atom) -> bool {
-    get_verification_status(atom) == Some("trusted") && get_status_origin(atom).is_none()
+    get_verification_status(atom) == Some("trusted") && !has_status_origin(atom)
 }
 
 /// Kinds whose members (enum constructors, struct fields/projections, class
@@ -194,18 +197,30 @@ pub struct PrepareStats {
     pub transitive: usize,
     pub local: usize,
     pub missing_deps: Vec<String>,
+    /// Post-normalization collisions that discarded a distinct real atom, as
+    /// `(discarded original key, surviving normalized key)` pairs. Discarding
+    /// evidence silently can launder contamination, so the `probe enrich`
+    /// boundary rejects the input when this is non-empty (P8).
+    pub dropped_atoms: Vec<(String, String)>,
 }
 
 // @kb: kb/engineering/properties.md#p8-code-name-normalization
 // @kb: kb/engineering/properties.md#p23-transitive-verification
 /// Carrier preparation for unary recomputation boundaries (ADR-006):
-/// normalize code-names (P8), then recompute enrichment (P23). With a single
-/// input there is no conflict resolution, so this ordering coincides with
-/// merge's per-input normalization. Enrichment over an unnormalized map can
-/// resolve names differently (a dotted-alias dependency dangles instead of
-/// reaching its contamination source), so normalization must run first.
+/// normalize code-names (P8), then recompute enrichment (P23), matching
+/// merge's per-input normalize-first ordering. Enrichment over an
+/// unnormalized map can resolve names differently (a dotted-alias dependency
+/// dangles instead of reaching its contamination source), so normalization
+/// must run first.
+///
+/// Normalization is not injective, so it can collide keys even within a
+/// single input; a collision that would discard a distinct real atom is
+/// reported in [`PrepareStats::dropped_atoms`] (the CLI boundary rejects it
+/// fail-closed — with one input there is no second source to arbitrate the
+/// evidence).
 pub fn prepare_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, PrepareStats) {
-    let (mut atoms, keys_normalized) = crate::commands::merge::normalize_atoms(atoms);
+    let (mut atoms, keys_normalized, dropped_atoms) =
+        crate::commands::merge::normalize_atoms(atoms);
     let (transitive, local, missing_deps) = enrich_verification_status(&mut atoms);
     (
         atoms,
@@ -214,6 +229,7 @@ pub fn prepare_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, 
             transitive,
             local,
             missing_deps,
+            dropped_atoms,
         },
     )
 }
@@ -264,7 +280,34 @@ pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
             std::process::exit(1);
         });
 
+    // Fail closed on out-of-enum status-origin markers (ADR-006 Decision 2):
+    // the runtime does not schema-validate, and a malformed marker must not
+    // silently read as absent.
+    if let Err(e) = crate::types::validate_status_origins(&atoms, &origin) {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+
     let (atoms, stats) = prepare_atoms(atoms);
+
+    // A normalization collision that discarded a distinct real atom is
+    // producer error at a unary boundary: silently selecting one atom's
+    // evidence can launder contamination (P8). Reject rather than write.
+    if !stats.dropped_atoms.is_empty() {
+        for (discarded, kept) in &stats.dropped_atoms {
+            eprintln!(
+                "Error: normalization collision: atom {discarded:?} would be discarded \
+                 (a distinct atom already occupies {kept:?})"
+            );
+        }
+        eprintln!(
+            "Error: {origin}: refusing to enrich — normalization collided {} distinct \
+             atom(s); fix the producer aliases and regenerate (P8)",
+            stats.dropped_atoms.len()
+        );
+        std::process::exit(1);
+    }
+
     let not_verified = atoms.len() - stats.transitive - stats.local;
 
     if stats.keys_normalized > 0 {
@@ -1117,6 +1160,73 @@ mod tests {
         assert_eq!(stats.keys_normalized, 1);
         assert!(prepared.contains_key("g()"));
         assert_eq!(get_vs(prepared.get("f").unwrap()), Some("verified"));
+    }
+
+    // P23 quantifies seeds over "any atom *carrying* status-origin": the
+    // check is presence-based, so a malformed non-string marker fails closed
+    // as a seed instead of silently reading as absent.
+    #[test]
+    fn test_non_string_status_origin_is_seed() {
+        let mut atoms = BTreeMap::new();
+
+        let mut caller = make_atom("caller");
+        set_verified(&mut caller);
+        add_dep(&mut caller, "g");
+        atoms.insert("caller".to_string(), caller);
+
+        let mut g = make_atom("g");
+        set_verified(&mut g);
+        g.extensions
+            .insert("status-origin".to_string(), serde_json::Value::Null);
+        atoms.insert("g".to_string(), g);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("caller").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("g").unwrap()), Some("verified"));
+    }
+
+    // The same fail-closed rule on the boundary side: a trusted atom bearing
+    // a malformed marker is a seed, not a boundary — it must not shield its
+    // callers.
+    #[test]
+    fn test_non_string_status_origin_disables_trusted_boundary() {
+        let mut atoms = BTreeMap::new();
+
+        let mut caller = make_atom("caller");
+        set_verified(&mut caller);
+        add_dep(&mut caller, "t");
+        atoms.insert("caller".to_string(), caller);
+
+        let mut t = make_atom("t");
+        set_trusted(&mut t);
+        t.extensions
+            .insert("status-origin".to_string(), serde_json::json!(42));
+        atoms.insert("t".to_string(), t);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("caller").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("t").unwrap()), Some("trusted"));
+    }
+
+    // P8 at the unary boundary: a normalization collision that would discard
+    // a distinct real atom is reported in PrepareStats (the CLI rejects it).
+    #[test]
+    fn test_prepare_reports_collision() {
+        let mut atoms = BTreeMap::new();
+
+        let mut g = make_atom("g");
+        set_verified(&mut g);
+        atoms.insert("g()".to_string(), g);
+
+        let mut g_alias = make_atom("g_alias");
+        set_status(&mut g_alias, "failed");
+        atoms.insert("g().".to_string(), g_alias);
+
+        let (_, stats) = prepare_atoms(atoms);
+        assert_eq!(
+            stats.dropped_atoms,
+            vec![("g().".to_string(), "g()".to_string())]
+        );
     }
 
     #[test]

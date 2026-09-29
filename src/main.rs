@@ -87,7 +87,7 @@ enum Commands {
 
     /// Recompute verification labels through the dependency graph.
     ///
-    /// Reads a Schema 3.0 atom file, normalizes code-names (P8), and sets
+    /// Reads a Schema 3.x atom file, normalizes code-names (P8), and sets
     /// every "verified"/"transitively-verified" label fresh (P23): an atom
     /// is "transitively-verified" iff no seed — an explicit
     /// failed/unverified atom, or any status-origin-bearing atom — is
@@ -103,7 +103,7 @@ enum Commands {
     /// normalized code-names.
     // @kb: kb/engineering/properties.md#p23-transitive-verification
     Enrich {
-        /// Input atom file (Schema 3.0).
+        /// Input atom file (Schema 3.x).
         #[arg(required = true)]
         input: PathBuf,
 
@@ -114,7 +114,7 @@ enum Commands {
 
     /// Summarize verified atoms: entrypoints, functions, lemmas, imported.
     ///
-    /// Reads a Schema 3.0 atom file and partitions all verified code atoms
+    /// Reads a Schema 3.x atom file and partitions all verified code atoms
     /// (language "blueprint" excluded) into four lists:
     ///
     /// Entrypoints — locally verified, non-stub, non-test, Rust `exec`
@@ -135,7 +135,7 @@ enum Commands {
     ///
     /// Output is a Schema 3.0 envelope with schema "probe/summary".
     Summary {
-        /// Input atom file (Schema 3.0).
+        /// Input atom file (Schema 3.x).
         #[arg(required = true)]
         input: PathBuf,
 

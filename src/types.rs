@@ -73,7 +73,7 @@ where
 }
 
 /// Line range of an atom's definition.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CodeText {
     #[serde(rename = "lines-start", default)]
     pub lines_start: usize,
@@ -87,7 +87,7 @@ pub struct CodeText {
 /// The `extensions` field captures any language-specific optional fields
 /// (e.g., `dependencies-with-locations`, `is-hidden`, `rust-source`) without
 /// the merge tool needing to know about them.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Atom {
     #[serde(rename = "display-name")]
     pub display_name: String,
@@ -116,6 +116,32 @@ impl Atom {
             && self.code_text.lines_start == 0
             && self.code_text.lines_end == 0
     }
+}
+
+// @kb: kb/engineering/schema.md#common-optional-fields — status-origin marker
+/// Validate every atom's `status-origin` marker against the two-value enum
+/// (ADR-006 Decision 2: `"translation"` or `"kernel-taint"`).
+///
+/// The executable schema constrains the marker, but the runtime load paths do
+/// not schema-validate, so `probe enrich` and `probe summary` call this at
+/// their boundaries: an out-of-contract marker fails closed here instead of
+/// silently reading as absent (non-string values) or being presented as local
+/// evidence (unknown strings).
+pub fn validate_status_origins(atoms: &BTreeMap<String, Atom>, origin: &str) -> Result<(), String> {
+    for (code_name, atom) in atoms {
+        if let Some(value) = atom.extensions.get("status-origin") {
+            match value.as_str() {
+                Some("translation" | "kernel-taint") => {}
+                _ => {
+                    return Err(format!(
+                        "{origin}: atom {code_name:?} carries invalid status-origin {value} \
+                         (expected \"translation\" or \"kernel-taint\", ADR-006)"
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -422,6 +448,57 @@ pub fn load_generic_file(path: &std::path::Path) -> Result<GenericLoadResult, St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ADR-006 Decision 2: `status-origin` is an enum over exactly two
+    /// values. Both values and an absent marker pass; unknown strings and
+    /// non-string values are rejected (fail-closed — the runtime does not
+    /// schema-validate).
+    #[test]
+    fn validate_status_origins_enforces_the_two_value_enum() {
+        let atom_with = |origin: serde_json::Value| -> BTreeMap<String, Atom> {
+            let mut atom = serde_json::json!({
+                "display-name": "f",
+                "dependencies": [],
+                "code-module": "",
+                "code-path": "src/lib.rs",
+                "code-text": {"lines-start": 1, "lines-end": 2},
+                "kind": "exec",
+                "language": "rust"
+            });
+            atom["status-origin"] = origin;
+            let atom: Atom = serde_json::from_value(atom).unwrap();
+            let mut map = BTreeMap::new();
+            map.insert("f".to_string(), atom);
+            map
+        };
+
+        for good in ["translation", "kernel-taint"] {
+            let atoms = atom_with(serde_json::json!(good));
+            assert!(validate_status_origins(&atoms, "t").is_ok(), "{good}");
+        }
+
+        // Absent marker passes.
+        let mut unmarked = atom_with(serde_json::json!("translation"));
+        unmarked
+            .get_mut("f")
+            .unwrap()
+            .extensions
+            .remove("status-origin");
+        assert!(validate_status_origins(&unmarked, "t").is_ok());
+
+        for bad in [
+            serde_json::json!("graph-taint"),
+            serde_json::json!(""),
+            serde_json::json!(null),
+            serde_json::json!(42),
+            serde_json::json!({}),
+        ] {
+            let atoms = atom_with(bad.clone());
+            let err = validate_status_origins(&atoms, "t").unwrap_err();
+            assert!(err.contains("invalid status-origin"), "{bad}: {err}");
+            assert!(err.contains("\"f\""), "{err}");
+        }
+    }
 
     /// P9: a composed envelope's inventory must survive loading — a malformed
     /// `inputs` array is an error, never a silently emptied inventory.
