@@ -1,7 +1,7 @@
 # UI Views for Probe Data
 
 Version: draft
-Date: 2026-03-17
+Date: 2026-09-29
 Parent document: [consumer-guide.md](consumer-guide.md)
 
 The views a UI should implement to let users explore probe atom data: language toggles,
@@ -13,10 +13,19 @@ deployed at
 
 ## Language toggles
 
-Every atom carries a `language` field (`"rust"`, `"lean"`, or `"verus"`).
+Every atom carries a `language` field; the value set is defined in
+[schema.md § Core fields](../kb/engineering/schema.md#core-fields-required-for-all-languages).
 A merged atom file (schema `probe/merged-atoms`) contains atoms from
 multiple languages in the same `data` dictionary. This makes language
 filtering trivial: partition nodes by `language` and expose a toggle.
+
+The set is larger than "Rust and Lean": Verus `proof`/`spec` atoms carry
+`language: "verus"` (the
+[kind→language rule](../kb/engineering/schema.md#language-assignment-for-verus-atoms))
+and probe-leanblueprint synthetic atoms carry `language: "blueprint"`.
+A partition that only knows `rust`/`lean` silently drops both, so the
+toggle below groups languages into sides rather than matching single
+values.
 
 ### Rust / Lean toggle
 
@@ -26,8 +35,8 @@ a probe-aeneas extraction), the UI should offer:
 
 | Mode | What is shown |
 |------|---------------|
-| **Rust view** | Only atoms where `language == "rust"`. Dependency edges are restricted to Rust-to-Rust. |
-| **Lean view** | Only atoms where `language == "lean"`. Dependency edges are restricted to Lean-to-Lean. |
+| **Rust view** | Atoms where `language` is `"rust"` or `"verus"` — Verus `proof`/`spec` atoms belong to the Rust side of the codebase even though the kind→language rule assigns them `language: "verus"`. Dependency edges are restricted to atoms within the view. |
+| **Lean view** | Atoms where `language` is `"lean"` or `"blueprint"`. Dependency edges are restricted to atoms within the view. |
 | **Combined view** | All atoms. Cross-language correspondence links (from `maps-to`/`mapped-from` records attached by `probe merge --mappings`) are visible, styleable/filterable by confidence. |
 
 Switching modes is a client-side filter on the loaded JSON -- no re-fetching. The toggle
@@ -41,7 +50,7 @@ atom metadata:
 
 | Aspect | Rust view | Lean view |
 |--------|-----------|-----------|
-| **Kind values** | `exec`, `proof`, `spec` (Verus) | `def`, `theorem`, `abbrev`, `class`, `structure`, `inductive`, `instance`, `axiom`, `opaque` |
+| **Kind values** | The Verus set ([schema.md § Kind values](../kb/engineering/schema.md#kind-values)) | The Lean declaration kinds (same table) |
 | **Code-name style** | `probe:crate/version/module/Type#method()` | `probe:Namespace.Name` |
 | **Spec display** | `primary-spec` is inline text (requires/ensures) | `primary-spec` is a code-name pointing to a theorem |
 | **File paths** | `src/scalar.rs` | `Mathlib/Data/Nat.lean` |
@@ -52,11 +61,17 @@ Rust atoms, a link to the specification theorem for Lean atoms.
 
 ### Cross-language links
 
-In combined view, atoms from different languages may be connected by
-mapping edges (created via a
-[mappings file](../kb/engineering/schema.md#mappings-file-format)). These edges deserve
-distinct styling (e.g. dashed lines, a different color) to distinguish
-them from intra-language dependency edges.
+In combined view, atoms from different languages may carry
+correspondence records (`maps-to`/`mapped-from`, attached by
+`probe merge --mappings` from a
+[mappings file](../kb/engineering/schema.md#mappings-file-format)). A
+correspondence is not a dependency: records are never written into
+`dependencies`
+([schema.md § Correspondence records](../kb/engineering/schema.md#correspondence-records-maps-to-mapped-from)),
+and cross-language linkage is a consumer view *derived* from them. If
+the UI draws record-derived links, they need distinct styling (e.g.
+dashed lines, a different color) so they cannot be read as dependency
+edges, and should be filterable by the record's `confidence`.
 
 When a Rust atom has a `translation-name` field (from probe-aeneas),
 the UI can show a "View Lean counterpart" action that jumps to the
@@ -86,8 +101,15 @@ dependency.
   two functions.
 - **Depth control.** Limit the graph to N hops from the selected
   node(s) to avoid overwhelming the display.
-- **Verification coloring.** Color nodes by `verification-status`:
-  green = verified, red = failed, grey = unverified, blue = unknown.
+- **Verification coloring.** Color nodes by `verification-status`. The
+  value set is defined in
+  [schema.md § Common optional fields](../kb/engineering/schema.md#common-optional-fields);
+  the canonical colour convention is VeriLib's
+  [Atom statuses and colours](https://docs.verilib.org/components/processor/atom-statuses-and-colours/):
+  red = `failed`, yellow = `unverified`, light green = `verified`,
+  dark green = `transitively-verified`, purple = `trusted`; grey when
+  `untracked: true`, no colour when `verification-status` is absent.
+  (No blue — the convention reserves colour for status, not role.)
 - **Kind badges.** Show the `kind` value (exec/proof/spec or
   def/theorem/etc.) as a badge or icon on each node.
 
@@ -137,9 +159,11 @@ files depend on `src/field.rs`?"
 | Atom within group | `display-name`, `kind` |
 | Line range | `code-text.lines-start` -- `code-text.lines-end` |
 
-**Stub handling:** Atoms with `code-path == ""` are stubs (external
-dependencies). Group them separately, e.g. under an "External" box,
-or omit them and show them only as edge targets.
+**Stub handling:** Stubs (external dependencies; the structural
+three-condition test is defined in
+[schema.md § Stubs](../kb/engineering/schema.md#stubs)) have no source
+file. Group them separately, e.g. under an "External" box, or omit
+them and show them only as edge targets.
 
 ### Crate map view
 
@@ -192,25 +216,31 @@ several filtering axes that a UI should expose:
 
 ### By declaration kind
 
-Filter nodes by `kind`. Useful for isolating executable code from
-specifications and proofs:
+Filter nodes by `kind` (per-language value sets:
+[schema.md § Kind values](../kb/engineering/schema.md#kind-values)).
+Useful for isolating executable code from specifications and proofs:
 
 | Filter | Effect |
 |--------|--------|
-| Exec only | Show only `exec` (Rust) or `def` (Lean) atoms -- the runnable code |
-| Proof only | Show `proof` (Rust) or `theorem` (Lean) atoms |
-| Spec only | Show `spec` (Rust) atoms |
+| Exec only | Only the runnable code (Rust `exec`, Lean `def`) |
+| Proof only | Proof artifacts (Verus `proof`, Lean `theorem`) |
+| Spec only | Specification artifacts (Verus `spec`) |
 | All | No filtering |
 
 ### By verification status
 
-When `verification-status` is present, filter by verification outcome:
+When `verification-status` is present, filter by verification outcome —
+one toggle per value of the status enum
+([schema.md § Common optional fields](../kb/engineering/schema.md#common-optional-fields)),
+using the same colours as the graph:
 
 | Filter | Atoms shown |
 |--------|-------------|
-| Verified | Green nodes only |
-| Failed | Red nodes only |
-| Unverified | Grey nodes only |
+| Transitively verified | Dark green nodes |
+| Verified (locally) | Light green nodes |
+| Trusted | Purple nodes |
+| Unverified | Yellow nodes |
+| Failed | Red nodes |
 | All | No filtering |
 
 ### By module
@@ -221,9 +251,10 @@ module tree with checkboxes) works well.
 
 ### Excluding stubs
 
-Stubs (`code-path == ""`) are external dependencies without source
-code. The UI should offer an option to hide them (showing only atoms
-with local source) or show them dimmed.
+Stubs ([schema.md § Stubs](../kb/engineering/schema.md#stubs)) are
+external dependencies without source code. The UI should offer an
+option to hide them (showing only atoms with local source) or show
+them dimmed.
 
 ### Excluding untracked atoms
 
@@ -285,7 +316,7 @@ If the loaded JSON is a merged file containing both Rust and Lean
 atoms (e.g. from probe-aeneas), toggling to Lean view shows the Lean
 counterparts of the same functions -- `batch_invert` becomes
 `Curve25519Dalek.Scalar.batch_invert` (or whatever the Lean name is).
-Cross-language mapping edges connect the two.
+Correspondence records (`maps-to`/`mapped-from`) link the two atoms.
 
 ## Implementation notes
 
@@ -295,10 +326,14 @@ The viewer should accept probe JSON files directly (either single-tool
 or merged envelopes). Read the `schema` field to determine the file
 type and adapt the UI accordingly:
 
-- If `schema` is `probe-*/extract` or `probe-*/atoms`: single-language
-  file, hide the language toggle.
-- If `schema` is `probe/merged-atoms` or `probe-aeneas/extract`:
-  multi-language file, show the language toggle.
+- Composed-provenance detection is structural
+  ([schema.md § Merged envelope variant](../kb/engineering/schema.md#merged-envelope-variant)):
+  an envelope with an `inputs` array is composed and potentially
+  multi-language — show the language toggle; one with a `source`
+  object is single-tool (`probe-*/extract`, or the legacy
+  `probe-*/atoms`) — hide it. The structural test beats matching
+  schema strings: `probe-aeneas/extract` is composed (Rust + Lean)
+  despite its single-tool schema string.
 - The `data` dictionary is the graph. Iterate keys for nodes, follow
   `dependencies` for edges.
 

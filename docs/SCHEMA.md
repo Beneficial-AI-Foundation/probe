@@ -77,12 +77,17 @@ parsing.
 
 The envelope describes the **file**: who produced it (`schema`, `tool`), what format it
 uses (`schema-version`), what project was analyzed (`source`), and when (`timestamp`).
-See [envelope-rationale.md](envelope-rationale.md) for the full field reference.
+The full field reference is
+[`kb/engineering/schema.md` § Envelope fields](../kb/engineering/schema.md#envelope-fields);
+[envelope-rationale.md](envelope-rationale.md) records the rationale.
 
 The envelope does **not** duplicate per-atom facts:
 
-- **Language.** Implied by `schema` for single-tool files (`probe-verus` = Rust,
-  `probe-lean` = Lean). For merged files, atoms come from multiple languages, so a
+- **Language.** Implied by `schema` for single-tool files (`probe-verus` = Rust —
+  though per-atom `language` still follows the
+  [kind→language rule](../kb/engineering/schema.md#language-assignment-for-verus-atoms),
+  so `proof`/`spec` atoms carry `"verus"`; `probe-lean` = Lean). For merged files,
+  atoms come from multiple languages, so a
   per-file language field would not apply. The per-atom `language` field handles both
   cases.
 - **Crate name or version.** These are per-atom facts embedded in the code-name URI.
