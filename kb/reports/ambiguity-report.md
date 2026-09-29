@@ -3,36 +3,32 @@ auditor: ambiguity-auditor
 date: 2026-09-29
 repo: probe (hub)
 kb: kb/ (own KB)
-scope: branch la/merge-soundness-pr3a-authority-boundary (merge-soundness PR 3a,
-  issue #76 — authority boundary), delta audit over the 2026-09-28 PR 1 report;
-  KB surfaces this PR implements re-checked against the code
-status: 2 critical (both scheduled, merge-order constraints, carried over), 3 warnings, 2 info
+scope: branch la/merge-soundness-pr2-enrich-recomputation (merge-soundness PR 2,
+  issue #78 — enrichment recomputation, summary consumer contract), delta audit
+  over the PR 3a report; KB surfaces this PR implements re-checked against the
+  code
+status: 1 critical (scheduled, merge-order constraint, carried over), 3 warnings, 2 info
 ---
 
 ## Critical
 
-Carried over from the 2026-09-28 PR 1 audit. Both are the known code-vs-spec
-divergences the plan (merge-soundness-fix-plan.md §9) schedules: the KB landed
-first, and the code PRs bring the implementation into conformance. PR 3a (this
-branch) closes the *authority-boundary* portion of that window; these two
-remain.
-
-### [C1] Enrichment implementation contradicts P23 on both branches
-- **Location**: src/commands/propagate.rs (upgrade-only pass; missing-status
-  atoms opaque to contamination)
-- **Issue / Evidence**: unchanged from the PR 1 report
-  (`v [verified] → helper [no status] → bad [unverified]` mislabels `v`).
-- **Recommendation**: PR 2. Its merge-order precondition — the authority
-  boundary of PR 3a — is satisfied by this branch: `probe enrich` now
-  validates its input (projection rejection + version gate) before reaching
-  the recomputation function.
+### [C1] ~~Enrichment implementation contradicts P23~~ — CLOSED by this branch
+- **Resolution**: `enrich_verification_status` (src/commands/propagate.rs) now
+  implements P23's path-based recomputation: one BFS from the unified seed set
+  (`failed`/`unverified` + every `status-origin`-bearing atom), transparency
+  through missing-status atoms, trusted-boundary precedence
+  (`trusted` AND origin absent), labels set fresh with unconditional demotion
+  of marked `transitively-verified`. The PR 1 counterexample
+  (`v [verified] → helper [no status] → bad [unverified]`) is a regression
+  test (`test_contamination_flows_through_missing_status`). Retained in the
+  report this round so the closure is on record; drops off next run.
 
 ### [C2] `merge --mappings` injects dependency edges, contradicting revised P13
 - **Location**: src/commands/merge.rs (edge-injection block; tests pinning it)
 - **Issue / Evidence**: unchanged from the PR 1 report.
-- **Recommendation**: PR 3b. The prerequisite the PR 1 report named —
-  "regenerated artifacts must wait for the version gate (PR 3a)" — is now in
-  place.
+- **Recommendation**: PR 3b (next in the plan §9 order). Its merge-order
+  precondition — PR 2's recomputation, which μ's re-enrichment reuses — is
+  satisfied by this branch.
 
 ## Warnings
 
@@ -44,17 +40,22 @@ issue; recorded in ADR-006 Decision 4). Not a hub KB defect.
 Carried over unchanged (local-only decks, updated when next regenerated).
 
 ### [W3] Remaining spec-ahead-of-code statements, all scheduled
-- **Location**: kb/engineering/properties.md P8 (unary-boundary normalization,
-  extended arrays), P9 (dedup clause), P15 (projection trims categorized
-  arrays), P23 (recomputation, merge re-enriches, projection
-  enrich-then-trim); glossary `projection` ("recomputed on the full input
-  before trimming"); kb/tools/probe-project.md step "prepare = enrich ∘
-  normalize"; kb/tools/probe-merge.md phases 2/4/5.
-- **Issue**: these describe PR 2/3b/3c behavior. After PR 3a the *authority*
-  statements (probe-merge.md phase 1 steps 3–4, schema.md § Authority
-  validation, P23's authority-boundary paragraph, glossary `version gate`,
-  `probe/projected-atoms` in Registered schema values) are implemented and
-  verified true against the code — they leave the divergence list.
+- **Location**: kb/engineering/schema.md § Authority validation ("merge
+  **re-enriches** the atoms category", line ~306) and § Correspondence records
+  (union rule); properties.md P4/P5 (law statements), P8 (extended arrays,
+  project boundary), P9 (dedup clause), P13/P27 (record attachment/union),
+  P15 (projection trims categorized arrays), P23 ("merge re-enriches",
+  projection enrich-then-trim); glossary `projection` ("recomputed on the full
+  input before trimming"); kb/tools/probe-project.md `prepare = enrich ∘
+  normalize` step; kb/tools/probe-merge.md phases 2/4/5.
+- **Issue**: these describe PR 3b/3c behavior. After PR 2 the *enrichment*
+  statements — P23's recomputation definition, blocker-seed and
+  trusted-boundary rules, P16's hub enrichment note, ADR-006 Decision 3's
+  unary-boundary preparation for `probe enrich`, Decision 9's summary
+  contract, the glossary's `blocker seed`/`trusted (boundary)`/
+  `transitively-verified` definitions, and kb/tools/probe-summary.md in its
+  entirety — are implemented and verified against the code; they leave the
+  divergence list.
 - **Recommendation**: none beyond executing the plan's remaining PRs; listed
   so the window stays explicit.
 
@@ -63,55 +64,42 @@ Carried over unchanged (local-only decks, updated when next regenerated).
 ### [I1] ADR-003 body retains superseded application wording
 Carried over (accepted: historical record behind a supersession banner).
 
-### [I2] Version-gate producer names are duplicated between ADR-006 and code
-- **Location**: kb/decisions/006-correspondence-records.md Decision 7 table;
-  src/authority.rs `GATE_FLOORS`/`PROBE_GATE_MIN`/`PROBE_GATE_CEILING`.
-- **Note**: the constants are intentionally compiled in (Decision 10 —
-  composers link them via their pinned hub dependency), so the duplication is
-  by design; the unit-test matrix pins each number, which is the drift guard.
-  No action.
+### [I2] Version-gate producer names duplicated between ADR-006 and code
+Carried over (by design, Decision 10; unit-test matrix is the drift guard).
 
 ## Fixed during this audit
 
-- kb/engineering/schema.md § Authority validation: added the validator
-  edge-case contract (fail-closed missing/malformed `tool`, unparsable
-  versions on gated names, presence-based `projection: null`, unknown names
-  pass, atoms-only scope) — it was decided in the PR 1 cross-model review and
-  implemented+tested in PR 3a but recorded only in the fix plan.
-- kb/engineering/architecture.md hub module inventory: added
-  `src/authority.rs` (the shared validator the KB already specced had no home
-  in the component list).
-- docs/schema-validation.md: registered-strings list updated to the
-  provenance-shape branch split (`probe/projected-atoms`, `probe-vcvio/extract`
-  no longer listed as unregistered) — found by the code-quality pass, noted
-  here because it was a doc/spec contradiction.
+(Doc/spec contradictions found by this round's code-quality pass, recorded
+here because they were KB-adjacent staleness:)
+
+- kb/engineering/architecture.md hub module inventory: `src/commands/propagate.rs`
+  was absent and the `summary.rs` line predated even the three-list contract —
+  both rewritten to the implemented behavior.
+- README quick-start, docs/consumer-guide.md, docs/testing-guide.md, CLAUDE.md:
+  upgrade-pass wording and three-list summary descriptions updated to
+  recomputation / four lists.
 
 ## Verified clean (this PR's KB surfaces)
 
-- Glossary `version gate`, `projection`, `blocker seed`, `status-origin`,
-  `carrier`, `correspondence record` — defined, cross-linked, and (for the
-  authority terms) consistent with the implementation landed here.
-- ADR-006 Decision 7 table ↔ src/authority.rs constants — identical values
-  (probe-lean 0.16.0, probe-aeneas 0.21.0, probe-leanblueprint 0.11.0,
-  probe-vcvio 0.2.0, probe 0.5.0 ≤ v < 1.0.0 + `merge-atoms` rejection).
-- kb/tools/probe-merge.md Phase 1 ordering (validate at load, then category
-  consistency, then structural provenance flatten) matches cmd_merge.
-- P9 structural-detection clause matches parse_envelope; the "inventories must
-  survive loading" requirement is now enforced fail-loudly (malformed `inputs`
-  errors).
-- schema.md § Registered schema values / § Projection metadata match the
-  emitted `probe/projected-atoms` envelope (schema-version 3.1, projection
-  block) and the executable schema's branches.
+- **P23 ↔ propagate.rs**: the executable definition, seed quantifier ("any
+  atom carrying `status-origin`" — including status-less marked atoms, now
+  pinned by test), trusted-boundary precedence, whole-atom trust, missing-dep
+  trusted fallback, non-candidate untouchability, determinism and idempotence
+  all match the implementation.
+- **ADR-006 Decision 2** (marker semantics) and **Decision 3** (recomputation
+  + carrier preparation at unary boundaries, enrich side) ↔ code: consistent;
+  `prepare_atoms` implements `enrich ∘ normalize` and `cmd_enrich` applies it
+  after authority validation.
+- **Decision 9 / kb/tools/probe-summary.md ↔ summary.rs**: four-partition
+  contract, membership conjunction, kernel-taint locality, blueprint
+  exclusion (both partitions and `depended_upon`), wire field names, CLI
+  shape, stderr statistics — all verified true, with the KB's documented JSON
+  field names pinned by a new wire-contract test.
+- **schema.md `status-origin` row ↔ schemas/atom-envelope.schema.json**: the
+  executable schema now constrains the marker to exactly the two documented
+  values (positive + negative fixtures).
+- **Glossary**: `blocker seed`, `carrier`, `trusted (boundary)`,
+  `transitively-verified`, `status-origin` — defined, cross-linked, and
+  consistent with the implementation landed here; no new undefined terms were
+  introduced by this PR (its code comments use the glossary vocabulary).
 - `./scripts/check-kb-links.sh` and the enum drift guard pass.
-
-## Post-audit delta (2026-09-29, review commit 9507b3c)
-
-- kb/engineering/schema.md structural-detection paragraph now records the
-  ambiguous-provenance and empty-`inputs` rejections (implemented and
-  tested in the same commit — spec and code moved together).
-- schema.md § Bumping the interchange schema-version repointed at
-  `parse_envelope` (`src/types.rs`): both references to the
-  `src/commands/propagate.rs` check were stale after PR 3a rerouted
-  `cmd_enrich` through the shared load path.
-- Rejected review suggestion (uniform 3.1 stamping of hub outputs)
-  recorded in merge-soundness-fix-plan.md §10 settled decisions.

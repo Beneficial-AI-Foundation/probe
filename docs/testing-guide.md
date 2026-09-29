@@ -147,9 +147,10 @@ Run with `cargo test` in the probe repo (counts are not maintained here
   rejected. Covers atoms, specs, and proofs merging with last-wins
   semantics.
 - **Enrich integration** (`tests/propagate.rs`) -- runs `probe enrich`
-  end-to-end: verified→transitively-verified upgrades through dependency
-  chains, blockers (unverified deps, cycles), trusted and missing deps,
-  and envelope preservation.
+  end-to-end: transitive labels recomputed through dependency chains
+  (stale labels downgraded), blockers (failing deps, `status-origin`
+  seeds, cycles), trusted and missing deps, carrier preparation
+  (dotted-alias normalization), and envelope preservation.
 - **Unit tests** (`src/commands/`, plus a field-preservation test in
   `src/types.rs`) -- exercise each command's logic in isolation: merge
   (stub replacement and stub detection, real-vs-real conflict

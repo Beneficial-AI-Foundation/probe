@@ -256,6 +256,34 @@ mod tests {
             .collect()
     }
 
+    // Wire contract (kb/tools/probe-summary.md § Output format): the four
+    // lists serialize under exactly these snake_case field names.
+    #[test]
+    fn test_summary_result_wire_field_names() {
+        let result = SummaryResult {
+            verified_entrypoints: vec![],
+            verified_functions: vec![],
+            verified_lemmas: vec![],
+            imported_verified: vec![],
+        };
+        let value = serde_json::to_value(&result).unwrap();
+        let keys: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            keys,
+            vec![
+                "imported_verified",
+                "verified_entrypoints",
+                "verified_functions",
+                "verified_lemmas"
+            ]
+        );
+    }
+
     #[test]
     fn test_partition_is_exact() {
         let mut atoms = BTreeMap::new();

@@ -197,7 +197,8 @@ read the summary sidecars. These are analysis outputs and are never merged back
 into atom files:
 
 - `probe summary <atoms>` partitions the verified atoms of an atom file
-  (merged or single-tool) into entrypoints, functions, and lemmas
+  (merged or single-tool) into entrypoints, functions, lemmas, and
+  imported-verified (translation-origin statuses, never shown as local)
   (`probe/summary`).
 - `probe-leanblueprint extract` writes a two-axis blueprint progress sidecar
   next to its enriched atoms — statement and proof status counts aggregated

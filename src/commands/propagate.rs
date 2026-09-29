@@ -1054,6 +1054,27 @@ mod tests {
         assert_eq!(get_vs(atoms.get("caller2").unwrap()), Some("verified"));
     }
 
+    // P23 quantifies seeds over "any atom carrying status-origin": a marked
+    // atom with no verification-status at all is still a seed — it blocks its
+    // callers and is never labelled itself.
+    #[test]
+    fn test_marked_status_less_atom_is_seed() {
+        let mut atoms = BTreeMap::new();
+
+        let mut caller = make_atom("caller");
+        set_verified(&mut caller);
+        add_dep(&mut caller, "marked");
+        atoms.insert("caller".to_string(), caller);
+
+        let mut marked = make_atom("marked");
+        set_origin(&mut marked, "translation");
+        atoms.insert("marked".to_string(), marked);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("caller").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("marked").unwrap()), None);
+    }
+
     // Carrier preparation (ADR-006): the dotted-alias contamination
     // regression — without P8 normalization the dep "g." dangles (treated as
     // trusted) and f is wrongly promoted; prepared, it reaches g [failed].
