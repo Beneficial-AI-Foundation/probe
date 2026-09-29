@@ -108,8 +108,11 @@ dependency.
   [Atom statuses and colours](https://docs.verilib.org/components/processor/atom-statuses-and-colours/):
   red = `failed`, yellow = `unverified`, light green = `verified`, <!-- enum-ok -->
   dark green = `transitively-verified`, purple = `trusted`; grey when
-  `untracked: true`, no colour when `verification-status` is absent.
-  (No blue — the convention reserves colour for status, not role.)
+  `untracked: true`. When `verification-status` is absent, the
+  convention distinguishes white (in scope but unspecified — an empty
+  bar signalling intent to verify) from no bar at all (no verification
+  intent, e.g. a pure-Rust atom). (No blue — the convention reserves
+  colour for status, not role.)
 - **Kind badges.** Show the `kind` value (exec/proof/spec or <!-- enum-ok -->
   def/theorem/etc.) as a badge or icon on each node.
 
@@ -185,6 +188,9 @@ depend on?", "how many functions does crate A call in crate B?"
   embedded in the code-name URI
   (`probe:<crate>/<version>/...`). For Lean, use `source.package`
   from the envelope (or the top-level namespace from the code-name).
+  On merged/composed files there is no top-level `source` — read the
+  matching entry from the `inputs[]` provenance array instead (see
+  [Data loading](#data-loading) below).
 - **Weighted edges.** Edge thickness proportional to the number of
   cross-crate dependency edges between the two crates.
 - **Boundary selection.** Select two crates to see the interface
@@ -273,8 +279,11 @@ shareable and bookmarkable. Key parameters:
 | `sink` | Sink function for caller exploration | `sink=reduce` |
 | `depth` | Hop limit from source/sink | `depth=1` |
 | `json` | URL to a graph JSON file | `json=https://example.com/graph.json` |
+| `focus` | Focus-set JSON emitted by `probe project --emit-focus` | `focus=projected.focus.json` |
 
-For probe-based viewers, additional parameters are useful:
+probegraph already ships `view`, `kind` and status parameters (see its
+QUERY_PIPELINE.md § URL parameters); for probe-based viewers generally,
+these parameters are useful:
 
 | Parameter | Purpose | Example |
 |-----------|---------|---------|
@@ -354,6 +363,9 @@ direct link:
 {source.repo}/blob/{source.commit}/{code-path}#L{lines-start}-L{lines-end}
 ```
 
+On merged/composed files, take `repo`/`commit` from the `inputs[]`
+entry whose language matches the atom (there is no top-level `source`).
+
 This gives every node a "View source" action.
 
 ## probegraph reference documentation
@@ -364,7 +376,7 @@ documentation for the algorithms and query system:
 
 | Document | Covers |
 |----------|--------|
-| [INTERACTIVE_VIEWER.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/docs/guides/INTERACTIVE_VIEWER.md) | User-facing guide to the three views, filtering, and interactions |
+| [viewer.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/docs/guides/viewer.md) | User-facing guide to the views, filtering, and interactions |
 | [CALL_GRAPH_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/CALL_GRAPH_ALGORITHM.md) | Hybrid Sugiyama + force-directed layout for the call graph view |
 | [FILE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/FILE_MAP_ALGORITHM.md) | Compound DAG layout (transitive reduction + dagre) for the file map view |
 | [CRATE_MAP_ALGORITHM.md](https://github.com/Beneficial-AI-Foundation/probegraph/blob/main/web/docs/technical/CRATE_MAP_ALGORITHM.md) | Quotient graph aggregation and three-mode interaction for the crate map view |

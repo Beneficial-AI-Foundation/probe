@@ -1,13 +1,15 @@
 ---
 title: Merge soundness fix plan
 date: 2026-09-22
-status: agreed — not yet started. Condensed 2026-09-28 from the full
-  version (13 Codex cross-model review rounds, 2026-09-22 → 2026-09-28),
-  archived with its complete revision history at
+status: executing — PR 1 (§7 KB/ADR-006 spec change) landed 2026-09-29
+  (issue #62, PR #63); PRs 3a, 2, 3b, 3c pending. Condensed 2026-09-28
+  from the full version (13 Codex cross-model review rounds, 2026-09-22
+  → 2026-09-28), archived with its complete revision history at
   docs/archive/merge-soundness-fix-plan-full.md. The rules here are
   unchanged; only history, review attributions and cross-section
-  restatements were cut.
-scope: fixes for merge-soundness-review.md, aligning code, KB and docs/categorical-framework.md
+  restatements were cut. Doc paths updated 2026-09-29 after the docs
+  cleanup (#65/#69/#71) moved/archived several targets — see §7 note.
+scope: fixes for merge-soundness-review.md, aligning code, KB and kb/engineering/categorical-framework.md
 ---
 
 # Merge soundness fix plan
@@ -700,8 +702,8 @@ appear in no verified list and do not affect entrypoint classification
 
 ## 4. Algebra: what must hold and why
 
-The laws live in docs/categorical-framework.md §Algebraic Laws, with
-normative copies in `kb/engineering/properties.md` P4/P5 and
+The laws live in kb/engineering/categorical-framework.md §Algebraic
+Laws, with normative copies in `kb/engineering/properties.md` P4/P5 and
 `kb/tools/probe-merge.md`. They are currently stated unconditionally and
 fail in specific ways. Target formulation:
 
@@ -799,7 +801,8 @@ On the `to` atom (formal side, e.g. Lean `ga`): the mirror field
 `mapped-from` with `"target": "probe:crate/1.0/mod/g()"`.
 
 - **Direction**: the mappings file's `from`/`to` are generic
-  **source/target** (docs/mappings-spec.md — the `sources` block
+  **source/target** (kb/engineering/schema.md §Mappings file format —
+  the `sources` block
   describes each side but assigns no implementation/formal roles; a
   Lean→Rust file is legal). `maps-to` goes on the `from` atom,
   `mapped-from` on the `to` atom, whichever languages the sides are.
@@ -809,7 +812,8 @@ On the `to` atom (formal side, e.g. Lean `ga`): the mirror field
   `corresponds-to`/`same-definition-as` over-claims for abstractions
   (`ga` is a model of `g`, not the same definition).
 - **Record fields**: `target`, `confidence`, `method`, copied from the
-  mappings file. Confidence levels (per docs/mappings-spec.md): `exact`,
+  mappings file. Confidence levels (per kb/engineering/schema.md
+  §Mappings file format): `exact`,
   `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`,
   `manual`. `method` is optional in the spec (src/types.rs:306) and
   stays optional in records (omitted when absent).
@@ -999,6 +1003,16 @@ extraction time), and the KB documents this limit.
 
 ## 7. KB and doc edits (Phase A, PR 1 — lands first; KB is source of truth)
 
+> **Status (2026-09-29): executed in PR 1 (#63).** The list below is
+> the historical instruction set. The docs cleanup (#65) subsequently
+> relocated three of its targets: `docs/categorical-framework.md` →
+> `kb/engineering/categorical-framework.md`; `docs/mappings-spec.md`
+> and `docs/merge-algorithm.md` → folded into
+> `kb/engineering/schema.md#mappings-file-format` /
+> `kb/tools/probe-merge.md` and frozen under `docs/archive/`. Any
+> later PR touching these topics edits the KB pages, **never** the
+> archived copies.
+
 1. **New ADR-006 "Correspondence records (maps-to)"** superseding
    ADR-003's *application* semantics only (generation — probe-aeneas
    strategies, 1-to-1 generation, 1-to-many acceptance, bidirectional
@@ -1086,7 +1100,7 @@ extraction time), and the KB documents this limit.
    document post-merge enrichment and input authority validation
    (projection rejection §3d, version gate §3f). Staleness diagnostics
    are deferred (§6) and not documented as existing behavior.
-5. **docs/categorical-framework.md** (non-normative, but must match):
+5. **kb/engineering/categorical-framework.md** (non-normative, but must match):
    - Laws section: replace the four laws with the §4 formulation.
    - DOTS table: "Composition with functor — `probe merge --mappings`"
      reworded: the tight morphism is *structural data carried alongside*
@@ -1388,7 +1402,7 @@ schema are touched, then `cargo test`. Hub Cargo.toml minor version bump
 
 | PR | Content | Depends on |
 |----|---------|-----------|
-| 1 | §7 KB/ADR-006 spec change (incl. §3b trusted-semantics producer audit + whole-atom-trust + copied-`trusted` precedence + code-atom scope of the assurance contract / blueprint presentation aggregates, §2 `status-origin` mechanism with both values, §3d projection rejection, §6 summary contract) | — |
+| 1 ✅ (#62/#63, 2026-09-29) | §7 KB/ADR-006 spec change (incl. §3b trusted-semantics producer audit + whole-atom-trust + copied-`trusted` precedence + code-atom scope of the assurance contract / blueprint presentation aggregates, §2 `status-origin` mechanism with both values, §3d projection rejection, §6 summary contract) | — |
 | 3a | §3d projected-atoms schema and rejection incl. legacy `projection`-field detection (types.rs plumbing) + §3f per-producer version gate (five entries; `probe` entry as interval with reserved ceiling + `merge-atoms` command rejection incl. the legacy Verus-composer regression; test l) + §6 structural composed-provenance detection (`inputs`/`source`) + shared authority validator (§3c) called from `cmd_merge`/`merge_atom_files`/`cmd_enrich` + version-gate hook in `probe summary`/`probe project` (§3f, test n) + two-branch executable schema incl. `probe/projected-atoms` and `probe-vcvio` in the single-tool branch with a positive `status-origin` fixture + projected-envelope and Aeneas-envelope validation tests (test m) | PR 1 |
 | 2 | §3a/§3b enrich recomputation as one BFS over the unified seed set (`failed`/`unverified` + `status-origin` atoms) + traversal fix + trusted-boundary precedence + `status-origin` enum in the atom schema + §6 summary `imported-verified` list (membership condition + status-matrix unit tests) + §6 summary blueprint-language exclusion (test o) + shared normalize/enrich preparation applied by `cmd_enrich` incl. the dotted-alias contamination regression (§3d) + tests (incl. j, k) | PR 1, PR 3a |
 | 3b | §5 maps-to records in merge.rs (attachment, union rule, loader changes, edge-injection removal) + §3c shared-path enrichment incl. authority-checked raw staging primitive (same §3d/§3f rejection) + `maps-to`/`mapped-from` record definitions in the executable schema + merged-envelope validation test + law tests (associativity with mappings across groupings; identity exact on carrier, up-to-normalization on legacy; F_M idempotence and compatibility; commutativity disjoint keys; record preservation through every equal-key case; enrichment of intermediates does not change selected base data) + record union on every equal-key case incl. normalization collisions (§6 — helper shared with `normalize_atoms`) + two-input dotted-alias evidence-selection regression (per-input normalization before conflict resolution, §3d) — tests run against `merge_atom_maps`, the operation §4 defines | PR 1, PR 2, PR 3a |

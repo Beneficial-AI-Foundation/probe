@@ -6,10 +6,10 @@
 
 Version: draft
 Date: 2026-09-28
-Parent document: [SCHEMA.md](SCHEMA.md)
+Parent document: [SCHEMA.md](../SCHEMA.md)
 
 The cross-language mappings file format used by `probe merge` to attach correspondence
-records across languages (see [ADR-006](../kb/decisions/006-correspondence-records.md)).
+records across languages (see [ADR-006](../../kb/decisions/006-correspondence-records.md)).
 
 ## Motivation
 
@@ -135,7 +135,7 @@ dependency. The `from`/`to` fields are generic source/target roles: the
 roles (a Lean→Rust file is legal).
 
 When `probe merge --mappings <file>` processes an atom merge
-([ADR-006](../kb/decisions/006-correspondence-records.md)):
+([ADR-006](../../kb/decisions/006-correspondence-records.md)):
 
 1. Load the full mapping records (`from`, `to`, `confidence`, optional
    `method`), normalizing endpoints (P8, trailing-dot strip) before any

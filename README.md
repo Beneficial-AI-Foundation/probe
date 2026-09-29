@@ -21,7 +21,7 @@ Reference docs in this repo:
 
 - [docs/consumer-guide.md](docs/consumer-guide.md) -- **Start here**: how to use all probe tools, examples, and working with the data
 - [docs/SCHEMA.md](docs/SCHEMA.md) -- Atom interchange format: pointer to the normative spec, per-tool extension docs, design rationale
-- [docs/schema-validation.md](docs/schema-validation.md) -- Validating probe output against the JSON Schema (Rust, Lean, CI)
+- [docs/schema-validation.md](docs/schema-validation.md) -- Validating probe output against the JSON Schema (Rust, CLI, CI)
 - [docs/ui-views.md](docs/ui-views.md) -- How a UI should implement language toggles, call graph / file map / crate map views
 - [docs/testing-guide.md](docs/testing-guide.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
@@ -58,7 +58,8 @@ probe merge verus_atoms.json lean_atoms.json -o merged.json
 probe project merged.json --mappings mappings.json -o projected.json
 
 # Enrich verification status (upgrade "verified" → "transitively-verified"
-# for atoms whose entire transitive closure is verified or trusted)
+# for atoms with no failed/unverified atom reachable along a dependency
+# path that doesn't pass through a trusted boundary — see P23)
 probe enrich extract_output.json -o enriched.json
 
 # Summarize verified atoms (entrypoints, functions, lemmas)

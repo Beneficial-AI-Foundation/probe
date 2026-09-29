@@ -6,15 +6,18 @@ kb/engineering/schema.md. Reference docs must link there instead of
 restating the lists ("never re-enumerate an enum in docs/") — restated
 copies rot silently when the KB evolves (docs-report C1/C2).
 
-This check flags any line in the tracked live docs surface (README.md +
-docs/, excluding docs/archive/) that contains THRESHOLD or more distinct
-values of the same enum: single mentions are legitimate, enumerations
-are the drift hazard. kb/ itself is out of scope — its normative files
-restate enum subsets by design and are kept consistent by the KB
-auditors.
+This check flags any line in the tracked live docs surface (README.md,
+docs/ excluding docs/archive/, and probe-extract-check/TESTING.md) that
+contains THRESHOLD or more distinct values of the same enum: single
+mentions are legitimate, enumerations are the drift hazard. It also
+flags any occurrence of a DEAD_VALUES entry (retired field names like
+`is-disabled`), regardless of count. kb/ itself is out of scope — its
+normative files restate enum subsets by design and are kept consistent
+by the KB auditors.
 
 Deliberate enumerations (e.g. the UI-owned colour mapping in
 docs/ui-views.md) opt out with an inline `<!-- enum-ok -->` marker.
+The marker skips the whole line, silencing the dead-value check too.
 
 The value lists below are fixed strings by design (keep it dumb); update
 them in lockstep with kb/engineering/schema.md §§ Core fields /
@@ -107,7 +110,14 @@ def enum_hits(line: str) -> list[tuple[str, list[str]]]:
 
 def scanned_files() -> list[str]:
     out = subprocess.run(
-        ["git", "ls-files", "README.md", "docs/*.md", "docs/**/*.md"],
+        [
+            "git",
+            "ls-files",
+            "README.md",
+            "docs/*.md",
+            "docs/**/*.md",
+            "probe-extract-check/TESTING.md",
+        ],
         capture_output=True,
         text=True,
         check=True,

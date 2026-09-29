@@ -30,7 +30,8 @@ The invariants every implementation must preserve are in
 
 ## Tool-specific extension fields
 
-Tools may add language-specific fields. Rules:
+Tools may add language-specific fields. Hub guidance (convention, not
+yet part of the normative KB spec):
 
 1. Extension fields must not conflict with core or common optional field names.
 2. Extension fields should use kebab-case naming.
@@ -50,7 +51,8 @@ Each tool's extension fields are specified in that tool's own `docs/SCHEMA.md`:
 
 ### Why code-names are fully qualified URIs
 
-Code-names like `probe:curve25519-dalek/4.1.3/scalar/Scalar#add()` embed crate name and
+Code-names like `probe:curve25519-dalek/4.1.3/scalar/Scalar#add()` (illustrative,
+simplified — real keys carry the full module path and impl segments) embed crate name and
 version even though the envelope already identifies the producing tool:
 
 **Crate/version is a per-atom fact.** A single file can hold atoms from multiple crates --
@@ -110,5 +112,6 @@ no information is duplicated across the envelope and per-atom layers.
 
 A machine-readable JSON Schema for the envelope and core atom fields is maintained at
 [`schemas/atom-envelope.schema.json`](../schemas/atom-envelope.schema.json). All
-`probe-*` codebases should validate their output against this schema in tests. See the
-project [README](../README.md#json-schema) for usage examples in Rust, Lean, and CI.
+`probe-*` codebases should validate their output against this schema in tests. See
+[schema-validation.md](schema-validation.md) for usage examples (Rust, CLI, CI) and
+what the schema covers.

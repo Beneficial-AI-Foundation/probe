@@ -63,8 +63,11 @@ explicit, not because PR 1 can or should fix them.
 
 ### [W2] Presentation decks still describe edge injection
 - **Location**: docs/lightning-talk-probes.md:51,121; docs/slides23-31.md:36
-- **Issue**: Both (untracked working files) say merge "adds/stitches
-  cross-language edges". Contradicts ADR-006 once PR 3b lands.
+  (deliberately local-only since 2026-09-29: gitignored per the docs
+  cleanup plan's decision 4, so unverifiable from a clean clone — the
+  line references apply to the local working copies)
+- **Issue**: Both say merge "adds/stitches cross-language edges".
+  Contradicts ADR-006 once PR 3b lands.
 - **Recommendation**: Update when the decks are next regenerated; they are
   not normative and not part of PR 1.
 
@@ -88,7 +91,9 @@ explicit, not because PR 1 can or should fix them.
   "Schema 3.x" during this audit.
 
 ### [I2] Categorical framework now labeled as analogy
-- **Location**: docs/categorical-framework.md (intro, laws, closure claims)
+- **Location**: kb/engineering/categorical-framework.md (intro, laws,
+  closure claims; at audit time `docs/categorical-framework.md`, moved
+  by #65)
 - **Note**: The DOTS/SSProve tables are explicitly labeled architectural
   analogies; laws restated on the carrier per P4/P5. Non-normative doc,
   consistent with the KB after this change set.

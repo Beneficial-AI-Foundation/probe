@@ -8,7 +8,7 @@ family.
 | Tool | Language | What it extracts | Repo |
 |------|----------|-----------------|------|
 | **probe-rust** | Rust | Call graph atoms from SCIP index | [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) |
-| **probe-lean** | Lean 4 | Call graph atoms + sorry detection + specs | [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) |
+| **probe-lean** | Lean 4 | Call graph atoms + kernel-based verification status (sorry/axiom taint) + specs | [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) |
 | **probe-leanblueprint** | Lean 4 | probe-lean atoms enriched with blueprint progress (statement/proof status) | [probe-leanblueprint](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) |
 | **probe-verus** | Rust/Verus | Call graph + specs + verification status | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) |
 | **probe-aeneas** | Rust + Lean | Cross-language merged graph (Aeneas projects) | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) |
@@ -50,7 +50,9 @@ using [VCVio](https://github.com/Verified-zkEVM/VCVio). It runs `probe-lean
 extract` for the atom base (or takes an existing extract via `--lean`)
 and attaches a security-protocol `classification` object per atom.
 
-Output lands in `.verilib/probes/` by default. Each tool's repo README
+Output lands in `.verilib/probes/` by default (probe-aeneas falls back
+to the current directory when no project root is available). Each
+tool's repo README
 documents additional flags for caching, auto-install, output paths, and
 other options.
 
@@ -85,12 +87,13 @@ For merged files (probe-aeneas), `source` is replaced by
 ### The `data` object
 
 A dictionary keyed by **code-name** (a URI like
-`probe:curve25519-dalek/4.1.3/scalar/Scalar#add()`). Each value is an
-atom:
+`probe:curve25519-dalek/4.1.3/scalar/Scalar#add()` — illustrative and
+simplified; real keys carry the full module path and impl segments).
+Each value is an atom:
 
 ```json
 {
-  "display-name": "add",
+  "display-name": "Scalar::add",
   "dependencies": ["probe:curve25519-dalek/4.1.3/field/reduce()"],
   "code-module": "scalar",
   "code-path": "src/scalar.rs",
@@ -106,7 +109,10 @@ The field-by-field reference — types, semantics, and the `language` value set 
 is [schema.md § Core fields](https://github.com/Beneficial-AI-Foundation/probe/blob/main/kb/engineering/schema.md#core-fields-required-for-all-languages).
 
 **Common optional fields.** Beyond the core fields, atoms may carry
-`primary-spec`, `verification-status`, `trusted-reason`, `untracked`, `specs`,
+`primary-spec`, `verification-status`, `status-origin`, `trusted-reason`,
+`untracked`, `specs`, the `maps-to`/`mapped-from` correspondence records
+(cross-language links attached by `probe merge --mappings`; see
+[ui-views.md](ui-views.md) for how a UI renders them),
 and tool-specific extension fields (e.g. probe-leanblueprint's `blueprint-*`
 progress fields). The authoritative list — field names, types, value sets, and
 which tool populates each — is
@@ -137,9 +143,10 @@ project; probe-lean ships a small self-contained Lean project instead.
 | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | [`examples/verus_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/examples/verus_curve25519-dalek_4.1.3.json) | `probe-verus/extract` |
 | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) | [`examples/aeneas_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/examples/aeneas_curve25519-dalek_4.1.3.json) | `probe-aeneas/extract` |
 
-probe-leanblueprint has no standalone example JSON — it enriches a `probe-lean`
-extract. Its [`examples/`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/tree/main/examples)
-directory holds runnable blueprint projects instead.
+probe-leanblueprint's [`examples/`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/tree/main/examples)
+directory holds runnable blueprint projects, each with its extracted
+`extract.json` (`probe-leanblueprint/extract`) and `extract.summary.json`
+sidecar.
 
 ## Documentation
 
@@ -175,6 +182,8 @@ for code_name, atom in atoms.items():
 ### Filtering stubs
 
 ```python
+# Sufficient on conformant data; the full structural test is P3
+# (empty code-path AND lines 0,0 — see the KB's stub definition).
 real_atoms = {
     k: v for k, v in atoms.items()
     if v["code-path"] != ""
@@ -187,11 +196,13 @@ Extract files hold the full call graph. For a roll-up of verification progress,
 read the summary sidecars. These are analysis outputs and are never merged back
 into atom files:
 
-- `probe summary <atoms>` partitions the verified atoms of a merged file into
-  entrypoints, functions, and lemmas (`probe/summary`).
+- `probe summary <atoms>` partitions the verified atoms of an atom file
+  (merged or single-tool) into entrypoints, functions, and lemmas
+  (`probe/summary`).
 - `probe-leanblueprint extract` writes a two-axis blueprint progress sidecar
-  next to its enriched atoms, counting statement and proof status per blueprint
-  node (`probe-leanblueprint/summary`).
+  next to its enriched atoms — statement and proof status counts aggregated
+  across blueprint nodes, with a per-chapter breakdown
+  (`probe-leanblueprint/summary`).
 
 To cut a focused subgraph instead of a roll-up, `probe project` trims a
 merged atom file to the BFS neighbourhood of its mapping endpoints (see
@@ -213,7 +224,7 @@ probe-extract-check output.json
 probe-extract-check output.json --project /path/to/project
 ```
 
-See [probe-extract-check/TESTING.md](../probe-extract-check/TESTING.md)
+See [probe-extract-check/TESTING.md](https://github.com/Beneficial-AI-Foundation/probe/blob/main/probe-extract-check/TESTING.md)
 for the full list of checked properties and the test guide.
 
 ## Installation

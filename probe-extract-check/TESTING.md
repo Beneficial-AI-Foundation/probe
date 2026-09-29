@@ -11,7 +11,7 @@ How the validator checks that JSON from `probe-rust extract`, `probe-verus extra
 | **No phantoms** | No atoms for declarations that don't exist in source |
 | **Correct locations** | `code-path` exists, `lines-start`/`lines-end` bracket the actual declaration |
 | **Correct names** | `display-name` matches the declaration at that location |
-| **Correct kind** | `exec`/`proof`/`spec`/`def`/`theorem`/etc. matches the actual declaration kind |
+| **Correct kind** | `kind` matches the actual declaration kind (value sets per language: [kb/engineering/schema.md § Kind values](../kb/engineering/schema.md#kind-values)) |
 | **Correct dependencies** | If A calls B, B is in A's dependencies; no spurious deps |
 | **Referential integrity** | Every dependency target either exists as an atom key or is a known external |
 | **Correct module** | `code-module` matches the actual module path |
@@ -85,7 +85,7 @@ Source-grounded validators tested in isolation with synthetic data.
 | `test_dep_found_in_span` | Callee name present in caller span produces no diagnostics |
 | `test_dep_not_found_in_span` | Callee name absent from caller span is flagged |
 | `test_symlink_escape_skipped_in_dep_checker` | Symlink resolving outside the root is skipped, not read |
-| `test_cache_uses_canonical_key` | Path aliases (`src/../src/lib.rs`) share one cache entry and pass the root check |
+| `test_cache_uses_canonical_key` | Path aliases (`src/../src/lib.rs`) resolve to the same file and pass the root check |
 
 #### golden
 
@@ -143,7 +143,7 @@ Atoms: 4
 |------|-----------------|
 | `golden_verus_micro_structural` | Envelope valid |
 | `golden_verus_micro_source_and_deps` | All atoms validate against source |
-| `golden_verus_micro_kinds` | `spec fn` → spec, `proof fn` → proof, `exec fn` → exec |
+| `golden_verus_micro_kinds` | `spec fn` → spec, `proof fn` → proof, `exec fn` → exec | <!-- enum-ok -->
 | `golden_verus_micro_categorized_deps` | `body-dependencies` / `requires-dependencies` populated correctly |
 
 #### lean_micro
@@ -155,7 +155,7 @@ Atoms: 10
 |------|-----------------|
 | `golden_lean_micro_structural` | Envelope valid |
 | `golden_lean_micro_source_and_deps` | All atoms validate against source |
-| `golden_lean_micro_kinds` | `def`, `theorem`, `structure`, `class`, `instance` kinds correct |
+| `golden_lean_micro_kinds` | `def`, `theorem`, `structure`, `class`, `instance` kinds correct | <!-- enum-ok -->
 | `golden_lean_micro_theorem_deps` | `double_eq_add_self` depends on both `double` and `add` |
 | `golden_lean_micro_instance` | Auto-named instance `instHasSizePoint` has correct kind and deps |
 | `golden_lean_micro_sorry` | `sorry_example` has `verification-status: "failed"` |
@@ -177,7 +177,7 @@ Run the property checkers (completeness, overlap) against each golden fixture.
 
 | Test | What it verifies |
 |------|-----------------|
-| `properties_rust_micro` | No overlaps, declaration count ratio within bounds |
+| `properties_rust_micro` | No property errors, no location overlaps (completeness runs but only errors/overlaps are asserted) |
 | `properties_verus_micro` | Same |
 | `properties_lean_micro` | Same |
 | `properties_aeneas_micro` | Same |
@@ -208,35 +208,47 @@ structurally identical (ignoring volatile fields like timestamp).
 
 ## Per-probe integration tests
 
-Each individual probe repository also carries its own integration tests that
-validate extract output using `probe-extract-check` as a dev-dependency.
-These run in each probe's CI and call the library API directly (no subprocess).
+Each individual probe repository also carries its own integration tests
+that validate extract output. How they use probe-extract-check differs
+per repo: probe-rust and probe-verus depend on it as a dev-dependency
+and call the library API; probe-lean's CI installs the CLI and runs it
+as a subprocess over its example extract; probe-aeneas validates
+structurally with `serde_json` alone and has no probe-extract-check
+dependency. (probe-verus's `tests/extract_check.rs` exists but is not
+currently invoked by its CI, which runs `--lib` plus three other named
+`--test` targets.)
 
 | Probe | Test file | What it checks |
 |-------|-----------|----------------|
 | [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) | `tests/extract_check.rs` | Loads `examples/rust_curve25519-dalek_4.1.3.json` as `AtomEnvelope`, runs structural checks, validates `probe:` key prefixes and required fields |
-| [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | `tests/extract_check.rs` | Loads `tests/fixtures/unified_test/atoms.json` as `AtomEnvelope`, validates `probe:` prefixes and Verus-specific kinds (exec/proof/spec) |
+| [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | `tests/extract_check.rs` | Loads `tests/fixtures/unified_test/atoms.json` as `AtomEnvelope`, validates `probe:` prefixes and Verus-specific kinds (exec/proof/spec) | <!-- enum-ok -->
 | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) | `tests/extract_check.rs` | Validates `MergedEnvelope` structure via `serde_json::Value`, runs the full merge pipeline via library API with pre-generated JSON (no external tools needed) |
-| [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) | `Tests/Main.lean` | Loads its example extract, validates envelope fields, atom count, `DeclKind` values, and `verification-status` |
+| [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) | `Tests/Main.lean` | Loads its example extract, validates envelope fields, a non-empty atom set, `DeclKind` values, and `verification-status` |
 
-The `#[ignore]` live tests in probe-rust and probe-verus additionally call
-`cmd_extract` via the library API (requires scip / verus-analyzer installed).
+probe-rust additionally has an `#[ignore]` live test calling
+`cmd_extract` via the library API (requires scip + rust-analyzer).
+probe-verus's equivalent was merged into its `extract_backward_compat`
+test, which is not `#[ignore]` — it skips at runtime when
+verus-analyzer/scip are unavailable.
 
 ## Fixture summary
 
 | Fixture | Files | Atoms | Edge cases |
 |---------|-------|-------|------------|
 | `rust_micro` | 5 `.rs` files | 15 | Mutual recursion, trait impls, generics, closures, macros, type-only module |
-| `verus_micro` | 1 `.rs` file | 4 | exec/proof/spec kinds, categorized deps |
-| `lean_micro` | 1 `.lean` file | 10 | def/theorem/structure/class/instance, sorry |
+| `verus_micro` | 1 `.rs` file | 4 | exec/proof/spec kinds, categorized deps | <!-- enum-ok -->
+| `lean_micro` | 1 `.lean` file | 10 | def/theorem/structure/class/instance, sorry | <!-- enum-ok -->
 | `aeneas_micro` | 1 `.rs` + 1 `.lean` | 3 | Cross-language translation mappings |
 
 ## Adding a new fixture
 
 1. Create a directory under `tests/fixtures/<name>/` with source files
 2. Hand-craft `expected.json` following the Schema 3.0 envelope format
-3. Run `cargo test -p probe-extract-check golden_<name>_source_and_deps` — fix any errors
-4. Add tests in `tests/golden_tests.rs` for the new fixture
+3. Sanity-check it with the CLI:
+   `probe-extract-check tests/fixtures/<name>/expected.json -p tests/fixtures/<name>` — fix any errors
+4. Add tests in `tests/golden_tests.rs` for the new fixture (a filter
+   like `cargo test -p probe-extract-check golden_<name>` matches
+   nothing — and exits 0 — until this step)
 5. Add a `properties_<name>` test if the fixture has source files
 
 ## CLI usage

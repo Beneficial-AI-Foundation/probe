@@ -7,8 +7,8 @@
 
 Version: draft
 Date: 2026-09-28
-Parent document: [SCHEMA.md](SCHEMA.md)
-Normative spec: [kb/engineering/schema.md](../kb/engineering/schema.md), [kb/engineering/properties.md](../kb/engineering/properties.md), [ADR-006](../kb/decisions/006-correspondence-records.md)
+Parent document: [SCHEMA.md](../SCHEMA.md)
+Normative spec: [kb/engineering/schema.md](../../kb/engineering/schema.md), [kb/engineering/properties.md](../../kb/engineering/properties.md), [ADR-006](../../kb/decisions/006-correspondence-records.md)
 
 The algorithm for `probe merge`, which combines data files from multiple `probe-*` tools
 into one. It handles three categories -- **atoms**, **specs**, and **proofs** -- each
@@ -135,7 +135,7 @@ See [mappings-spec.md](mappings-spec.md) and ADR-006.
 ### Phase 3c: Re-enrich (atoms only)
 
 After all inputs are combined, run enrichment recomputation
-([P23](../kb/engineering/properties.md#p23-transitive-verification)) over the
+([P23](../../kb/engineering/properties.md#p23-transitive-verification)) over the
 merged atom map — one reverse BFS from the unified seed set (explicit
 `failed`/`unverified` atoms plus every `status-origin`-bearing atom), labels
 set fresh. Stub resolution can invalidate labels computed at extract time, so
