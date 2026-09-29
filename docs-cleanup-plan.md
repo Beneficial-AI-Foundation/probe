@@ -181,9 +181,9 @@ Mostly `git add`/moves; some need decisions. Can ride along with PR B.
    and untracked `docs/assets/{division,pipeline}.{mmd,png}` have zero
    referrers — move with the decks or delete (`division.mmd`'s
    facts-vs-palette split is drawn nowhere else).
-   Status 2026-09-29: untracked diagrams gitignored with the decks; the
-   three tracked PNGs stay tracked for now (untracking was declined in
-   PR B — revisit if the decks ever move to engineering-docs).
+   Status 2026-09-29: resolved — all deck assets untracked and
+   gitignored with the decks (kept on disk); the earlier untrack failure
+   was a global `git rm` deny rule, since narrowed to allow `--cached`.
 5. `docs/probe-dispatch-plan.md` (I3, untracked, unique content:
    marker-file dispatch design, the live Schema 2.0-verilib vs 3.0-hub
    skew, deployment gaps) — **decision needed**: track it (its own text
