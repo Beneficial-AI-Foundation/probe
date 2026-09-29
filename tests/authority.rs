@@ -148,6 +148,11 @@ fn assert_enrich_rejects(dir: &Path, input: &Path, needle: &str) {
         stderr.contains(needle),
         "stderr should mention {needle:?}: {stderr}"
     );
+    assert!(
+        !out.exists(),
+        "enrich must not write output when rejecting {}",
+        input.display()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -562,6 +567,57 @@ fn project_rejects_empty_inputs_inventory() {
     assert!(stderr.contains("empty \"inputs\""), "{stderr}");
 
     assert_merge_rejects(tmp.path(), &path, "empty \"inputs\"");
+}
+
+// ---------------------------------------------------------------------------
+// Enrich input validation: unsupported schema strings and non-atoms
+// categories are rejected at the binary level (both checks moved into
+// parse_envelope / cmd_enrich by ADR-006)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn enrich_rejects_unsupported_schema_string() {
+    let tmp = TempDir::new().unwrap();
+    // Post-threshold tool, so the rejection is attributable to the schema
+    // string alone.
+    let path = write_json(
+        tmp.path(),
+        "bogus_schema.json",
+        &single_tool_envelope(
+            "probe-verus/bogus",
+            "probe-verus",
+            "2.0.0",
+            "probe:x/1.0/f()",
+        ),
+    );
+    assert_enrich_rejects(tmp.path(), &path, "unsupported schema");
+}
+
+#[test]
+fn enrich_rejects_specs_envelope() {
+    let tmp = TempDir::new().unwrap();
+    // A valid specs-category envelope: parse_envelope accepts it, but enrich
+    // only recomputes over atoms.
+    let specs = json!({
+        "schema": "probe-verus/specs",
+        "schema-version": "3.0",
+        "tool": { "name": "probe-verus", "version": "2.0.0", "command": "specify" },
+        "source": source("rust", "pkg"),
+        "timestamp": "2026-01-01T00:00:00Z",
+        "data": {
+            "probe:pkg/1.0/f()": {
+                "specified": true,
+                "code-path": "src/lib.rs",
+                "spec-text": { "lines-start": 1, "lines-end": 3 },
+                "kind": "exec",
+                "has_requires": true,
+                "has_ensures": true,
+                "context": "standalone"
+            }
+        }
+    });
+    let path = write_json(tmp.path(), "specs.json", &specs);
+    assert_enrich_rejects(tmp.path(), &path, "expected atoms schema, got specs");
 }
 
 // ---------------------------------------------------------------------------
