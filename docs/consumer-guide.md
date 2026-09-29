@@ -12,6 +12,7 @@ family.
 | **probe-leanblueprint** | Lean 4 | probe-lean atoms enriched with blueprint progress (statement/proof status) | [probe-leanblueprint](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) |
 | **probe-verus** | Rust/Verus | Call graph + specs + verification status | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) |
 | **probe-aeneas** | Rust + Lean | Cross-language merged graph (Aeneas projects) | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) |
+| **probe-vcvio** (proof of concept) | Lean 4 | probe-lean atoms enriched with VCVio security-protocol classification | [probe-vcvio](https://github.com/Beneficial-AI-Foundation/probe-vcvio) |
 
 They all produce JSON files conforming to the Schema 3.x envelope format
 defined in [`kb/engineering/schema.md`](https://github.com/Beneficial-AI-Foundation/probe/blob/main/kb/engineering/schema.md).
@@ -26,6 +27,7 @@ probe-lean          extract <project_path>
 probe-leanblueprint extract <project_path>
 probe-verus         extract <project_path>
 probe-aeneas        extract <project_path>
+probe-vcvio         extract <project_path>
 ```
 
 For probe-leanblueprint, the Lean project must ship a blueprint — a Verso
@@ -42,6 +44,11 @@ advanced flags instead:
 ```bash
 probe-aeneas extract --rust <rust_json> --lean <lean_json> --lean-project <lean_project_path>
 ```
+
+For probe-vcvio (a proof of concept), the project must be a Lean project
+using [VCVio](https://github.com/Verified-zkEVM/VCVio). It runs `probe-lean
+extract` for the atom base (or takes an existing extract via `--lean`)
+and attaches a security-protocol `classification` object per atom.
 
 Output lands in `.verilib/probes/` by default. Each tool's repo README
 documents additional flags for caching, auto-install, output paths, and
@@ -120,13 +127,13 @@ represent external crate functions or library calls.
 
 ## Example files
 
-All examples use the **curve25519-dalek** ecosystem as the reference
-project.
+Most examples use the **curve25519-dalek** ecosystem as the reference
+project; probe-lean ships a small self-contained Lean project instead.
 
 | Repo | File | Schema |
 |------|------|--------|
 | [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) | [`examples/rust_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-rust/blob/main/examples/rust_curve25519-dalek_4.1.3.json) | `probe-rust/extract` |
-| [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) | [`examples/lean_Curve25519Dalek_0.1.0.json`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/examples/lean_Curve25519Dalek_0.1.0.json) | `probe-lean/extract` |
+| [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) | [`examples/lean_ExampleProject_0.1.0.json`](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/examples/lean_ExampleProject_0.1.0.json) | `probe-lean/extract` |
 | [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | [`examples/verus_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/examples/verus_curve25519-dalek_4.1.3.json) | `probe-verus/extract` |
 | [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) | [`examples/aeneas_curve25519-dalek_4.1.3.json`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/examples/aeneas_curve25519-dalek_4.1.3.json) | `probe-aeneas/extract` |
 
@@ -186,6 +193,10 @@ into atom files:
   next to its enriched atoms, counting statement and proof status per blueprint
   node (`probe-leanblueprint/summary`).
 
+To cut a focused subgraph instead of a roll-up, `probe project` trims a
+merged atom file to the BFS neighbourhood of its mapping endpoints (see
+the [probe README](https://github.com/Beneficial-AI-Foundation/probe#usage)).
+
 ## Validating extract output
 
 The [`probe-extract-check`](https://github.com/Beneficial-AI-Foundation/probe/tree/main/probe-extract-check)
@@ -202,9 +213,8 @@ probe-extract-check output.json
 probe-extract-check output.json --project /path/to/project
 ```
 
-See [extract-check-design.md](extract-check-design.md) for the full
-list of checks and [probe-extract-check/TESTING.md](../probe-extract-check/TESTING.md)
-for the test guide.
+See [probe-extract-check/TESTING.md](../probe-extract-check/TESTING.md)
+for the full list of checked properties and the test guide.
 
 ## Installation
 
