@@ -7,8 +7,18 @@ scope: fixes for merge-soundness-review.md, aligning code, KB and docs/categoric
 
 # Merge soundness fix plan
 
+> **Archived 2026-09-29.** Full version preserved for provenance — the
+> complete 13-round Codex review history is in the front matter above.
+> The **live, condensed plan is
+> [`merge-soundness-fix-plan.md`](../../merge-soundness-fix-plan.md)**
+> at the repo root; execute from there, not from this copy (its status
+> line and doc paths are frozen at 2026-09-28 — e.g. PR 1 has since
+> landed as #63, and `docs/categorical-framework.md` /
+> `docs/mappings-spec.md` / `docs/merge-algorithm.md` were moved into
+> the KB or archived by #65).
+
 Self-contained plan for resolving the findings in
-[merge-soundness-review.md](merge-soundness-review.md). Written to be
+[merge-soundness-review.md](../../merge-soundness-review.md). Written to be
 executable from a fresh session: it records the design decisions, the
 rationale, the exact current behavior with code locations, and the target
 behavior.

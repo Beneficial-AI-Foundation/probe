@@ -81,9 +81,10 @@ enum Commands {
     ///
     /// Reads a Schema 3.0 atom file, walks the dependency graph, and
     /// upgrades `verification-status` from "verified" to
-    /// "transitively-verified" on atoms whose entire transitive dependency
-    /// closure is verified or trusted. Atoms that remain "verified" are only
-    /// locally verified (some transitive dep is not verified/trusted).
+    /// "transitively-verified" on atoms with no failed/unverified atom
+    /// reachable along a dependency path that doesn't pass through a
+    /// trusted boundary (P23). Atoms that remain "verified" are only
+    /// locally verified (such a blocker is reachable).
     ///
     /// The output preserves the input envelope structure exactly.
     // @kb: kb/engineering/properties.md#p23-transitive-verification

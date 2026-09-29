@@ -41,6 +41,8 @@ def load_atoms(path):
         return json.load(f)["data"]
 
 def non_stub(atom):
+    # Sufficient on conformant data; the full structural test is P3
+    # (empty code-path AND lines 0,0 — see the KB's stub definition).
     return atom["code-path"] != ""
 
 def check_completeness(atoms, rendered_nodes, rendered_edges):
@@ -148,12 +150,13 @@ Run with `cargo test` in the probe repo (counts are not maintained here
   end-to-end: verified→transitively-verified upgrades through dependency
   chains, blockers (unverified deps, cycles), trusted and missing deps,
   and envelope preservation.
-- **Unit tests** (`src/commands/`, `src/types.rs`) -- exercise each
-  command's logic in isolation: merge (stub replacement, real-vs-real
-  conflict resolution, trailing-dot normalization, cross-language merge,
+- **Unit tests** (`src/commands/`, plus a field-preservation test in
+  `src/types.rs`) -- exercise each command's logic in isolation: merge
+  (stub replacement and stub detection, real-vs-real conflict
+  resolution, trailing-dot normalization, cross-language merge,
   mappings-file loading and application, recursive provenance
   flattening), enrich/propagate, project (BFS subgraph projection from
-  mapping seeds), summary partitioning, and stub detection.
+  mapping seeds), and summary partitioning.
 
 ### Individual probes
 

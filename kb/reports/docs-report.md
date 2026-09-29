@@ -1,298 +1,416 @@
 ---
 auditor: docs-auditor
-date: 2026-09-28
+date: 2026-09-29
 repo: probe (hub)
 kb: kb/ (own KB)
-scope: branch la/docs-single-source @ 980614e (post docs-single-sourcing, PR #65); audited docs/, README, CHANGELOG, probe-extract-check/TESTING.md, and untracked artifacts. kb/ spec content itself is covered by the three KB auditors and was used as ground truth here, except where code was the ground truth.
-status: 3 critical, 11 warnings, 6 info
+scope: main @ ed558b7 (post docs-cleanup — PRs #67/#69/#71/#73 all merged); re-audit after executing the 2026-09-28 report. Audited README, docs/ (live + archive), probe-extract-check/TESTING.md, CHANGELOG [Unreleased], scripts, CI, the tracked merge-soundness plans, and the one untracked artifact. kb/ spec content is the KB auditors' scope and served as ground truth, except where the code was the ground truth.
+status: 0 critical, 13 warnings, 11 info
 ---
 
-Docs verified claim-by-claim against `src/`, `probe-extract-check/`,
-`.github/workflows/`, `schemas/`, sibling repos under `../`, and git history.
-This audit ran immediately after the single-sourcing restructure (PR #65), which
-already resolved the `docs/SCHEMA.md` / merge-algorithm / mappings-spec drift
-class; findings below are what remains.
+Re-audit of the cleaned-up docs, claim-by-claim against `src/`,
+`schemas/`, `probe-extract-check/`, `.github/workflows/`, the sibling
+repos' `origin/main` under `../`, and git history. The 2026-09-28
+report's executed verdicts all held (see Verified clean); everything
+below is either newly found, introduced since, or a known carry-over.
 
 ## Critical
 
-### [C1] `docs/ui-views.md` contradicts the schema contract in ways that break a UI built from it
-- **Location**: docs/ui-views.md:16, 42-48, 56-59, 89-90, 207-214, 288
-- **Issue**: Five independent contradictions with `kb/engineering/schema.md`:
-  (1) lines 56-59 and 288 still say cross-language "mapping edges" connect atoms
-  in merged output — ADR-006's explicitly rejected design; line 31 of the same
-  file was updated to correspondence records, so the file self-contradicts.
-  (2) line 89-90 colors by `green/red/grey/blue = verified/failed/unverified/unknown`
-  — `"unknown"` is not a status, and `trusted` / `transitively-verified` (the
-  enrichment output a UI most needs to distinguish) have no color; same gap in
-  the filter table at 207-214. (3) line 16 gives the `language` set as
-  rust/lean/verus — missing `blueprint`, so a partition built on it drops every
-  probe-leanblueprint synthetic atom. (4) lines 42-44 put `proof`/`spec` kinds
-  under the Rust column while line 29 defines the Rust view as
-  `language == "rust"` — under the kind→language rule those atoms carry
-  `language: "verus"`, so the doc's own Rust view hides them. (5) lines 140-142
-  and 224-226 define stubs by `code-path == ""` alone; P3 requires all three
-  conditions.
-- **Evidence**: kb/engineering/schema.md:128 (language set), :134-137 (kinds),
-  :139-147 (kind→language), :157 (status enum), :262-265 + src/types.rs:114-118
-  (three-condition stub test); kb/decisions/006-correspondence-records.md
-  (records, never edges).
-- **Recommendation**: Rewrite 56-59/288 to correspondence records; replace the
-  enum restatements (16, 42-48, 89-90, 207-214) with KB links, keeping only the
-  UI-owned color/toggle mapping extended to all five statuses; fix the stub
-  predicate. ui-views.md is now the largest remaining enum-restatement surface
-  in `docs/`.
-
-### [C2] `docs/probes-overview-slides.md` presents superseded status semantics as current guidance
-- **Location**: docs/probes-overview-slides.md:195, 217-222, 315, 345
-- **Issue**: Tracked, orphaned (zero inbound links) July-2026 slide deck. It
-  uses the dead field name `disabled` (renamed `untracked` in the breaking 3.0
-  rename), proposes a six-value status vocabulary that is not the shipped
-  five-value contract, and states the rule "any function that doesn't have a
-  spec is disabled" — the exact opposite of P24/P25 (spec-less in-scope
-  functions are `untracked: false`, the tracked backlog). Its colour/status
-  half (161-365) is the material CHANGELOG 0.4.0 records as deliberately moved
-  to the VeriLib engineering docs; this deck is the last tracked survivor of
-  that sweep. Line 345 links the proposal doc only via a pinned-SHA URL; the
-  live successor is docs.verilib.org.
-- **Evidence**: kb/engineering/properties.md:240,258 (P24/P25);
-  kb/engineering/schema.md:382 (is-disabled→untracked); CHANGELOG.md:46-47.
-- **Recommendation**: Archive with an outcome header (colour scheme moved to
-  VeriLib docs; status vocabulary superseded by properties.md). Do not keep as
-  a live doc — a reader cannot tell it is a snapshot.
-
-### [C3] Tracked KB files reference untracked working files — dangling on the forge today
-- **Location**: kb/decisions/006-correspondence-records.md:12-13;
-  kb/reports/ambiguity-report.md:16,65
-- **Issue**: ADR-006 cites `merge-soundness-review.md` and
-  `merge-soundness-fix-plan.md` by name "in the hub repo"; the tracked
-  ambiguity report cites the plan's §9 and has an open finding (W2) against
-  `docs/lightning-talk-probes.md` / `docs/slides23-31.md`. All of these are
-  untracked. The live fix plan's own front matter points at
-  `docs/archive/merge-soundness-fix-plan-full.md` — also untracked, inside an
-  otherwise-tracked directory. Anyone reading ADR-006 on GitHub cannot follow
-  its provenance citations.
-- **Evidence**: `git status --porcelain` vs `git grep -n merge-soundness`
-  (kb/decisions/006:12-13, kb/reports/ambiguity-report.md:16).
-- **Recommendation**: Track `merge-soundness-fix-plan.md`,
-  `merge-soundness-review.md`, and `docs/archive/merge-soundness-fix-plan-full.md`
-  (the plan is live and drives the open PR train). For W2's slide files, either
-  track them or move them to engineering-docs and amend the finding.
+None. The one critical-severity fact found this round (W0) is already
+scheduled work in the merge-soundness plan, so per the W1 precedent it
+is reported as a known merge-order constraint, not new drift.
 
 ## Warnings
 
-### [W1] ADR-006 spec/code inversion — merge-order constraint, not new drift
-- **Location**: kb/engineering/schema.md:93,206; src/main.rs:37-42 vs
-  src/commands/merge.rs:131-166; src/types.rs:163-177
-- **Issue**: The KB (and, since PR #65, the `--mappings` CLI help) describe
-  correspondence-record attachment and `probe/projected-atoms` category
-  detection; the code still injects dependency edges
-  (`atom.dependencies.insert`, stat label "Cross-lang edges") and
-  `detect_category` has no `probe/projected-atoms` arm. This is the known
-  ADR-006 "spec only — implementation lands in follow-up PRs" state
-  (CHANGELOG Unreleased; merge-soundness plan PRs 3a/3b), not undocumented
-  drift — but nothing in schema.md marks those two statements as pending, and
-  the CLI help now describes unimplemented behavior to end users.
-- **Recommendation**: Land PRs 3a/3b per the plan. If they are more than a
-  release away, add a "pending implementation (ADR-006 rollout)" marker at
-  schema.md:93 and in the CLI help.
+### [W0] The JSON Schema rejects the KB-legal composed envelope probe-aeneas ships — known, scheduled in merge-soundness PR 3a
+- **Location**: schemas/atom-envelope.schema.json ($defs.singleToolAtomsEnvelope);
+  docs/schema-validation.md:4-5; tests/schema_validation.rs:217-250
+- **Issue**: `kb/engineering/schema.md:75` (and P9) state that producers
+  other than the hub may emit composed envelopes under their own schema
+  strings — "e.g. `probe-aeneas/extract` with `inputs: [Rust, Lean]`
+  and no `source`". probe-aeneas's shipped
+  `examples/aeneas_curve25519-dalek_4.1.3.json` is exactly that shape,
+  and it fails validation (re-verified with jsonschema 0.28 semantics /
+  Draft 2020-12: 1 error — `singleToolAtomsEnvelope` requires `source`
+  and its `additionalProperties: false` forbids `inputs`;
+  `mergedAtomsEnvelope` pins `schema` to `probe/merged-atoms`). The
+  repo's own test masks the gap:
+  `single_tool_aeneas_extract_envelope_is_valid` constructs a synthetic
+  `probe-aeneas/extract` **with** a `source` object — a shape
+  probe-aeneas does not emit. `docs/schema-validation.md`'s headline
+  ("validates both single-tool and merged envelopes") overstates
+  accordingly: the failure class is structural (composed single-tool),
+  not just the unregistered-schema-string list the doc gives at :66-68
+  (that list itself is verbatim-accurate).
+- **Evidence**: `git -C ../probe-aeneas show origin/main:examples/...`
+  top-level keys `[data, inputs, schema, schema-version, timestamp, tool]`;
+  Draft202012Validator → 1 error.
+- **Status**: **Already scheduled** — merge-soundness-fix-plan.md §6
+  ("Composed-provenance detection is structural" + "Executable schema":
+  rework the branch split to key on provenance shape so "the Aeneas
+  composed envelope validates instead of matching neither branch"),
+  assigned to PR 3a in §9 together with "Aeneas-envelope validation
+  tests (test m)", which also replaces the masking synthetic test. The
+  same PR registers `probe/projected-atoms` and `probe-vcvio` in the
+  schema, shrinking schema-validation.md's "not yet registered" list.
+- **Recommendation**: No separate action; land PR 3a per the plan, then
+  update `docs/schema-validation.md`'s coverage prose and unregistered
+  list in that PR.
 
-### [W2] `probe project` is invisible in every user-facing doc
-- **Location**: README.md:9,48-64; docs/consumer-guide.md; docs/testing-guide.md:132-148
-- **Issue**: The clap parser ships four subcommands (`merge`, `project`,
-  `enrich`, `summary`; src/main.rs:20-122) and `probe project` has a KB page,
-  but README says "(`merge`, `enrich`, `summary`)", the Usage block has no
-  project example, and the testing guide lists none of its 14 unit tests.
-- **Recommendation**: Add `probe project` to README (one usage line:
-  `--mappings` required, `--forward-depth` default 2, `--reverse-depth`
-  default 0, `-o` default `projected.json`, `--emit-focus`) and to the
-  consumer guide's progress section.
+### [W1] ADR-006 spec/code inversion — known carry-over, unchanged
+- **Location**: src/commands/merge.rs:131-166; src/types.rs:163-177;
+  src/commands/propagate.rs:151-165
+- **Issue**: Unchanged from the previous report: the KB and CLI help
+  describe correspondence-record attachment and `probe/projected-atoms`
+  detection; the code still injects dependency edges and
+  `detect_category` has no projected-atoms arm. Additionally noted this
+  round: `propagate.rs` only ever upgrades (`verified` →
+  `transitively-verified`); P23's restated semantics are a
+  recomputation that can also demote. All of this is the documented
+  "spec only — implementation lands in follow-up PRs" state.
+- **Recommendation**: Land the merge-soundness plan's PRs 3a/3b. Not a
+  docs action; listed so the next audit doesn't rediscover it.
 
-### [W3] `docs/envelope-rationale.md` is written as an unshipped proposal and uses legacy schemas in its flagship examples
-- **Location**: docs/envelope-rationale.md:1,10-20,91,95,141,202-230,266,284-293
-- **Issue**: Title still says "Schema 2.0"; "Today these files are bare JSON
-  dictionaries" (shipped years ago); canonical examples use the Schema-1.x
-  legacy `probe-lean/atoms` + `atomize`; the "Proposed layout" names a
-  `translations/` folder where the KB specifies `.verilib/mappings/`; the
-  Rollout section ("only consumer is verilib-cli, no migration needed") is
-  contradicted by the KB's own multi-consumer lockstep-bump runbook. Its Field
-  Reference and Merged Envelope sections duplicate kb/engineering/schema.md
-  field-for-field and have already drifted (no structural composed-provenance
-  detection).
-- **Recommendation**: Trim to the genuinely unique rationale ("Why an Envelope
-  Is Needed", "What the Envelope Should NOT Do"), retitle without "2.0",
-  replace the field reference / merged-variant / package-versioning /
-  folder-structure sections with KB links, delete the Rollout section. Repoint
-  docs/SCHEMA.md's "full field reference" sentence to the KB.
+### [W2] TESTING.md's per-probe integration section misdescribes three sibling repos
+- **Location**: probe-extract-check/TESTING.md:211-213, 222-223
+- **Issue**: The intro claims each probe repo validates extract output
+  "using `probe-extract-check` as a dev-dependency", running "in each
+  probe's CI", "library API directly (no subprocess)". Verified against
+  the siblings' origin/main: (1) probe-aeneas has no
+  probe-extract-check dependency at all (dev-deps: `serde_json` only);
+  (2) probe-lean's CI installs the CLI and runs it as a subprocess
+  (`.github/workflows/ci.yml:187,193`); (3) probe-verus's CI runs
+  `cargo test --lib` plus three named `--test` targets, none of which
+  is `extract_check` — the file exists but never runs in CI. Separately,
+  :222-223 claims probe-verus has an `#[ignore]` live test calling
+  `cmd_extract`; that test was merged into `extract_backward_compat`
+  (issue #23), which is not `#[ignore]` (it runtime-gates on
+  `tools_available()`). The probe-rust half of both claims is correct.
+- **Recommendation**: Rewrite the intro per-repo (the table rows
+  themselves are accurate); fix or drop the :222-223 sentence. File the
+  probe-verus CI omission in that repo (see Real bugs).
 
-### [W4] `docs/extract-check-design.md` is a stale lower-resolution copy of TESTING.md
-- **Location**: docs/extract-check-design.md:58,76-77,99-107,124,127,132-141
-- **Issue**: Every count is wrong (rust_micro 12→15 atoms, 3→5 files;
-  integration 25→27 active; total 51→65); it omits the path-safety checks, the
-  P14 `dependencies-with-locations` ordering check, and the 4 idempotency
-  tests. ~80% duplicates probe-extract-check/TESTING.md, whose versions of the
-  same tables are correct.
-- **Recommendation**: Move the unique "What 'correct' means" properties table
-  (lines 6-18) and the three-layer framing into TESTING.md as a preamble;
-  delete the rest; update the two inbound links (README.md, consumer-guide).
+### [W3] TESTING.md describes assertions four tests don't make
+- **Location**: probe-extract-check/TESTING.md:147, 180-183, 220, 88
+- **Issue**: (1) `golden_verus_micro_categorized_deps` — doc says
+  "`body-dependencies` / `requires-dependencies` populated correctly";
+  the test (`golden_tests.rs:262-279`) asserts only `body-dependencies`
+  (the fixture carries `requires-dependencies`, so this is a coverage
+  gap the doc masks). (2) `properties_{verus,lean,aeneas}_micro` — the
+  "Same" rows inherit "no overlaps, ratio within bounds" from
+  `properties_rust_micro`, but those three assert only error-freedom;
+  overlap and completeness are warnings and go unchecked, and even the
+  rust variant does not assert the ratio half. (3) The probe-lean row's
+  "atom count" is a non-emptiness check in `Tests/Main.lean`, not a
+  count. (4) `test_cache_uses_canonical_key` asserts only
+  `errors.is_empty()`; cache-entry sharing is stated intent, never
+  observed.
+- **Recommendation**: Weaken the four descriptions to what is asserted,
+  or strengthen the tests (the categorized-deps one is worth
+  strengthening — see Real bugs).
 
-### [W5] `probe-extract-check/TESTING.md` undercounts its own suite
-- **Location**: probe-extract-check/TESTING.md:24,40,47,68,75,169-178
-- **Issue**: Unit counts stale (22 stated, 30 actual — the missing 8 are the
-  security-hardening and P14-ordering tests, so the doc under-sells real
-  coverage); Layer-2 header "(27 tests, of which 8 are ignored)" is wrong
-  twice (23 golden, all active). Every named test resolves correctly — only
-  the arithmetic is stale. Exit codes (2 = parse failure, 1 = errors or
-  warnings without `--allow-warnings`, 0 = clean) and the `-p` short flag are
-  documented nowhere.
-- **Recommendation**: Replace hand-maintained totals with "run
-  `cargo test -p probe-extract-check`"; keep the per-test semantic tables
-  (100% accurate today); add exit codes.
+### [W4] README and `probe enrich --help` use the P23 wording the KB explicitly retired
+- **Location**: README.md:60-61; src/main.rs:82-86
+- **Issue**: Both say enrichment upgrades atoms "whose entire
+  transitive closure is verified or trusted".
+  `kb/engineering/properties.md:208` states P23's path/seed-based rule
+  "*replaces* the earlier 'every transitively reachable dependency is
+  verified or trusted' wording", and the code follows the KB
+  (`propagate.rs:21-23` seeds only from `unverified`/`failed`;
+  missing-status atoms are transparent). The docs describe semantics
+  that would wrongly predict non-promotion when status-less atoms are
+  in the closure.
+- **Recommendation**: One-sentence fix in both places ("no failed or
+  unverified atom is reachable along a non-trusted path", or link P23).
 
-### [W6] `docs/schema-validation.md` claims validation in repos that don't validate
-- **Location**: docs/schema-validation.md:6,8,26,51
-- **Issue**: Headings claim probe-verus and probe-lean validate against the
-  JSON Schema; neither has any jsonschema dependency or reference. "The
-  machine-readable contract all probe-* codebases should validate against"
-  overstates coverage: `probe/summary`, `probe/mappings`,
-  `probe/projected-atoms`, `probe-lean/viewify`, `probe-leanblueprint/summary`
-  are not registered in the schema's `oneOf`.
-- **Recommendation**: Scope the headings to this repo (the only validator
-  today), state the schema's actual coverage, and keep it as the single home
-  of the validation recipe (see W7).
+### [W5] consumer-guide's flagship atom example teaches the wrong `display-name` convention
+- **Location**: docs/consumer-guide.md:93 (vs :88)
+- **Issue**: The worked example gives `"display-name": "add"` for the
+  code-name `...scalar/Scalar#add()`. `kb/engineering/schema.md:122`
+  specifies `"MyStruct::method"`, P21 mandates `SelfType::method` for
+  impl methods, `docs/SCHEMA.md:72` says `"Scalar::add"`, and real
+  probe-rust data agrees (`"Scalar52::zeroize"` etc.).
+- **Recommendation**: `"add"` → `"Scalar::add"`.
 
-### [W7] Schema-validation recipe is triplicated
-- **Location**: README.md:66-72 ↔ docs/schema-validation.md ↔ docs/testing-guide.md:17-28
-- **Issue**: Three copies of the same recipe; testing-guide additionally points
-  readers to a README section that contains no examples.
-- **Recommendation**: Canonical home `docs/schema-validation.md`; README keeps
-  a one-line pointer; testing-guide links there directly.
+### [W6] consumer-guide denies an example file probe-leanblueprint ships
+- **Location**: docs/consumer-guide.md:140-142
+- **Issue**: "probe-leanblueprint has no standalone example JSON" — its
+  origin/main has
+  `examples/verso-blueprint-project-template/extract.json`
+  (`probe-leanblueprint/extract`, schema-version 3.0) plus six
+  `extract.summary.json` sidecars.
+- **Recommendation**: Fix the sentence; optionally add the row to the
+  example-files table.
 
-### [W8] `docs/testing-guide.md` test inventory is stale and incomplete
-- **Location**: docs/testing-guide.md:21-23,132-148,147
-- **Issue**: "Schema validation (7 tests)" → 9; "Merge unit (15 tests)" → 22;
-  `tests/propagate.rs` (7), `propagate.rs` unit (20), `project.rs` (14),
-  `summary.rs` (7), `types.rs` (1) all unlisted; "translation-based edge
-  creation" uses pre-0.3.0 terminology and describes the ADR-006-superseded
-  behavior; probe-leanblueprint silently missing from the per-repo table.
-- **Recommendation**: Same cure as W5 — drop hand-maintained counts, keep the
-  semantic descriptions, fix the terminology, note leanblueprint has no
-  TESTING.md yet.
+### [W7] consumer-guide describes the blueprint summary as per-node; the KB says aggregated
+- **Location**: docs/consumer-guide.md:193-194
+- **Issue**: "counting statement and proof status per blueprint node" —
+  `kb/engineering/schema.md:97` defines `probe-leanblueprint/summary`
+  as "aggregated over blueprint nodes, **not keyed per node**", and the
+  shipped artifact's `data` is `{totals, all, definitions, theorems,
+  headline, by-chapter}`.
+- **Recommendation**: "per blueprint node" → "aggregated across
+  blueprint nodes (with per-chapter breakdown)".
 
-### [W9] `docs/consumer-guide.md` example table 404s for probe-lean
-- **Location**: docs/consumer-guide.md:123-124,129
-- **Issue**: `examples/lean_Curve25519Dalek_0.1.0.json` does not exist in
-  probe-lean (its example is `lean_ExampleProject_0.1.0.json`; the
-  curve25519 file lives in probe-aeneas), so the GitHub link is dead and "All
-  examples use the curve25519-dalek ecosystem" is no longer true. probe-vcvio
-  is absent from the tool table (also from README's ecosystem table).
-- **Recommendation**: Fix the row, soften the "all examples" claim, decide
-  whether draft-status probe-vcvio should be listed.
+### [W8] Dead probegraph link in ui-views' doc table
+- **Location**: docs/ui-views.md:367
+- **Issue**: Links `docs/guides/INTERACTIVE_VIEWER.md` in probegraph;
+  that path does not exist on probegraph's origin/main (the guides dir
+  has `viewer.md`, `ci-integration.md`, `metrics-reference.md`,
+  `vscode-extension.md`). The other four probegraph links resolve.
+- **Recommendation**: Repoint to `docs/guides/viewer.md`.
 
-### [W10] `docs/structure/` trilogy and `docs/web-cli-probe/001_motivation.md` are outcome-less historical proposals
-- **Location**: docs/structure/001-003, docs/web-cli-probe/001_motivation.md (all orphaned, zero inbound links, untouched since 2026-03-20)
-- **Issue**: 001/002 specify the verilib-cli product (implemented there; hub
-  scope violation per ADR-005; `veri-name` never built; `scip:` naming
-  reversed to `probe:`; spec-status vocabulary contradicts properties.md).
-  003's "Schema of probe outputs" (L50-110) is the highest-risk stale content
-  in the repo: pre-envelope bare dicts, `scip:` dependencies, `specified` and
-  boolean `verified` fields — a grep for `atoms.json`/`specs.json` lands here
-  with no version marker. web-cli-probe/001's 10-item plan is essentially all
-  shipped (in verilib-cli, probe-lean viewify, probe-aeneas) or explicitly
-  dropped (latex); its sibling 002 was already deleted in the ADR-005 sweep.
-- **Recommendation**: Archive all four with outcome headers (003's header must
-  name kb/engineering/schema.md as the superseding spec; web-cli-probe/001 may
-  simply be deleted to match its sibling).
+### [W9] Stale "(Rust, Lean, CI)" enumerations for the validation recipes
+- **Location**: README.md:24; docs/SCHEMA.md:114
+- **Issue**: `docs/schema-validation.md` now has Rust / command-line /
+  CI sections (the Lean heading was renamed in #71); README's own
+  §JSON Scheme line already says "(Rust, CLI, CI)" but the doc-list
+  bullet at :24 and SCHEMA.md:114 still say Lean.
+- **Recommendation**: Two one-word fixes.
 
-### [W11] kb/reports contains three reports for a different repo
-- **Location**: kb/reports/{ambiguity,quality,test}-report-probe-aeneas.md (untracked)
-- **Issue**: Their headers name `repo: probe-aeneas`; they landed here because
-  probe-aeneas has no local kb/ and the auditor skills resolved the hub KB as
-  the output root. The unsuffixed tracked siblings audit this repo — the
-  suffix convention worked, but the files sit in the wrong repo and are
-  untracked. One nugget inside: a merge-order constraint ("probe#58 before
-  probe-aeneas 0.20.0 conformance").
-- **Recommendation**: Move them to probe-aeneas (create kb/reports/ there or
-  give the skill an output-dir override); put the merge-order note on the
-  issue if still open.
+### [W10] The live merge-soundness plan targets doc paths that no longer exist
+- **Location**: merge-soundness-fix-plan.md:10, 703, 802, 812, 1089,
+  1137-1150
+- **Issue**: The unexecuted plan names `docs/categorical-framework.md`
+  (moved to `kb/engineering/categorical-framework.md` in #65),
+  `docs/merge-algorithm.md` and `docs/mappings-spec.md` (archived and
+  frozen in #65) as §9 rewrite targets, and cites line numbers in
+  `docs/SCHEMA.md` (~196, ~318) that predate its reduction to 114
+  lines. Whoever executes PRs 3a/3b from this plan will be misdirected
+  into rewriting frozen archive files.
+- **Recommendation**: Patch the plan's §9 target list to the KB paths
+  (the archived copies are explicitly "not updated"; their outcome
+  headers already delegate to the KB).
+
+### [W11] The archived full merge-soundness plan is the only archive file without an outcome header
+- **Location**: docs/archive/merge-soundness-fix-plan-full.md:1-10
+- **Issue**: Its front matter still reads "status: agreed — not yet
+  started". The other 7 archive files all carry a dated
+  "> **Archived …**" header (the plan's own ground rule, line 33). The
+  live condensed plan points here, but the pointer is one-directional —
+  a reader landing in the archive sees a live-looking plan.
+- **Recommendation**: Prepend the standard header ("full version
+  preserved for provenance; the live, condensed plan is
+  `merge-soundness-fix-plan.md` at the repo root").
+
+### [W12] The tracked ambiguity report cites a dead path and unverifiable files
+- **Location**: kb/reports/ambiguity-report.md:91, 65
+- **Issue**: :91 locates a finding in `docs/categorical-framework.md`
+  (moved to kb/ in #65). :65's W2 finding cites
+  `docs/lightning-talk-probes.md` / `docs/slides23-31.md`, which
+  decision 4 (2026-09-29) made local-only/gitignored; the plan's own
+  instruction was to "amend that finding" if they weren't tracked, and
+  it wasn't — the finding is now unverifiable from a clean clone.
+- **Recommendation**: Update the two locations (or annotate W2 as
+  referring to local-only material, with the decks' edge-injection
+  content still due an update when PR 3b lands).
 
 ## Info
 
-### [I1] Repo-root scratch artifacts (~19 MB) neither tracked nor ignored
-- **Location**: test.json (5.7 MB merged output), summary_curve25519-dalek_4.1.3.json (schema 2.0), dots.pdf, "Signal Shot Launch".pptx/pdf ×3 (one 0-byte), scripts/__pycache__/, .vscode/
-- **Recommendation**: Delete or move out; add `*.json` scratch patterns /
-  `.vscode/` / `__pycache__/` to .gitignore as appropriate.
+### [I1] Post-move link rot inside the frozen archive copies
+- **Location**: docs/archive/merge-algorithm.md:10-11,138;
+  docs/archive/mappings-spec.md:9,12,138;
+  docs/archive/merge-soundness-fix-plan-full.md:11
+- **Issue**: Body links written pre-move now resolve one directory
+  short (`../kb/…` → `docs/kb/…`; `SCHEMA.md` →
+  `docs/archive/SCHEMA.md`; `merge-soundness-review.md` → archive-local).
+  The prepended headers use correct `../../kb/…` paths, and the files
+  are explicitly "kept for historical reference; not updated" — hence
+  info, not warning. `check-kb-links.sh` cannot catch these (it only
+  walks `kb/`).
+- **Recommendation**: Optional mechanical fix; or accept as frozen.
 
-### [I2] Orphaned figures in docs/assets
-- **Location**: tracked atom-bar.png, atom-dot.png, shapes-roles.png; untracked division.{mmd,png}, pipeline.{mmd,png}
-- **Issue**: Zero inbound references from any markdown, tracked or untracked.
-  The untracked pair likely belongs with the untracked slide decks.
-- **Recommendation**: Move with the decks or delete; `division.mmd`'s
-  facts-vs-palette split is drawn nowhere else if that idea still matters.
+### [I2] One-condition stub predicates in the Python snippets
+- **Location**: docs/consumer-guide.md:178-181; docs/testing-guide.md:43-44
+- **Issue**: Both filter stubs by `code-path != ""` alone. P3 is a
+  three-condition iff, and consumer-guide itself states all three at
+  :124. Correct on conformant data; the snippets are the copy-paste
+  artifact.
+- **Recommendation**: Add the two extra conditions or a one-line
+  "(sufficient on conformant data; the full test is P3)" comment.
 
-### [I3] `docs/probe-dispatch-plan.md` (untracked) holds unique design content
-- **Issue**: Marker-file dispatch design, the live Schema 2.0 (verilib
-  atomizer) vs 3.0 (hub) skew, and deployment-gap observations exist nowhere
-  else. The doc prescribes its own home (`kb/tools/probe-dispatch.md` + ADR).
-- **Recommendation**: Track it (or extract the skew note and open questions
-  into an issue) — it is a plan, and plans rot fastest untracked.
+### [I3] Enum drift guard: blind spots and a docstring omission
+- **Location**: scripts/check-enum-drift.py:2-24,108-117;
+  probe-extract-check/TESTING.md:14; docs/ui-views.md:238-244
+- **Issue**: (1) TESTING.md:14 restates five `kind` values on one line
+  but the file is outside the scanned set (README + docs/), despite
+  being advertised as a live reference doc at README:29. (2) One-value-
+  per-row tables (ui-views' status filter table :238-244) are invisible
+  to the per-line rule and carry no `<!-- enum-ok -->`. (3) The module
+  docstring omits the `is-disabled` dead-value check, and the
+  `<!-- enum-ok -->` marker silences that check too, not just
+  enumerations.
+- **Recommendation**: Add `probe-extract-check/TESTING.md` to the
+  scanned set (with an `enum-ok` marker on line 14 or a KB link),
+  mention the dead-value check in the docstring. The multi-line-table
+  blind spot is inherent to the per-line rule; accept it.
 
-### [I4] Dangling `@kb:` anchor
-- **Location**: src/commands/propagate.rs:64
-- **Issue**: `// @kb: kb/engineering/schema.md#verification-status-values` —
-  no such heading (the values live in § Common optional fields).
-  `check-kb-links.sh` does not validate `@kb:` anchors.
-- **Recommendation**: Fix the anchor; optionally teach the script to check
-  `@kb:` references.
+### [I4] CHANGELOG [Unreleased] names files a sibling bullet in the same section archives
+- **Location**: CHANGELOG.md:21-22
+- **Issue**: "Aligned `docs/merge-algorithm.md`, `docs/mappings-spec.md`
+  … with ADR-006" precedes the bullet recording those files' archival.
+  Accurate as history, but a reader of the released section will follow
+  three dead paths. Cosmetic ordering artifact.
+- **Recommendation**: Optionally annotate "(since archived, see below)".
 
-### [I5] README copy-paste gap and imprecision in docs/SCHEMA.md
-- **Location**: README.md:49-53; docs/SCHEMA.md:84-86
-- **Issue**: README shows `cargo build` then bare `probe merge …` with no
-  install step. SCHEMA.md's "probe-verus = Rust" elides the kind→language
-  rule (the next sentence saves it).
-- **Recommendation**: One-line fixes.
+### [I5] Untracked session artifact: docs/verification-statuses-pr-comments.md
+- **Location**: docs/verification-statuses-pr-comments.md (untracked;
+  the repo's only non-ignored untracked file)
+- **Issue**: Pre-posting working copy of a review delivered to PR #24
+  (merged 2026-07-01, 10 inline comments posted); the reviewed document
+  left this repo in 0.4.0; its one open question ("does `is-hidden`
+  exist?") is answered by `kb/engineering/schema.md:179`; it uses the
+  pre-rename `is-disabled` field name throughout. Same class as the I6
+  artifacts the plan ordered deleted.
+- **Recommendation**: Delete.
 
-### [I6] Session review artifacts at root are fully applied
-- **Location**: docs-probe-consistency-review.md, schema-vs-kb-audit.md, pr-63-review-comments.md (untracked)
-- **Issue**: Their recommendations landed in PR #65 / PR #63 (verify the
-  remaining pr-63 comment items were posted before discarding).
-- **Recommendation**: Delete after that check.
+### [I6] ui-views internal drifts (three small ones)
+- **Location**: docs/ui-views.md:189-190,201,354; :272-284; :110-111
+- **Issue**: (1) Crate-map and source-linking read `source.package` /
+  `source.repo`/`source.commit`, but the views target merged files
+  where `source` is replaced by `inputs` — as :329-336 itself states;
+  the fallbacks need `inputs[].source`. (2) The "additional parameters"
+  table proposes `view`/`kind`/`status` params probegraph already ships,
+  and the key-parameters table omits `focus`, which `--emit-focus`
+  (src/main.rs:76-78) makes a first-class interface. (3) "no colour
+  when `verification-status` is absent" collapses VeriLib's white
+  (in-scope, unspecified) vs no-bar (no verification intent)
+  distinction; the five status→colour pairs themselves match exactly.
+- **Recommendation**: Small wording fixes on the next ui-views pass.
 
-## Overlap map (topic × canonical home)
+### [I7] consumer-guide completeness nits
+- **Location**: docs/consumer-guide.md:11, 53, 109-110, 190, 216
+- **Issue**: The common-optional-fields list omits `status-origin` and
+  `maps-to`/`mapped-from` — the guide never mentions correspondence
+  records although ui-views builds a view on them; "sorry detection"
+  understates probe-lean's kernel-based taint walk (P16); the
+  `.verilib/probes/` default is qualified for probe-aeneas (cwd
+  fallback without a project root); `probe summary` accepts any atom
+  file, not only merged; :216 is the guide's only repo-relative link in
+  an otherwise absolute-URL document.
+- **Recommendation**: Fold into the next consumer-guide touch-up; none
+  is individually urgent.
 
-| Topic | Canonical | Duplicates to fold/link |
+### [I8] Illustrative code-names don't resolve in the linked example files
+- **Location**: docs/SCHEMA.md:53; docs/consumer-guide.md:88,94
+- **Issue**: `probe:curve25519-dalek/4.1.3/scalar/Scalar#add()` and
+  `…/field/reduce()` match the KB's own simplified illustration
+  (schema.md:244-248) but exist in no shipped example; real keys carry
+  full module paths and impl segments. A consumer trying the examples
+  against the linked file finds nothing.
+- **Recommendation**: Either mark as schematic or quote a real key. If
+  the KB illustration changes, that is a KB decision — flag, don't fix
+  unilaterally.
+
+### [I9] docs/SCHEMA.md states extension-field rules the normative KB doesn't
+- **Location**: docs/SCHEMA.md:33-38 vs kb/engineering/schema.md:165-167
+- **Issue**: Four normative-sounding rules (must-not-conflict,
+  kebab-case, must-ignore, omit-when-empty) have no KB counterpart,
+  in a file that declares the KB authoritative at :13.
+- **Recommendation**: Promote to the KB (human decision) or reword as
+  non-normative guidance.
+
+### [I10] Sibling-repo staleness (out of this repo's scope; file issues there)
+- **Location**: ../probe-aeneas docs/USAGE.md:64-67 + README.md:5;
+  ../probe-leanblueprint README.md:24; ../probe-verus .github/workflows/ci.yml
+- **Issue**: probe-aeneas still describes extract as producing
+  "cross-language dependency edges" (retired by ADR-006);
+  probe-leanblueprint's README cites property "P26", which no longer
+  exists in the hub's properties.md; probe-verus CI never runs its
+  `tests/extract_check.rs` (see W2/Real bugs).
+- **Recommendation**: One issue per sibling repo.
+
+### [I11] Two procedural nits
+- **Location**: probe-extract-check/TESTING.md:238-239;
+  docs/testing-guide.md:153-158
+- **Issue**: TESTING.md's "Adding a new fixture" steps 3/4 are
+  inverted — at step 3 the named test doesn't exist yet, so the filter
+  silently matches nothing and exits 0. testing-guide credits
+  `src/types.rs` with stub detection; its single test is
+  field-preservation, `test_is_stub` lives in `commands/merge.rs`.
+- **Recommendation**: Swap the steps (or point step 3 at the CLI);
+  reword the attribution.
+
+## Real bugs (code, not docs — do not document around)
+
+1. **JSON Schema + masking test** (W0): `singleToolAtomsEnvelope`
+   rejects composed single-tool envelopes the KB legalizes;
+   `tests/schema_validation.rs:217-250` validates a synthetic shape
+   probe-aeneas doesn't emit. Scheduled: merge-soundness plan PR 3a.
+2. **`golden_verus_micro_categorized_deps`** asserts nothing about
+   `requires-dependencies` despite the fixture carrying it (W3.1).
+3. **probe-verus CI** never builds/runs `tests/extract_check.rs`
+   (`cargo test --lib` + three explicit `--test` targets that don't
+   include it) — sibling repo.
+4. **`propagate.rs` upgrade-only** vs P23's recomputation semantics —
+   part of the known ADR-006 rollout (W1), not new.
+
+## Overlap map (topic × canonical home, post-cleanup)
+
+| Topic | Canonical | Remaining copies / risk |
 |-------|-----------|-------------------------|
-| Envelope fields, merged variant | kb/engineering/schema.md | envelope-rationale.md §Field Reference, §Merged Envelope (W3) |
-| Status/kind/language enums | kb/engineering/schema.md | ui-views.md (C1); probes-overview-slides (C2, archive) |
-| Schema-validation recipe | docs/schema-validation.md | README §JSON Schema, testing-guide §Schema validation (W7) |
-| extract-check tests | probe-extract-check/TESTING.md | extract-check-design.md (W4, fold+delete) |
-| Merge algorithm / mappings format | kb (done in PR #65) | — |
-
-## Proposed target structure
-
-`docs/` live set after executing: `SCHEMA.md`, `consumer-guide.md`,
-`envelope-rationale.md` (trimmed ~60%), `ui-views.md` (corrected),
-`schema-validation.md`, `testing-guide.md` — 6 reference docs, none normative.
-`docs/archive/`: +5 (structure ×3, web-cli-probe/001 or delete,
-probes-overview-slides), each with an outcome header.
-`extract-check-design.md` deleted after folding into TESTING.md.
-Tracked additions: merge-soundness plan + review + archived full plan,
-probe-dispatch-plan (or issue). Net: 15 tracked docs/ files → 6 live + archive.
+| Stub predicate | properties.md P3 / schema.md#stubs | consumer-guide prose (accurate) + two 1-of-3 code snippets (I2) — highest residual drift risk |
+| JSON-Schema coverage prose | docs/schema-validation.md | README:24 + SCHEMA.md:114 already drifted (W9); five files mention coverage |
+| probegraph doc links | probegraph repo | duplicated inline + table in ui-views; only the table copy is dead (W8) |
+| Status/kind/language enums | kb/engineering/schema.md | guarded by check-enum-drift.py; blind spots in I3 |
+| Envelope fields, merged variant | kb/engineering/schema.md | all live docs delegate — clean |
+| extract-check tests | probe-extract-check/TESTING.md | single home — clean (accuracy findings W2/W3 notwithstanding) |
 
 ## Structural gaps
 
-1. No drift guard: nothing in CI fails when an enum is restated outside the KB.
-   A grep-based check (status/kind/language enum strings appear only in
-   kb/engineering/schema.md) would have caught C1/C2 at commit time.
-2. `probe project` has no user-facing documentation (W2).
-3. Exit codes for probe-extract-check documented nowhere (W5).
+1. **No cross-repo/external link validation.** `check-kb-links.sh`
+   skips `https://` links and only walks `kb/` for markdown links;
+   every dead-link finding this round (W8, the fixed W9-class, I1) is
+   in that blind spot. Extending the script to check `docs/*.md`
+   relative links is cheap; external GitHub links would need a
+   networked CI step (optional, could be a scheduled job).
+2. **Drift-guard scope** (I3): `probe-extract-check/TESTING.md` is a
+   README-advertised live doc outside the scanned set.
+3. **The schema's structural gap** (W0) has no test expressing the
+   KB's `source`-XOR-`inputs` rule against real producer output —
+   closed by merge-soundness PR 3a's "test m" when it lands.
 
 ## Verified clean
 
-- README relative links (13/13 resolve), per-tool doc table, merge/enrich/summary usage lines.
-- CHANGELOG: all referenced files/commits verified against history; dangling paths are accurate history, internally cross-referenced.
-- docs/SCHEMA.md post-rewrite: all KB section claims resolve; no restated tables; no stale version.
-- consumer-guide: extract commands and flags across all five sibling repos, `.verilib/probes/` default, core-field list vs JSON Schema, stub filter, summary sidecar semantics, probe-extract-check CLI.
-- probe-extract-check/TESTING.md: all named tests/fixtures resolve one-for-one (only the totals are stale).
-- ui-views.md: field names, code-name formats, `untracked` usage (no `is-disabled` residue), merged schema string.
-- kb/tools/ catalog stubs conform to ADR-005 (role + contracts + delegation, no mechanics); P11/P12/P18/P20/P26 migration confirmed (commit 232eb85).
-- No case-only filename collisions; no byte-identical duplicate docs.
+- Previous report's executed verdicts all hold: 6 live docs + 8
+  archived (7/8 outcome headers accurate and their superseding
+  artifacts exist — the 8th is W11); zero live links into the archive;
+  no case collisions; root scratch gone; .gitignore matches the plan
+  decisions; docs-cleanup-plan's Status paragraph verified against git
+  history claim-by-claim.
+- README: all 12 relative links resolve; Usage block matches the clap
+  parser flag-for-flag (merge/project/enrich/summary, defaults
+  included); per-tool table — all six siblings have both linked docs on
+  origin/main with correct org/branch; §JSON Schema matches the
+  schema's oneOf.
+- CI: fmt/clippy/kb-links/enum-drift/test jobs run what the docs claim;
+  both drift-guard invocations pass; enum value lists in the guard
+  match schema.md exactly (15 kinds, 4 languages, 5 statuses).
+- schema-validation.md: "Registered schema strings" reproduces the
+  schema's patterns verbatim; all six "not yet registered" strings
+  genuinely match no pattern; "only this repo validates" re-verified
+  (zero jsonschema deps across all six siblings); Rust example matches
+  the pinned jsonschema 0.28 API; curl URL path correct.
+- consumer-guide: envelope example field-for-field identical to the KB;
+  all six extract command lines verified against sibling USAGE docs;
+  probe-leanblueprint/probe-aeneas/probe-vcvio prose accurate
+  (blueprint signals, aeneas-config.yml, --lean/classification);
+  example-files table — all four files exist on origin/main with the
+  documented schema strings.
+- ui-views: correspondence-record language matches ADR-006; status
+  colour mapping complete over all five values and identical to
+  VeriLib's canonical table; language partition covers the 4-value enum
+  exactly; four of five probegraph links resolve.
+- testing-guide: no stale counts anywhere; every described suite and
+  named behavior exists; per-repo table verified (TESTING.md presence,
+  probe-lean command verbatim, leanblueprint's absence).
+- probe-extract-check/TESTING.md: all 65 test names resolve one-for-one
+  in both directions (no orphans either way); fixture file lists and
+  atom counts exact (15/4/10/3); ignored-test tables match the
+  attributes; CLI flags, `-p` short form, and all three exit codes
+  match main.rs; quick-start commands all run (30 lib + 27 active / 8
+  ignored integration).
+- CHANGELOG [Unreleased]: all spot-checked claims true (files exist,
+  features present, #70/#72 entries accurate).
+- merge-soundness plan/review/ADR-006/ambiguity-report cross-citations:
+  all cited working files now tracked (C3 from the previous report is
+  resolved).

@@ -276,6 +276,16 @@ fn golden_verus_micro_categorized_deps() {
         body_deps.contains(&"probe:verus-micro/0.1.0/lib/checked_add()"),
         "double_checked should have body dep on checked_add"
     );
+    let requires_deps = double
+        .extensions
+        .get("requires-dependencies")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
+        .unwrap_or_default();
+    assert!(
+        requires_deps.contains(&"probe:verus-micro/0.1.0/lib/is_positive()"),
+        "double_checked should have requires dep on is_positive"
+    );
 }
 
 // =========================================================================
@@ -439,6 +449,12 @@ fn properties_lean_micro() {
         probe_extract_check::properties::check_properties(&envelope.data, Some(&project_path));
     let errors: Vec<_> = diags.iter().filter(|d| d.level == Level::Error).collect();
     assert!(errors.is_empty(), "property errors: {errors:?}");
+    // Check no overlap warnings either
+    let overlaps: Vec<_> = diags
+        .iter()
+        .filter(|d| d.message.contains("overlapping"))
+        .collect();
+    assert!(overlaps.is_empty(), "unexpected overlaps: {overlaps:?}");
 }
 
 #[test]
@@ -450,6 +466,12 @@ fn properties_verus_micro() {
         probe_extract_check::properties::check_properties(&envelope.data, Some(&project_path));
     let errors: Vec<_> = diags.iter().filter(|d| d.level == Level::Error).collect();
     assert!(errors.is_empty(), "property errors: {errors:?}");
+    // Check no overlap warnings either
+    let overlaps: Vec<_> = diags
+        .iter()
+        .filter(|d| d.message.contains("overlapping"))
+        .collect();
+    assert!(overlaps.is_empty(), "unexpected overlaps: {overlaps:?}");
 }
 
 #[test]
@@ -461,6 +483,12 @@ fn properties_aeneas_micro() {
         probe_extract_check::properties::check_properties(&envelope.data, Some(&project_path));
     let errors: Vec<_> = diags.iter().filter(|d| d.level == Level::Error).collect();
     assert!(errors.is_empty(), "property errors: {errors:?}");
+    // Check no overlap warnings either
+    let overlaps: Vec<_> = diags
+        .iter()
+        .filter(|d| d.message.contains("overlapping"))
+        .collect();
+    assert!(overlaps.is_empty(), "unexpected overlaps: {overlaps:?}");
 }
 
 // =========================================================================
