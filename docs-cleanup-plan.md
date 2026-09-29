@@ -10,8 +10,17 @@ landed on main 2026-09-29). PR B + housekeeping merged (issue #68,
 PR #69). PR C+D executed (issue #70, branch `la/docs-cleanup-pr-cd`);
 during it, W6's "verify again" check confirmed no sibling repo has
 added jsonschema validation, and `probe-vcvio/extract` was added to the
-unregistered-schema list alongside the report's five. Remaining: the
-optional drift guard. C and D were folded into one PR: they share
+unregistered-schema list alongside the report's five (merged as PR #71).
+Drift guard executed (issue #72): `scripts/check-enum-drift.py` + CI
+job; scoped to README + live `docs/` rather than "exactly one file" —
+kb/'s normative files (properties, glossary, spec, ADRs, tools) restate
+enum subsets by design, so allowlisting them all would equal excluding
+kb/, and the KB auditors already cover internal KB consistency. The
+detection rule is 3+ distinct same-enum values on one line (single
+mentions are legitimate; ui-views' sanctioned colour mapping opts out
+via `<!-- enum-ok -->`), verified against git history to catch every
+C1/C2 restatement line. THE PLAN IS NOW FULLY EXECUTED. C and D were
+folded into one PR: they share
 `README.md`/`docs/consumer-guide.md` and the split was only by report
 finding IDs.
 

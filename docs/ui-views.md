@@ -106,11 +106,11 @@ dependency.
   [schema.md § Common optional fields](../kb/engineering/schema.md#common-optional-fields);
   the canonical colour convention is VeriLib's
   [Atom statuses and colours](https://docs.verilib.org/components/processor/atom-statuses-and-colours/):
-  red = `failed`, yellow = `unverified`, light green = `verified`,
+  red = `failed`, yellow = `unverified`, light green = `verified`, <!-- enum-ok -->
   dark green = `transitively-verified`, purple = `trusted`; grey when
   `untracked: true`, no colour when `verification-status` is absent.
   (No blue — the convention reserves colour for status, not role.)
-- **Kind badges.** Show the `kind` value (exec/proof/spec or
+- **Kind badges.** Show the `kind` value (exec/proof/spec or <!-- enum-ok -->
   def/theorem/etc.) as a badge or icon on each node.
 
 **Example (probegraph):**
