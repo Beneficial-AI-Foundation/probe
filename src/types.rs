@@ -188,6 +188,7 @@ pub fn detect_category(schema: &str) -> Option<SchemaCategory> {
 // ---------------------------------------------------------------------------
 
 /// Parsed envelope metadata returned by [`load_envelope`].
+#[derive(Debug)]
 pub struct EnvelopeMeta {
     pub schema: String,
     pub category: SchemaCategory,
@@ -241,7 +242,10 @@ pub fn parse_envelope(raw: &serde_json::Value, origin: &str) -> Result<EnvelopeM
         .clone();
 
     let provenance = if let Some(inputs) = raw.get("inputs") {
-        serde_json::from_value::<Vec<InputProvenance>>(inputs.clone()).unwrap_or_default()
+        // P9: a composed envelope's inventory must survive loading — a
+        // malformed `inputs` array is an error, not an empty inventory.
+        serde_json::from_value::<Vec<InputProvenance>>(inputs.clone())
+            .map_err(|e| format!("{origin}: malformed \"inputs\" provenance: {e}"))?
     } else {
         let source = raw
             .get("source")
@@ -396,6 +400,57 @@ pub fn load_generic_file(path: &std::path::Path) -> Result<GenericLoadResult, St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// P9: a composed envelope's inventory must survive loading — a malformed
+    /// `inputs` array is an error, never a silently emptied inventory.
+    #[test]
+    fn parse_envelope_rejects_malformed_inputs() {
+        let raw = serde_json::json!({
+            "schema": "probe/merged-atoms",
+            "schema-version": "3.0",
+            "tool": {"name": "probe", "version": "0.5.0", "command": "merge"},
+            "inputs": [ {"schema": "probe-rust/extract"} ],
+            "timestamp": "2026-01-01T00:00:00Z",
+            "data": {}
+        });
+        let err = parse_envelope(&raw, "test-input").unwrap_err();
+        assert!(err.contains("malformed \"inputs\""), "{err}");
+
+        let not_an_array = serde_json::json!({
+            "schema": "probe/merged-atoms",
+            "schema-version": "3.0",
+            "tool": {"name": "probe", "version": "0.5.0", "command": "merge"},
+            "inputs": "oops",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "data": {}
+        });
+        let err = parse_envelope(&not_an_array, "test-input").unwrap_err();
+        assert!(err.contains("malformed \"inputs\""), "{err}");
+    }
+
+    /// Composed detection is structural (P9): an `inputs` array marks a
+    /// composed envelope regardless of schema string; `source` marks
+    /// single-tool.
+    #[test]
+    fn parse_envelope_detects_composed_shape_structurally() {
+        let composed = serde_json::json!({
+            "schema": "probe-aeneas/extract",
+            "schema-version": "3.0",
+            "tool": {"name": "probe-aeneas", "version": "0.21.0", "command": "extract"},
+            "inputs": [
+                {"schema": "probe-rust/extract", "source": {"repo": "r", "commit": "c",
+                 "language": "rust", "package": "pkg-rust", "package-version": "1.0"}},
+                {"schema": "probe-lean/extract", "source": {"repo": "r", "commit": "c",
+                 "language": "lean", "package": "pkg-lean", "package-version": "1.0"}}
+            ],
+            "timestamp": "2026-01-01T00:00:00Z",
+            "data": {}
+        });
+        let meta = parse_envelope(&composed, "aeneas.json").unwrap();
+        assert_eq!(meta.provenance.len(), 2, "composed inventory preserved");
+        assert_eq!(meta.provenance[0].source.package, "pkg-rust");
+        assert_eq!(meta.provenance[1].source.package, "pkg-lean");
+    }
 
     /// Unknown `source` fields (e.g. `class`) must survive a deserialize →
     /// serialize round-trip instead of being dropped.

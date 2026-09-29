@@ -51,7 +51,7 @@ curl -sL https://raw.githubusercontent.com/Beneficial-AI-Foundation/probe/main/s
 ## What the schema covers
 
 - **Envelope structure**: `schema`, `schema-version`, `tool`, `source`/`inputs`, `timestamp`, `data`
-- **Single-tool vs merged**: discriminated by the `schema` field (`probe-*/atoms` vs `probe/merged-*`)
+- **Single-tool vs composed**: the atoms branches are discriminated by provenance shape — a `source` object marks single-tool, an `inputs` array marks composed ([ADR-006](../kb/decisions/006-correspondence-records.md), [P9](../kb/engineering/properties.md#p9-provenance-is-preserved)); an envelope carrying both matches neither branch
 - **Core atom fields**: `display-name`, `dependencies`, `code-module`, `code-path`, `code-text`, `kind`, `language`
 - **Extensions**: `additionalProperties: true` on atoms allows language-specific fields to pass through
 
@@ -59,10 +59,11 @@ curl -sL https://raw.githubusercontent.com/Beneficial-AI-Foundation/probe/main/s
 
 The `oneOf` accepts exactly:
 
-- `probe-(rust|lean|verus|aeneas|leanblueprint)/(atoms|enriched-atoms|extract)` — single-tool atom envelopes
+- `probe-(rust|lean|verus|aeneas|leanblueprint|vcvio)/(atoms|enriched-atoms|extract)` with `source` provenance — single-tool atom envelopes
+- the same atom schema strings plus `probe/merged-atoms` and `probe/projected-atoms` with `inputs` provenance — composed atom envelopes (e.g. `probe-aeneas/extract` with `inputs: [Rust, Lean]`); a `probe/projected-atoms` envelope must also carry its `projection` block
 - `probe-(rust|lean|verus|aeneas|leanblueprint)/(specs|proofs|stubs|verification-report)` — single-tool generic envelopes
-- `probe/merged-atoms`, `probe/merged-(specs|proofs)` — merged envelopes
+- `probe/merged-(specs|proofs)` — merged generic envelopes
 
 Not yet registered (files with these `schema` values fail validation):
-`probe/summary`, `probe/mappings`, `probe/projected-atoms`,
-`probe-lean/viewify`, `probe-leanblueprint/summary`, `probe-vcvio/extract`.
+`probe/summary`, `probe/mappings`,
+`probe-lean/viewify`, `probe-leanblueprint/summary`.

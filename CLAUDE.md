@@ -100,11 +100,14 @@ The following invariants (from `kb/engineering/properties.md`) are most commonly
 
 ```
 src/
-  main.rs          # CLI: `probe merge`, `probe summary`
+  main.rs          # CLI: `probe merge`, `probe project`, `probe enrich`, `probe summary`
   lib.rs           # Module exports
   types.rs         # Atom, AtomEnvelope, MergedEnvelope, SchemaCategory, loading
+  authority.rs     # Shared authority validator: projection rejection + version gate (ADR-006)
   commands/
     merge.rs       # Merge algorithm, normalization, translation application
+    project.rs     # Graph projection from mapping seeds (probe/projected-atoms output)
+    propagate.rs   # Enrichment: verified/transitively-verified via reverse BFS
     summary.rs     # Verified-atom partitioning: entrypoints, functions, lemmas
 probe-extract-check/  # Validator for extract output vs source code
 kb/                   # Knowledge base (source of truth)
