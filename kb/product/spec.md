@@ -37,9 +37,9 @@ The probe ecosystem extracts structured data from multi-language verification pr
 **3. Verification status** — Determine which definitions are verified, failed, unverified, or trusted (assumed correct without proof).
 
 - probe-verus: runs `cargo verus`, parses output, maps errors to functions
-- probe-lean: detects sorry warnings in build output; axioms and `*External.lean` declarations (hand-written models of external code) are reported as `"trusted"`
+- probe-lean: computes trust and sorry taint over the kernel environment ([P16](../engineering/properties.md#p16-verification-status-mapping)); axioms, `@[externally_verified]` declarations, and non-proof declarations in `*External` modules (hand-written models of external code) are reported as `"trusted"`
 
-**4. Cross-language merging** — Combine data from different languages into a single graph with cross-language dependency edges.
+**4. Cross-language merging** — Combine data from different languages into a single graph; counterpart atoms are linked by `maps-to`/`mapped-from` correspondence records ([ADR-006](../decisions/006-correspondence-records.md)), never by fabricated dependency edges.
 
 - probe merge: universal composition operator (any language pair)
 - probe-aeneas: generates Rust↔Lean cross-language mappings for Aeneas-transpiled projects

@@ -1,11 +1,11 @@
 # Probe Mappings Specification
 
 Version: draft
-Date: 2026-06-03
+Date: 2026-09-28
 Parent document: [SCHEMA.md](SCHEMA.md)
 
-The cross-language mappings file format used by `probe merge` to match code-names across
-languages.
+The cross-language mappings file format used by `probe merge` to attach correspondence
+records across languages (see [ADR-006](../kb/decisions/006-correspondence-records.md)).
 
 ## Motivation
 
@@ -66,7 +66,7 @@ Must be `"probe/mappings"`.
 
 #### `schema-version` (string, required)
 
-Must be `"2.0"`.
+Must be `3.x` (currently `"3.0"`).
 
 #### `tool` (object, required)
 
@@ -124,18 +124,36 @@ A finer description of the matching method used. Examples:
 
 ## Semantics
 
-Mappings are **bidirectional**: if `from → to` exists, the merge tool treats
-the two code-names as representing the same logical entity.
+A mapping entry records a **correspondence** — "there is a mappings-file entry
+linking these names, with this confidence" — not an identity and not a
+dependency. The `from`/`to` fields are generic source/target roles: the
+`sources` block describes each side but assigns no implementation/formal
+roles (a Lean→Rust file is legal).
 
-When `probe merge --mappings <file>` processes an atom merge:
+When `probe merge --mappings <file>` processes an atom merge
+([ADR-006](../kb/decisions/006-correspondence-records.md)):
 
-1. Load the mappings file and build bidirectional lookup tables (`from→[to₁,to₂,…]`
-   and `to→[from₁,from₂,…]`).
-2. During merge, when an atom has a dependency on code-name X, and X has mappings
-   to Y₁, Y₂, … the merge tool adds each Yᵢ as an additional dependency edge
-   (provided Yᵢ exists in the merged key set and isn't already a dependency).
-3. The merged output retains all atoms as separate entries with their original
-   code-names, but dependency edges now cross the language boundary.
+1. Load the full mapping records (`from`, `to`, `confidence`, optional
+   `method`), normalizing endpoints (P8, trailing-dot strip) before any
+   lookup.
+2. After the base merge, attach a `maps-to` record
+   (`{target, confidence, method?}`) to each mapping's `from` atom present
+   in the merged map, and a mirror `mapped-from` record to each `to` atom
+   present. `dependencies` is never modified. A record whose target is
+   absent from the merged map is still attached (dangling target ⇒
+   warning, not skip).
+3. The merged output retains all atoms as separate entries with their
+   original code-names; cross-language linkage is carried as
+   correspondence records, and cross-language *resolution* is a derived
+   consumer view over those records.
+
+Mirrors are best-effort: if the target atom is absent at attachment time
+and arrives in a later plain merge, it carries no `mapped-from`. The
+correspondence relation is defined as the union over both fields, so a
+missing mirror loses no information; re-running merge with the mappings
+file (or regenerating) restores mirrors. Corrections and withdrawals take
+effect only by regenerating from extracts + the corrected mappings file —
+attachment never removes a record.
 
 ## Folder Convention
 

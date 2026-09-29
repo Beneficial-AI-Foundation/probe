@@ -72,7 +72,7 @@ fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, us
 }
 
 // @kb: kb/engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement
-// @kb: kb/engineering/properties.md#p13-cross-language-edges-require-existence
+// @kb: kb/engineering/properties.md#p13-correspondence-records-attach-unconditionally
 /// Merge multiple atom maps into one, optionally applying cross-language mappings.
 ///
 /// The first map is the base. For each subsequent map:

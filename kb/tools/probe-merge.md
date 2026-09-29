@@ -1,18 +1,18 @@
 ---
 title: "Tool: probe (merge operator)"
-last-updated: 2026-06-03
+last-updated: 2026-09-28
 status: draft
 ---
 
 # probe (merge operator)
 
 **Directory**: `baif/probe/`
-**Role**: Central hub — defines [Schema 3.0](../engineering/schema.md) types and the universal merge operator.
+**Role**: Central hub — defines [Schema 3.x](../engineering/schema.md) types and the universal merge operator.
 **Subcommands**: `merge`, `project`, `enrich`, `summary`
 
 ## What this tool does
 
-`probe merge` takes two or more Schema 3.0 JSON files and produces a single merged output. It is the only composition operator in the ecosystem — all tools that need to combine data go through it.
+`probe merge` takes two or more Schema 3.x JSON files and produces a single merged output. It is the only composition operator in the ecosystem — all tools that need to combine data go through it.
 
 See [architecture.md](../engineering/architecture.md) for how this fits into the data flow.
 
@@ -26,32 +26,36 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 
 ## Merge algorithm detail
 
-### Phase 1: Load and validate
+### Phase 1: Load and validate authority
 
 1. Parse each input file's envelope
 2. Validate `schema-version` starts with `"3."`
-3. Detect [schema category](../engineering/glossary.md#schema-category) from `schema` field
-4. Validate all inputs belong to the same category
-5. Flatten provenance from all inputs
+3. **Reject projections** — inputs carrying `probe/projected-atoms`, or the legacy form (`probe/merged-atoms` plus a `projection` envelope field), are errors: projections are views, and deleting edges must not improve assurance ([ADR-006](../decisions/006-correspondence-records.md))
+4. **Reject pre-contract envelopes** — the per-producer version gate ([schema.md § Authority validation](../engineering/schema.md#authority-validation-and-re-enrichment)); the `probe` entry is an interval plus a `tool.command: "merge-atoms"` rejection
+5. Detect [schema category](../engineering/glossary.md#schema-category) from `schema` field
+6. Validate all inputs belong to the same category
+7. Flatten provenance from all inputs — composed shape detected structurally (`inputs` vs `source`), entries deduplicated ([P9](../engineering/properties.md#p9-provenance-is-preserved))
 
-### Phase 2: Normalize
+Authority validation (steps 3–4) is one shared validator invoked at every envelope boundary: `cmd_merge`, `merge_atom_files`, `cmd_enrich`, the raw staging primitive; `probe summary`/`probe project` run the version-gate component. The bare-map library API (`merge_atom_maps`) cannot check authority — callers own the envelope boundary.
 
-Strip trailing `.` from all code-name keys and dependency references. This handles a legacy verus-analyzer artifact. See [P8](../engineering/properties.md#p8-code-name-normalization).
+### Phase 2: Normalize (per input, before conflict resolution)
+
+Strip trailing `.` from all code-name keys, dependency references, code-name-bearing extension arrays, and mapping endpoints ([P8](../engineering/properties.md#p8-code-name-normalization)). Per-input ordering is semantic: it selects which atom wins a post-normalization collision before evidence from other inputs is considered.
 
 ### Phase 3: Merge
 
-- **Atoms**: `merge_atom_maps()` — first-wins with [stub](../engineering/glossary.md#stub) replacement. See [P6](../engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement).
+- **Atoms**: `merge_atom_maps()` — first-wins with [stub](../engineering/glossary.md#stub) replacement. See [P6](../engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement). On every equal-key resolution, `maps-to`/`mapped-from` records are unioned ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
 - **Specs/Proofs**: `merge_generic_maps()` — last-wins. See [P7](../engineering/properties.md#p7-specsproofs-merge-is-last-wins).
 
-### Phase 4: Apply cross-language mappings (optional)
+### Phase 4: Attach correspondence records (optional)
 
-When `--mappings <file>` is provided, for each atom's dependencies:
-- Look up each dependency in both directions of the mapping (from→to and to→from)
-- Each source may map to multiple targets (1-to-many)
-- If a mapped code-name exists in the merged key set and isn't already a dependency, add it
-- See [P13](../engineering/properties.md#p13-cross-language-edges-require-existence)
+When `--mappings <file>` is provided, each mapping entry attaches a `maps-to` record to its `from` atom and a `mapped-from` record to its `to` atom — `dependencies` is never modified. Attachment is unconditional (dangling target ⇒ warning, not skip), key-local, and set-like. See [P13](../engineering/properties.md#p13-correspondence-records-attach-unconditionally) and [schema.md § Correspondence records](../engineering/schema.md#correspondence-records-maps-to-mapped-from).
 
-### Phase 5: Write output
+### Phase 5: Re-enrich
+
+After all inputs are combined, the atoms category runs enrichment recomputation ([P23](../engineering/properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged labels are recomputed, never inherited. A raw staging primitive for multi-step pipelines (probe-aeneas) defers this single enrichment pass but still validates authority; its output carries potentially stale derived statuses.
+
+### Phase 6: Write output
 
 Construct merged envelope with `inputs` array (not `source`), serialize with sorted keys for [determinism](../engineering/properties.md#p14-deterministic-output).
 
@@ -66,12 +70,12 @@ After merging, the tool prints:
 | Stubs remaining | yes | — |
 | New entries added | yes | yes |
 | Keys normalized | yes | yes |
-| Conflicts | yes (real-vs-real, base kept) | yes (overrides, incoming kept) |
-| Mappings applied | yes (if `--mappings`) | — |
+| Conflicts | yes (real-vs-real, base kept; post-normalization collisions counted) | yes (overrides, incoming kept) |
+| Records attached | yes (if `--mappings`: `maps-to`/`mapped-from` counts, dangling-target warnings) | — |
 
 ## Categorical framework
 
-`probe merge` is described algebraically in `probe/docs/categorical-framework.md`. Key insight: it satisfies [associativity](../engineering/properties.md#p4-merge-associativity), [identity](../engineering/properties.md#p5-merge-identity), and commutativity for disjoint keys. Each probe tool is a [doctrine](../engineering/glossary.md#doctrine); probe-aeneas is a [functor](../engineering/glossary.md#functor) factory.
+`probe merge` is described algebraically in `probe/docs/categorical-framework.md`. Merge factors as `F_M ∘ μ` (plain merge, then correspondence-record attachment for fixed mappings M). On the **carrier** — normalized, enrichment-consistent atom maps — μ satisfies [associativity](../engineering/properties.md#p4-merge-associativity-on-the-carrier), [identity](../engineering/properties.md#p5-merge-identity-exact-on-the-carrier) (exact on the carrier; up to normalization+enrichment on legacy inputs), and commutativity for disjoint keys; F_M is idempotent and compatible with μ (`F_M(μ(A, B)) = μ(F_M(A), F_M(B))`). Projected artifacts are outside μ's domain (rejected). Laws are stated modulo envelope meta and over provenance as a deduplicated source inventory. Each probe tool is a [doctrine](../engineering/glossary.md#doctrine); probe-aeneas is a [functor](../engineering/glossary.md#functor) factory.
 
 ## probe-extract-check
 
@@ -84,15 +88,4 @@ Used in probe-rust and probe-verus test suites.
 
 ## Relationship to probe-verus merge-atoms
 
-`probe merge` generalizes probe-verus's `merge-atoms` command:
-
-| Aspect | probe-verus merge-atoms | probe merge |
-|--------|------------------------|-------------|
-| Input | Bare JSON (no envelope) | Schema 3.0 enveloped |
-| Output | Bare JSON | Schema 3.0 envelope |
-| Categories | Atoms only | Atoms, specs, proofs |
-| Languages | Rust only | Any |
-| Provenance | None | `inputs` array |
-| Cross-language | N/A | Via `--mappings` |
-
-Merge rules (stub resolution, conflict handling, normalization) are identical.
+probe-verus's `merge-atoms` is a legacy independent merge implementation, slated for retirement or reimplementation as a caller of the hub's authority-validating merge ([ADR-006](../decisions/006-correspondence-records.md)). Its envelope writer masquerades as the hub (`tool.name: "probe"` at probe-verus's own version) and its atom type drops verification statuses, `status-origin` markers, and correspondence records. The hub's version gate rejects its outputs at any version: the `probe` gate entry is an interval (`< 1.0.0`) and additionally rejects `tool.command: "merge-atoms"`, a command the hub never shipped.

@@ -1,6 +1,6 @@
 ---
 title: Per-Tool Knowledge
-last-updated: 2026-07-31
+last-updated: 2026-09-28
 status: draft
 ---
 
@@ -29,6 +29,7 @@ concepts (envelope, atom fields, merge), see [engineering/](../engineering/index
 | [probe-lean.md](probe-lean.md) | probe-lean | Lean 4 | [repo](https://github.com/Beneficial-AI-Foundation/probe-lean) |
 | [probe-aeneas.md](probe-aeneas.md) | probe-aeneas | Rust | [repo](https://github.com/Beneficial-AI-Foundation/probe-aeneas) |
 | [probe-leanblueprint.md](probe-leanblueprint.md) | probe-leanblueprint | Rust + Python | [repo](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) |
+| [probe-vcvio.md](probe-vcvio.md) | probe-vcvio | Rust | [repo](https://github.com/Beneficial-AI-Foundation/probe-vcvio) |
 
 ## When to read which file
 

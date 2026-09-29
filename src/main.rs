@@ -85,7 +85,7 @@ enum Commands {
     /// locally verified (some transitive dep is not verified/trusted).
     ///
     /// The output preserves the input envelope structure exactly.
-    // @kb: kb/engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination
+    // @kb: kb/engineering/properties.md#p23-transitive-verification
     Enrich {
         /// Input atom file (Schema 3.0).
         #[arg(required = true)]

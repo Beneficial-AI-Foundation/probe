@@ -6,7 +6,7 @@ status: draft
 
 # Architecture
 
-The probe ecosystem is a multi-language code analysis pipeline. Each tool targets a specific language, extracts structured data (call graphs, specs, verification status), and outputs JSON conforming to the [Schema 3.0](schema.md) envelope format. A central merge operator composes outputs across tools and languages.
+The probe ecosystem is a multi-language code analysis pipeline. Each tool targets a specific language, extracts structured data (call graphs, specs, verification status), and outputs JSON conforming to the [Schema 3.x](schema.md) envelope format. A central merge operator composes outputs across tools and languages.
 
 ## Components
 
@@ -24,10 +24,10 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 
 ### probe (central hub)
 
-**Role**: Defines the canonical [Schema 3.0](schema.md) types and the universal `merge` operator.
+**Role**: Defines the canonical [Schema 3.x](schema.md) types and the universal `merge` operator.
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
-- `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, optional cross-language edges via `--mappings`
+- `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, post-merge enrichment recomputation, optional correspondence-record attachment via `--mappings`
 - `src/commands/project.rs` — Graph projection: BFS expansion from mapping seeds with separate forward/reverse depth
 - `src/commands/summary.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies
 - `probe-extract-check/` — Validator that checks extract JSON against actual source code
@@ -76,7 +76,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 **Pipeline** (unified `extract` command):
 1. Build target project via `lake build`
 2. Walk Lean environment, extract declarations and dependencies (type vs term)
-3. Detect sorry warnings from build output
+3. Compute trust and sorry taint over the kernel environment (kernel-based, not warning-based — [P16](properties.md#p16-verification-status-mapping))
 4. Compute specs (reverse dependency edges from theorems)
 5. Wrap in Schema 3.0 envelope
 
@@ -127,6 +127,18 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 
 See [tools/probe-leanblueprint.md](../tools/probe-leanblueprint.md) and [ADR-004](../decisions/004-probe-leanblueprint.md).
 
+### probe-vcvio
+
+**Role**: Security-protocol classification annotator over probe-lean extracts.
+
+**Pipeline**: accept an existing `probe-lean/extract` envelope (`--lean`), annotate atoms with protocol classification, re-emit everything — verification statuses included — as `probe-vcvio/extract` under its own tool identity.
+
+**Key insight**: it is a composer of shape (ii) under the [ADR-006](../decisions/006-correspondence-records.md) composer rule — re-emitting foreign verification evidence under its own identity conceals the evidence's origin from a gate keyed on the original producer's name, so it must run the version-gate component on its input before re-stamping. It reuses the hub's `Atom` type, so `status-origin` markers and correspondence records survive its round-trip.
+
+**Subcommands**: `extract`
+
+See [tools/probe-vcvio.md](../tools/probe-vcvio.md).
+
 ## Data flow
 
 ```
@@ -146,6 +158,10 @@ Target Projects (Rust, Lean, Verus)
     │       │                            (enrich probe-lean atoms with blueprint status)
     │       ├─ runs probe-lean extract (or --lean)
     │       └─ reads Verso manifest / Massot plasTeX
+    │
+    ├── probe-vcvio extract ─────→ vcvio_atoms.json    (annotate a probe-lean
+    │                                                   extract with protocol
+    │                                                   classification)
     │
     └── probe merge ─────────────→ merged_atoms.json   (generic cross-tool merge)
             │

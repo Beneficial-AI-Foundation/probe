@@ -40,8 +40,8 @@ atoms/specs/proofs and a verification-report.
   ([P15](../engineering/properties.md#p15-dependency-completeness)).
 - `verification-status` follows the shared vocabulary
   ([P16](../engineering/properties.md#p16-verification-status-mapping)); enrichment
-  upgrades to `transitively-verified`
-  ([P23](../engineering/properties.md#p23-transitive-verification-is-computed-by-reverse-bfs-contamination)).
+  recomputes the `verified`/`transitively-verified` split
+  ([P23](../engineering/properties.md#p23-transitive-verification)).
 - The `kind → language` value convention (exec→rust, proof|spec→verus) matches
   the shared schema
   ([schema.md#language-assignment-for-verus-atoms](../engineering/schema.md#language-assignment-for-verus-atoms));

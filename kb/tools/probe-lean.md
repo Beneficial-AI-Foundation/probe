@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-lean"
-last-updated: 2026-07-31
+last-updated: 2026-09-28
 status: draft
 ---
 
@@ -42,6 +42,19 @@ separation, [ADR-001](../decisions/001-separate-repos.md)).
 - `verification-status` / `trusted-reason` use the shared vocabulary
   ([P16](../engineering/properties.md#p16-verification-status-mapping),
   [P22](../engineering/properties.md#p22-cross-tool-trust-reason-vocabulary)).
+- **`status-origin: "kernel-taint"` marker** ([ADR-006](../decisions/006-correspondence-records.md)):
+  probe-lean's authoritative statuses come from a kernel-level taint walk,
+  and its `verified` verdict can rest on taint the emitted graph cannot
+  express (e.g. a sorry in a compiler-generated proof auxiliary that is
+  not an atom). Whenever the taint pass runs — including under
+  `--skip-enrich` — such atoms are stamped `status-origin: "kernel-taint"`.
+  Marked atoms are blocker seeds in hub enrichment
+  ([P23](../engineering/properties.md#p23-transitive-verification)):
+  never promoted to `transitively-verified`, and blocking promotion of
+  their callers. An **unmarked** `verified` atom is safely promotable by
+  hub recomputation. Pre-marker extracts (below the ADR-006 gate threshold
+  for `probe-lean`) are rejected by hub merge/enrich/summary/project and
+  are re-extracted, not re-used.
 - Deterministic output
   ([P14](../engineering/properties.md#p14-deterministic-output)).
 - Lean-specific and `classification` extension fields round-trip through

@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-leanblueprint"
-last-updated: 2026-07-31
+last-updated: 2026-09-28
 status: draft
 ---
 
@@ -44,6 +44,28 @@ two-axis `probe-leanblueprint/summary` sidecar. A direct analogue of
 - Reuses `probe::commands::propagate::enrich_verification_status` and depends on
   the hub crate for shared types (`Atom`, `AtomEnvelope`, `Source`, `Tool`,
   `CodeText`, `load_atom_file`).
+- **Composer obligation** ([ADR-006](../decisions/006-correspondence-records.md),
+  composer shape i — enrich-and-re-emit): it runs hub enrichment over a
+  foreign atom base and re-emits under its own tool identity, so it must
+  call the shared authority validator on its input first — rejecting
+  projections (both formats) and pre-contract envelopes — and preserve
+  `status-origin` markers end to end. Without this it is a laundering
+  channel: a pre-marker Lean extract goes in, an apparently authoritative
+  extract with a fresh tool version comes out.
+- **Synthesis rule** ([ADR-006](../decisions/006-correspondence-records.md)):
+  `derive_synthetic_verification` propagates contributors' `status-origin`
+  markers — a binding over marked evidence never synthesizes an unmarked
+  `trusted`/`verified`. Synthetic `language: "blueprint"` statuses are
+  **presentation aggregates** outside the code-atom assurance contract
+  ([P23](../engineering/properties.md#p23-transitive-verification)):
+  they are never trust-boundary assertions, and `probe summary` excludes
+  blueprint-language atoms from every partition.
+- Emits a **composed `inputs` envelope** carrying the loaded
+  `Vec<InputProvenance>` through ([P9](../engineering/properties.md#p9-provenance-is-preserved))
+  rather than selecting a single `source`.
+- Pre-contract outputs (below the ADR-006 gate threshold for
+  `probe-leanblueprint`) are rejected by hub merge/enrich/summary/project
+  and are regenerated, not repaired.
 
 ## Its own invariant
 
