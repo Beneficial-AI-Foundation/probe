@@ -1,5 +1,12 @@
 # Structure for Verification Projects - Requirements
 
+> **Archived 2026-09-29.** Outcome: partly shipped in verilib-cli
+> (structure-root, frontmatter, spec certs); `veri-name` was never built;
+> the `scip:`/`panto:` naming was reversed to `probe:`; the spec-status
+> vocabulary is superseded by the single `verification-status` contract in
+> [kb/engineering/properties.md](../../kb/engineering/properties.md). Kept
+> for historical reference; not updated.
+
 ## Conceptual Overview of VeriLib Structure
 
 - **Structure == Cognitive Structure** (will not call it Blueprint from now on)

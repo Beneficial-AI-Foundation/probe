@@ -1,5 +1,8 @@
 # Structure for Verification Projects - Motivation
 
+> **Archived 2026-09-29.** Outcome: implemented as verilib-cli
+> (`../verilib-cli`). Kept for historical reference; not updated.
+
 Similar to Blueprint for theorem-proving projects, we have *Structure* for verification projects. Also known as VeriLib Structure or the *molecular structure* of the project.
 
 ## Blueprint

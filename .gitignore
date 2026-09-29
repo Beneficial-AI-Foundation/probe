@@ -1,8 +1,30 @@
 /target
 
+# Editor/tooling local state
+.vscode/
+__pycache__/
+
+# Root-level scratch (probe extracts, test outputs)
+/*.json
+
 # Colour/stats docs — VeriLib-specific, kept locally but not tracked here.
 # Canonical home: Beneficial-AI-Foundation/engineering-docs.
 docs/probes_statuses_colours.md
 docs/probes_statuses_colours.pdf
 docs/archive/verification-statuses.md
 docs/VeriLib_Atom_Proposal.pdf
+
+# Presentation material — kept locally but not tracked here
+# (docs-cleanup plan decisions 3/4, 2026-09-29).
+docs/lightning-talk-probes.md
+docs/slides23-31.md
+docs/assets/atom-bar.png
+docs/assets/atom-dot.png
+docs/assets/shapes-roles.png
+docs/assets/division.mmd
+docs/assets/division.png
+docs/assets/pipeline.mmd
+docs/assets/pipeline.png
+
+# Dispatch design draft — kept locally until promoted to kb/tools/ + ADR.
+docs/probe-dispatch-plan.md
