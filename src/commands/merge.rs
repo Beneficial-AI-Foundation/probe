@@ -1,6 +1,7 @@
+use crate::authority::{load_validated_atom_file, validate_authority, AuthorityScope};
 use crate::types::{
-    load_atom_file, load_envelope, load_mappings, Atom, InputProvenance, MergedAtomEnvelope,
-    MergedGenericEnvelope, SchemaCategory, Tool,
+    load_envelope, load_mappings, Atom, InputProvenance, MergedAtomEnvelope, MergedGenericEnvelope,
+    SchemaCategory, Tool,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -177,6 +178,9 @@ pub fn merge_atom_maps(
 ///
 /// This is a mid-level convenience between `merge_atom_maps` (pure in-memory)
 /// and `cmd_merge` (full CLI with category detection and envelope writing).
+/// Each input passes the shared authority validator (projection rejection +
+/// version gate, ADR-006) before merging.
+// @kb: kb/engineering/schema.md#authority-validation-and-re-enrichment
 #[allow(clippy::type_complexity)]
 pub fn merge_atom_files(
     paths: &[&Path],
@@ -186,7 +190,7 @@ pub fn merge_atom_files(
     let mut provenance = Vec::new();
 
     for path in paths {
-        let (atoms, prov) = load_atom_file(path)?;
+        let (atoms, prov) = load_validated_atom_file(path, AuthorityScope::Recompute)?;
         maps.push(atoms);
         provenance.extend(prov);
     }
@@ -279,6 +283,14 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, mappings_path: Option<Pa
         println!("  Loading {}...", path.display());
         match load_envelope(path) {
             Ok(meta) => {
+                if let Err(e) = validate_authority(
+                    &meta,
+                    &path.display().to_string(),
+                    AuthorityScope::Recompute,
+                ) {
+                    eprintln!("Error: {e}");
+                    std::process::exit(1);
+                }
                 println!(
                     "    schema: \"{}\" ({}), {} provenance entries",
                     meta.schema,

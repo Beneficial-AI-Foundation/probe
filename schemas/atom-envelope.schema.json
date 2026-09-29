@@ -2,23 +2,23 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Beneficial-AI-Foundation/probe/schemas/atom-envelope.schema.json",
   "title": "Probe Atom Envelope",
-  "description": "Schema 3.0 envelope for probe-* atom files (single-tool and merged).",
+  "description": "Schema 3.x envelope for probe-* atom files. Atoms branches are keyed on provenance shape (ADR-006): a `source` object marks a single-tool envelope, an `inputs` array marks a composed one — producers may compose under their own schema strings (e.g. probe-aeneas/extract).",
 
   "oneOf": [
     { "$ref": "#/$defs/singleToolAtomsEnvelope" },
     { "$ref": "#/$defs/singleToolGenericEnvelope" },
-    { "$ref": "#/$defs/mergedAtomsEnvelope" },
+    { "$ref": "#/$defs/composedAtomsEnvelope" },
     { "$ref": "#/$defs/mergedGenericEnvelope" }
   ],
 
   "$defs": {
     "singleToolAtomsEnvelope": {
       "type": "object",
-      "description": "Envelope for a single-tool atoms-category file (e.g., probe-verus/atoms, probe-lean/extract). data is a dictionary of atoms.",
+      "description": "Envelope for an atoms-category file with single-tool (`source`) provenance (e.g., probe-verus/atoms, probe-lean/extract, probe-vcvio/extract). data is a dictionary of atoms.",
       "properties": {
         "schema": {
           "type": "string",
-          "pattern": "^probe-(rust|lean|verus|aeneas|leanblueprint)/(atoms|enriched-atoms|extract)$"
+          "pattern": "^probe-(rust|lean|verus|aeneas|leanblueprint|vcvio)/(atoms|enriched-atoms|extract)$"
         },
         "schema-version": { "$ref": "#/$defs/schemaVersion" },
         "tool": { "$ref": "#/$defs/tool" },
@@ -48,13 +48,17 @@
       "additionalProperties": false
     },
 
-    "mergedAtomsEnvelope": {
+    "composedAtomsEnvelope": {
       "type": "object",
-      "description": "Envelope for merged or projected atom files (probe merge, probe project).",
+      "description": "Envelope for an atoms-category file with composed (`inputs`) provenance: hub merges (probe/merged-atoms), projections (probe/projected-atoms — a view rejected by merge/enrich, ADR-006), and producer-composed extracts (e.g. probe-aeneas/extract). A probe/projected-atoms envelope must carry the projection block.",
+      "if": {
+        "properties": { "schema": { "const": "probe/projected-atoms" } }
+      },
+      "then": { "required": ["projection"] },
       "properties": {
         "schema": {
           "type": "string",
-          "const": "probe/merged-atoms"
+          "pattern": "^(probe/(merged|projected)-atoms|probe-(rust|lean|verus|aeneas|leanblueprint|vcvio)/(atoms|enriched-atoms|extract))$"
         },
         "schema-version": { "$ref": "#/$defs/schemaVersion" },
         "tool": { "$ref": "#/$defs/tool" },
@@ -145,7 +149,7 @@
         },
         "command": {
           "type": "string",
-          "description": "The command that produced this file (e.g., \"atomize\", \"merge-atoms\")."
+          "description": "The command that produced this file (e.g., \"atomize\", \"extract\", \"merge\", \"project\")."
         }
       },
       "required": ["name", "version", "command"],

@@ -74,13 +74,13 @@ fn check_array_ordering(data: &BTreeMap<String, Atom>, diags: &mut Vec<Diagnosti
             if let Some(arr) = dwl.as_array() {
                 let entries: Vec<(u64, &str)> = arr
                     .iter()
-                    .filter_map(|entry| {
+                    .map(|entry| {
                         let line = entry.get("line").and_then(|v| v.as_u64()).unwrap_or(0);
                         let cn = entry
                             .get("code-name")
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
-                        Some((line, cn))
+                        (line, cn)
                     })
                     .collect();
 

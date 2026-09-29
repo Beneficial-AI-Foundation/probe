@@ -27,6 +27,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 **Role**: Defines the canonical [Schema 3.x](schema.md) types and the universal `merge` operator.
 
 - `src/types.rs` — `Atom`, `AtomEnvelope`, `MergedEnvelope<D>`, `SchemaCategory`, loading/validation
+- `src/authority.rs` — Shared authority validator ([ADR-006](../decisions/006-correspondence-records.md)): projection rejection (both formats) and the per-producer version gate, invoked at every envelope boundary (merge/enrich apply both predicates; summary/project the gate only)
 - `src/commands/merge.rs` — Merge algorithm: stub replacement for atoms, last-wins for specs/proofs, post-merge enrichment recomputation, optional correspondence-record attachment via `--mappings`
 - `src/commands/project.rs` — Graph projection: BFS expansion from mapping seeds with separate forward/reverse depth
 - `src/commands/summary.rs` — Read-only analysis: partitions verified atoms into entrypoints and verified dependencies

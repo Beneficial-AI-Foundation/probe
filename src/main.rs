@@ -25,6 +25,11 @@ enum Commands {
     /// category is auto-detected from the inputs; all inputs must be the same
     /// category. For atoms, stubs are replaced by real entries (first-wins on
     /// conflict). For specs and proofs, last-wins on conflict.
+    ///
+    /// Atoms inputs must pass authority validation (ADR-006): projections
+    /// (probe/projected-atoms, or the legacy probe/merged-atoms form with a
+    /// projection field) and pre-contract envelopes (per-producer
+    /// tool.version gate) are rejected — regenerate them instead.
     Merge {
         /// Input files (at least 2 required).
         #[arg(required = true, num_args = 2..)]
@@ -49,7 +54,10 @@ enum Commands {
     /// Reads a Schema 3.0 atom file and a mappings file, uses all mapping
     /// endpoints (from + to) as seeds, then expands via BFS: forward
     /// (callees) and backward (callers) with separate depth controls.
-    /// Outputs a trimmed atom file containing only the projected subgraph.
+    /// Outputs a trimmed atom file containing only the projected subgraph,
+    /// under the probe/projected-atoms schema — a view that probe merge and
+    /// probe enrich reject (ADR-006). The input must pass the per-producer
+    /// version gate; already-projected inputs stay readable.
     // @kb: kb/tools/probe-project.md
     Project {
         /// Input atom file (merged or single-tool).
@@ -86,6 +94,9 @@ enum Commands {
     /// trusted boundary (P23). Atoms that remain "verified" are only
     /// locally verified (such a blocker is reachable).
     ///
+    /// The input must pass authority validation (ADR-006): projections in
+    /// either format and pre-contract envelopes are rejected.
+    ///
     /// The output preserves the input envelope structure exactly.
     // @kb: kb/engineering/properties.md#p23-transitive-verification
     Enrich {
@@ -109,6 +120,10 @@ enum Commands {
     /// Verified functions — remaining verified Rust `exec` atoms.
     ///
     /// Verified lemmas — verified Verus `proof`/`spec` atoms.
+    ///
+    /// The input must pass the per-producer version gate (ADR-006): a
+    /// pre-contract verified status is indistinguishable from local
+    /// evidence. Projections stay readable.
     ///
     /// Output is a Schema 3.0 envelope with schema "probe/summary".
     Summary {

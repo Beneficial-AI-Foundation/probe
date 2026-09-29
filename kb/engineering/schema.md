@@ -72,7 +72,7 @@ When `probe merge` produces output, `source` is replaced by `inputs`:
 
 When a previously merged file is used as input, its `inputs` entries are flattened into the new output — provenance is carried forward recursively. Provenance is a **deduplicated source inventory**: the `inputs` array records *which* sources were composed, not how many times ([P9](properties.md#p9-provenance-is-preserved)).
 
-**Composed-provenance detection is structural**, not schema-string-based: an envelope with an `inputs` array is composed, one with a `source` object is single-tool. Producers other than the hub may emit composed envelopes under their own schema strings (e.g. `probe-aeneas/extract` with `inputs: [Rust, Lean]` and no `source`); loaders must preserve their inventories ([ADR-006](../decisions/006-correspondence-records.md)).
+**Composed-provenance detection is structural**, not schema-string-based: an envelope with an `inputs` array is composed, one with a `source` object is single-tool. Producers other than the hub may emit composed envelopes under their own schema strings (e.g. `probe-aeneas/extract` with `inputs: [Rust, Lean]` and no `source`); loaders must preserve their inventories ([ADR-006](../decisions/006-correspondence-records.md)). An envelope carrying **both** `source` and `inputs` is ambiguous and rejected at load (it matches neither branch of the executable schema), and a composed envelope's `inputs` must be a non-empty well-formed array — malformed or empty inventories are load errors, never silently emptied or propagated.
 
 ### Registered schema values
 
@@ -301,6 +301,7 @@ When `--mappings <file>` is provided to `probe merge`, mappings attach [correspo
 
 - **Projection rejection**: inputs carrying `probe/projected-atoms`, or the legacy form (`probe/merged-atoms` plus a `projection` envelope field), are errors — projections are views; deleting edges must not improve assurance.
 - **Version gate**: atoms envelopes whose `tool.name` is in the per-producer gate table with `tool.version` below that producer's contract threshold are errors (pre-contract artifacts can carry unmarked imported or graph-inexpressible evidence). The `probe` entry is an interval (`threshold ≤ version < 1.0.0`) and additionally rejects `tool.command: "merge-atoms"` at any version. `probe summary` and `probe project` run the version-gate component too.
+- **Validator edge cases** (fail-closed): missing or malformed `tool` metadata on an atoms envelope is a rejection, as is an unparsable `tool.version` on a gated tool name (versions parse as numeric `major.minor[.patch]` only — pre-release suffixes do not parse). The legacy-projection predicate is presence-based: `projection: null` counts as present. Unknown `tool.name`s pass at any version ([ADR-006](../decisions/006-correspondence-records.md) Decision 7's audited-population scope), and non-atoms categories (specs/proofs) are not gated. Unknown schema strings keep their ordinary category-detection error.
 
 After combining all inputs, merge **re-enriches** the atoms category via the shared enrichment recomputation ([P23](properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged output labels are recomputed, never inherited.
 
@@ -384,11 +385,11 @@ The distinct schema string is an **authority boundary**, not a hint: `probe merg
 
 ### Bumping the interchange schema-version (major)
 
-The `schema-version` major is a **cross-repo contract**: every producer stamps it, every consumer validates it (`schema_version.starts_with("<major>.")` in `src/types.rs` and `src/commands/propagate.rs`). A major bump is breaking and must land **in lockstep across the ecosystem** — a partial bump makes atom-loading fail with `… incompatible schema-version "X.0" (expected <major>.x)`.
+The `schema-version` major is a **cross-repo contract**: every producer stamps it, every consumer validates it (`schema_version.starts_with("<major>.")` in `parse_envelope`, `src/types.rs` — the single load path all hub commands route through). A major bump is breaking and must land **in lockstep across the ecosystem** — a partial bump makes atom-loading fail with `… incompatible schema-version "X.0" (expected <major>.x)`.
 
 Checklist for a major bump (N → N+1):
 
-1. **Hub (this repo).** Move the gate to `starts_with("N+1.")` in `src/types.rs` and `src/commands/propagate.rs`; bump the version emitted by `merge`/`summary`/`project`; update this file and the version-history table above. Cut a **tagged release** — downstream pins tags, not `main`.
+1. **Hub (this repo).** Move the gate to `starts_with("N+1.")` in `parse_envelope` (`src/types.rs`); bump the version emitted by `merge`/`summary`/`project`; update this file and the version-history table above. Cut a **tagged release** — downstream pins tags, not `main`.
 2. **Producers** (`probe-rust`, `probe-lean`, `probe-verus`, `probe-leanblueprint`, `probe-aeneas`). Change the emitted `schema-version` to N+1; pin the hub dep to the new tag; relock; cut a **tagged release** each.
 3. **Consumers** (`probe-aeneas`, `probe-verus`). Pin the hub tag — this is the validator — and ensure the sub-extractors they invoke emit N+1 (probe-aeneas installs `probe-rust`/`probe-lean` unpinned, see [probe-aeneas#53](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/53)); relock; release.
 4. **Images / verilib.** Rebuild every ECR image from the new releases, repoint verilib, and build `--locked` so a dependency can't silently float.
