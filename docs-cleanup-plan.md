@@ -5,10 +5,14 @@ Executes the findings of `kb/reports/docs-report.md` (docs-auditor,
 it has the evidence and exact line references; this plan only adds
 execution order, grouping, and the decisions that need a human.
 
-Status: PR A done — issue #66, draft PR #67 (branch `la/docs-cleanup-pr-a`,
-stacked on #65). Next: PR B.
-Context: written on branch `la/docs-single-source` (draft PR #65, stacked
-on PR #63). Start after #65 merges, or stack on it the same way.
+Status: PR A merged (issue #66, PR #67; the whole #63 → #65 → #67 stack
+landed on main 2026-09-29). PR B + housekeeping executed (issue #68,
+branch `la/docs-cleanup-pr-b`). Remaining: C+D combined, then the
+optional drift guard. No more stacking — the remaining PRs touch files
+disjoint from each other and from main-line work, so each branches off
+`main` independently. C and D are folded into one PR: they share
+`README.md`/`docs/consumer-guide.md` and the split was only by report
+finding IDs.
 
 ## Ground rules
 
@@ -142,7 +146,7 @@ One issue + PR.
 
 ## PR D — user-facing gaps (W2, W9, I5 README)
 
-One issue + PR — could merge into PR C if small.
+Folded into PR C (one issue + PR covering both; see Status).
 
 1. README: add `probe project` to the CLI list and Usage block
    (`--mappings` required, `--forward-depth` default 2,
@@ -177,6 +181,9 @@ Mostly `git add`/moves; some need decisions. Can ride along with PR B.
    and untracked `docs/assets/{division,pipeline}.{mmd,png}` have zero
    referrers — move with the decks or delete (`division.mmd`'s
    facts-vs-palette split is drawn nowhere else).
+   Status 2026-09-29: untracked diagrams gitignored with the decks; the
+   three tracked PNGs stay tracked for now (untracking was declined in
+   PR B — revisit if the decks ever move to engineering-docs).
 5. `docs/probe-dispatch-plan.md` (I3, untracked, unique content:
    marker-file dispatch design, the live Schema 2.0-verilib vs 3.0-hub
    skew, deployment gaps) — **decision needed**: track it (its own text
@@ -201,18 +208,25 @@ dumb (fixed string list, allowlist for the glossary/ADRs if needed).
 
 ## Decisions needed from lacra (collected)
 
-1. `docs/web-cli-probe/001_motivation.md`: delete or archive?
+Decided 2026-09-29 (all but #2, which gates PR C+D):
+
+1. `docs/web-cli-probe/001_motivation.md`: **archived** with outcome
+   header.
 2. probe-vcvio in the public tool tables now, or wait until it leaves
-   draft?
-3. `docs/probe-dispatch-plan.md`: track as-is, promote to
-   `kb/tools/probe-dispatch.md` + ADR, or distill to an issue?
-4. Slide decks (`lightning-talk-probes.md`, `slides23-31.md`): track
-   here or move to engineering-docs?
-5. Signal Shot / dots.pdf: where do presentation binaries live?
+   draft? — **still open**.
+3. `docs/probe-dispatch-plan.md`: **kept local-only** (gitignored). Not
+   needed for the probe-merge work (it covers upload→probe routing, not
+   the merge algorithm). Promote to `kb/tools/` + ADR later if wanted.
+4. Slide decks (`lightning-talk-probes.md`, `slides23-31.md`):
+   **kept local-only** (gitignored), together with their untracked
+   `docs/assets/` diagrams.
+5. Signal Shot / dots.pdf: **deleted** (they live where they were
+   authored, not in this repo).
 
 ## Suggested order
 
-A → B (+housekeeping riding along) → C → D → optional drift guard.
-A and B are independent of the merge-soundness PR train; C/D touch no
-spec content. After each PR: run `/docs-auditor` verdicts off the list,
-and re-run the ambiguity auditor only if KB files changed.
+~~A~~ → B (+housekeeping riding along) → C+D → optional drift guard.
+Each remaining PR branches off `main`; all are independent of the
+merge-soundness PR train and touch no spec content. After each PR: run
+`/docs-auditor` verdicts off the list, and re-run the ambiguity auditor
+only if KB files changed.
