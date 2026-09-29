@@ -18,9 +18,9 @@ need only the JSON file, not the source code.
 
 Before rendering, validate the input JSON against the
 [JSON Schema](https://github.com/Beneficial-AI-Foundation/probe/blob/main/schemas/atom-envelope.schema.json)
-provided in the probe repo. See the
-[probe README](https://github.com/Beneficial-AI-Foundation/probe#json-schema)
-for examples in Rust, Python, and CLI.
+provided in the probe repo. See
+[schema-validation.md](schema-validation.md) for what the schema covers
+and validation examples in Rust, Python, and CLI.
 
 ```bash
 pip install jsonschema
@@ -131,21 +131,29 @@ What each probe repo's own test suite covers (so you don't have to):
 
 ### probe (this repo)
 
-Run with `cargo test` in the probe repo.
+Run with `cargo test` in the probe repo (counts are not maintained here
+-- the test run reports them).
 
-- **Schema validation** (7 tests) -- envelopes for each tool
-  (`probe-<x>/extract`, merged atoms) are validated against the
+- **Schema validation** (`tests/schema_validation.rs`) -- envelopes for
+  each tool (`probe-<x>/extract`, merged atoms) are validated against the
   [JSON Schema](https://github.com/Beneficial-AI-Foundation/probe/blob/main/schemas/atom-envelope.schema.json).
   A negative test confirms that missing required fields are rejected.
-- **Merge integration** (11 tests) -- runs the `probe merge` binary on
-  fixture files and checks that stubs are replaced by real atoms,
-  cross-project dependency edges are preserved, provenance is recorded,
-  and category mismatches (e.g. mixing atoms and specs) are rejected.
-  Covers atoms, specs, and proofs merging with last-wins semantics.
-- **Merge unit** (15 tests) -- exercises merge logic in isolation:
-  stub replacement, real-vs-real conflict resolution, trailing-dot
-  normalization, cross-language merge, translation-based edge creation,
-  and recursive provenance flattening.
+- **Merge integration** (`tests/merge.rs`) -- runs the `probe merge`
+  binary on fixture files and checks that stubs are replaced by real
+  atoms, cross-project dependency edges are preserved, provenance is
+  recorded, and category mismatches (e.g. mixing atoms and specs) are
+  rejected. Covers atoms, specs, and proofs merging with last-wins
+  semantics.
+- **Enrich integration** (`tests/propagate.rs`) -- runs `probe enrich`
+  end-to-end: verified→transitively-verified upgrades through dependency
+  chains, blockers (unverified deps, cycles), trusted and missing deps,
+  and envelope preservation.
+- **Unit tests** (`src/commands/`, `src/types.rs`) -- exercise each
+  command's logic in isolation: merge (stub replacement, real-vs-real
+  conflict resolution, trailing-dot normalization, cross-language merge,
+  mappings-file loading and application, recursive provenance
+  flattening), enrich/propagate, project (BFS subgraph projection from
+  mapping seeds), summary partitioning, and stub detection.
 
 ### Individual probes
 
@@ -158,6 +166,7 @@ instructions, and CI details.
 | probe-verus | `cargo test` | [TESTING.md](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/TESTING.md) |
 | probe-aeneas | `cargo test` | [TESTING.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/TESTING.md) |
 | probe-lean | `lake build tests && .lake/build/bin/tests` | [TESTING.md](https://github.com/Beneficial-AI-Foundation/probe-lean/blob/main/TESTING.md) |
+| probe-leanblueprint | `cargo test` | No TESTING.md yet; see the [repo README](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint) |
 
 If you suspect an issue with the extracted data, open an issue in the
 relevant probe repository.

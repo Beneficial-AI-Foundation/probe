@@ -1,5 +1,33 @@
 # probe-extract-check: Test Guide
 
+How the validator checks that JSON from `probe-rust extract`, `probe-verus extract`,
+`probe-lean extract`, and `probe-aeneas extract` is correct against the source code.
+
+## What "correct" means — properties to verify
+
+| Property | Description |
+|----------|-------------|
+| **Completeness** | Every declaration in source has a corresponding atom |
+| **No phantoms** | No atoms for declarations that don't exist in source |
+| **Correct locations** | `code-path` exists, `lines-start`/`lines-end` bracket the actual declaration |
+| **Correct names** | `display-name` matches the declaration at that location |
+| **Correct kind** | `exec`/`proof`/`spec`/`def`/`theorem`/etc. matches the actual declaration kind |
+| **Correct dependencies** | If A calls B, B is in A's dependencies; no spurious deps |
+| **Referential integrity** | Every dependency target either exists as an atom key or is a known external |
+| **Correct module** | `code-module` matches the actual module path |
+
+Three complementary layers verify these properties:
+
+1. **Source-grounded validators** — check extract JSON against the actual
+   source files (`structural.rs`, `source_checker.rs`, `dep_checker.rs`),
+   tested in isolation by the unit tests below.
+2. **Golden file tests** — curated micro-projects with hand-verified
+   `expected.json`, compared via a structural JSON diff that ignores
+   volatile fields (`golden.rs`).
+3. **Property-based checks** — checks that run against any extract output
+   without golden files: completeness counting and location-overlap
+   detection (`properties.rs`).
+
 ## Quick start
 
 ```bash
@@ -19,13 +47,16 @@ cargo test -p probe-extract-check --lib
 cargo test -p probe-extract-check --test golden_tests
 ```
 
+Test totals are not maintained by hand in this file — run
+`cargo test -p probe-extract-check` for the current counts.
+
 ## Test layers
 
-### Layer 1: Unit tests (22 tests)
+### Layer 1: Unit tests
 
 Source-grounded validators tested in isolation with synthetic data.
 
-#### structural (4 tests)
+#### structural
 
 | Test | What it verifies |
 |------|-----------------|
@@ -34,7 +65,7 @@ Source-grounded validators tested in isolation with synthetic data.
 | `test_dangling_dependency` | Dependency target missing from `data` is flagged |
 | `test_stubs_skip_line_range_check` | External stubs (0/0 ranges) are exempt from line checks |
 
-#### source_checker (5 tests)
+#### source_checker
 
 | Test | What it verifies |
 |------|-----------------|
@@ -43,15 +74,20 @@ Source-grounded validators tested in isolation with synthetic data.
 | `test_line_range_exceeds_file` | `lines-end` beyond file length is flagged |
 | `test_name_not_in_span` | `display-name` absent from source span is flagged |
 | `test_lean_theorem_kind` | Lean `theorem` keyword correctly matched |
+| `test_path_traversal_with_dotdot` | `code-path` with `..` escaping the project root is an error |
+| `test_absolute_path_treated_as_error` | Absolute `code-path` is an error, never read |
+| `test_symlink_escape_rejected` | Symlink inside the project resolving outside the root is rejected |
 
-#### dep_checker (2 tests)
+#### dep_checker
 
 | Test | What it verifies |
 |------|-----------------|
 | `test_dep_found_in_span` | Callee name present in caller span produces no diagnostics |
 | `test_dep_not_found_in_span` | Callee name absent from caller span is flagged |
+| `test_symlink_escape_skipped_in_dep_checker` | Symlink resolving outside the root is skipped, not read |
+| `test_cache_uses_canonical_key` | Path aliases (`src/../src/lib.rs`) share one cache entry and pass the root check |
 
-#### golden (6 tests)
+#### golden
 
 | Test | What it verifies |
 |------|-----------------|
@@ -62,7 +98,7 @@ Source-grounded validators tested in isolation with synthetic data.
 | `test_value_mismatch` | Different values at same path are reported |
 | `test_data_timestamp_not_ignored` | Volatile-named fields inside `data` are NOT ignored |
 
-#### properties (5 tests)
+#### properties
 
 | Test | What it verifies |
 |------|-----------------|
@@ -71,12 +107,16 @@ Source-grounded validators tested in isolation with synthetic data.
 | `test_completeness_good_ratio` | 3 atoms for 3 source fns produces no warnings |
 | `test_completeness_low_ratio` | 2 atoms for 10 source fns triggers completeness warning |
 | `test_lean_completeness` | Lean declaration counting works correctly |
+| `test_sorted_dwl_passes` | Sorted `dependencies-with-locations` produces no warnings (P14) |
+| `test_unsorted_dwl_warns` | Unsorted `dependencies-with-locations` is flagged (P14) |
+| `test_no_dwl_passes` | Atoms without `dependencies-with-locations` are exempt |
 
-### Layer 2: Golden file tests (27 tests, of which 8 are ignored)
+### Layer 2: Golden file tests
 
 Each fixture is a micro source project with a hand-verified `expected.json`.
+All golden tests run by default (none are ignored).
 
-#### rust_micro (10 active tests)
+#### rust_micro
 
 Source: `src/lib.rs`, `src/math.rs`, `src/shapes.rs`, `src/macros.rs`, `src/types_only.rs`
 Atoms: 15
@@ -94,7 +134,7 @@ Atoms: 15
 | `golden_rust_micro_types_only_no_atoms` | Module with only types/consts contributes zero atoms |
 | `golden_rust_micro_macro_generated` | Macro-generated `to_u64`/`to_i64` exist, `convert_both` depends on both |
 
-#### verus_micro (4 active tests)
+#### verus_micro
 
 Source: `src/lib.rs` (Verus)
 Atoms: 4
@@ -106,7 +146,7 @@ Atoms: 4
 | `golden_verus_micro_kinds` | `spec fn` → spec, `proof fn` → proof, `exec fn` → exec |
 | `golden_verus_micro_categorized_deps` | `body-dependencies` / `requires-dependencies` populated correctly |
 
-#### lean_micro (6 active tests)
+#### lean_micro
 
 Source: `LeanMicro/Basic.lean`
 Atoms: 10
@@ -120,7 +160,7 @@ Atoms: 10
 | `golden_lean_micro_instance` | Auto-named instance `instHasSizePoint` has correct kind and deps |
 | `golden_lean_micro_sorry` | `sorry_example` has `verification-status: "failed"` |
 
-#### aeneas_micro (3 active tests)
+#### aeneas_micro
 
 Source: `rust_src/src/lib.rs` + `lean_src/AeneasMicro.lean`
 Atoms: 3
@@ -131,7 +171,7 @@ Atoms: 3
 | `golden_aeneas_micro_source_and_deps` | Rust atoms validate against Rust source |
 | `golden_aeneas_micro_translations` | All atoms have `translation-name` pointing to Lean |
 
-### Layer 3: Property checks (4 active tests)
+### Layer 3: Property checks
 
 Run the property checkers (completeness, overlap) against each golden fixture.
 
@@ -142,7 +182,7 @@ Run the property checkers (completeness, overlap) against each golden fixture.
 | `properties_lean_micro` | Same |
 | `properties_aeneas_micro` | Same |
 
-### Live tool comparison (4 ignored tests)
+### Live tool comparison (ignored by default)
 
 Run actual extract tools on micro-projects and diff output against golden files.
 These require the respective tools to be installed on `PATH`.
@@ -154,7 +194,7 @@ These require the respective tools to be installed on `PATH`.
 | `live_probe_lean_extract` | `probe-lean` |
 | `live_probe_aeneas_extract` | `probe-aeneas` |
 
-### Idempotency (4 ignored tests)
+### Idempotency (ignored by default)
 
 Run each extract tool twice on the same project and verify outputs are
 structurally identical (ignoring volatile fields like timestamp).
@@ -166,16 +206,21 @@ structurally identical (ignoring volatile fields like timestamp).
 | `idempotency_probe_lean` | `probe-lean` |
 | `idempotency_probe_aeneas` | `probe-aeneas` |
 
-## Test counts
+## Per-probe integration tests
 
-| Category | Active | Ignored | Total |
-|----------|--------|---------|-------|
-| Unit tests | 22 | 0 | 22 |
-| Golden file tests | 23 | 0 | 23 |
-| Property checks | 4 | 0 | 4 |
-| Live tool comparison | 0 | 4 | 4 |
-| Idempotency | 0 | 4 | 4 |
-| **Total** | **49** | **8** | **57** |
+Each individual probe repository also carries its own integration tests that
+validate extract output using `probe-extract-check` as a dev-dependency.
+These run in each probe's CI and call the library API directly (no subprocess).
+
+| Probe | Test file | What it checks |
+|-------|-----------|----------------|
+| [probe-rust](https://github.com/Beneficial-AI-Foundation/probe-rust) | `tests/extract_check.rs` | Loads `examples/rust_curve25519-dalek_4.1.3.json` as `AtomEnvelope`, runs structural checks, validates `probe:` key prefixes and required fields |
+| [probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus) | `tests/extract_check.rs` | Loads `tests/fixtures/unified_test/atoms.json` as `AtomEnvelope`, validates `probe:` prefixes and Verus-specific kinds (exec/proof/spec) |
+| [probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas) | `tests/extract_check.rs` | Validates `MergedEnvelope` structure via `serde_json::Value`, runs the full merge pipeline via library API with pre-generated JSON (no external tools needed) |
+| [probe-lean](https://github.com/Beneficial-AI-Foundation/probe-lean) | `Tests/Main.lean` | Loads its example extract, validates envelope fields, atom count, `DeclKind` values, and `verification-status` |
+
+The `#[ignore]` live tests in probe-rust and probe-verus additionally call
+`cmd_extract` via the library API (requires scip / verus-analyzer installed).
 
 ## Fixture summary
 
@@ -202,9 +247,17 @@ The crate also builds a CLI binary for ad-hoc validation:
 # Structural checks only (no source needed)
 probe-extract-check output.json
 
-# Full validation against source project
+# Full validation against source project (-p is the short form)
 probe-extract-check output.json --project /path/to/project
 
 # Ignore warnings, fail only on errors
-probe-extract-check output.json --project /path/to/project --allow-warnings
+probe-extract-check output.json -p /path/to/project --allow-warnings
 ```
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Clean run (warnings allowed only with `--allow-warnings`) |
+| 1 | Errors found, or warnings found without `--allow-warnings` |
+| 2 | Input JSON could not be read or parsed |

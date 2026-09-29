@@ -6,7 +6,7 @@ This repository contains:
 
 - **Specification documents** defining the interchange format for atom files
 - **JSON Schema** for machine-validatable envelope and atom structure
-- **`probe` CLI** for cross-tool operations (`merge`, `enrich`, `summary`)
+- **`probe` CLI** for cross-tool operations (`merge`, `project`, `enrich`, `summary`)
 - **`probe-extract-check`** -- validator that checks extract JSON correctness against source code
 
 ## Documentation
@@ -26,8 +26,7 @@ Reference docs in this repo:
 - [docs/testing-guide.md](docs/testing-guide.md) -- Testing that your visualization matches the probe data
 - [docs/envelope-rationale.md](docs/envelope-rationale.md) -- Envelope design and rationale
 - [kb/engineering/categorical-framework.md](kb/engineering/categorical-framework.md) -- Categorical/algebraic structure of probe merge
-- [docs/extract-check-design.md](docs/extract-check-design.md) -- Design of the extract-check validation tool
-- [probe-extract-check/TESTING.md](probe-extract-check/TESTING.md) -- Test guide for probe-extract-check
+- [probe-extract-check/TESTING.md](probe-extract-check/TESTING.md) -- What the extract-check validator checks, and its test guide
 - [schemas/atom-envelope.schema.json](schemas/atom-envelope.schema.json) -- JSON Schema
 
 ### Per-tool docs across the ecosystem
@@ -42,15 +41,21 @@ Each probe repo has `docs/USAGE.md` (command reference) and `docs/SCHEMA.md` (JS
 | **[probe-leanblueprint](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-leanblueprint/blob/main/docs/SCHEMA.md) | Lean blueprint progress fields |
 | **[probe-verus](https://github.com/Beneficial-AI-Foundation/probe-verus)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-verus/blob/main/docs/SCHEMA.md) | Verus-specific fields |
 | **[probe-aeneas](https://github.com/Beneficial-AI-Foundation/probe-aeneas)** | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md) | Aeneas-specific fields |
+| **[probe-vcvio](https://github.com/Beneficial-AI-Foundation/probe-vcvio)** (proof of concept) | [`docs/USAGE.md`](https://github.com/Beneficial-AI-Foundation/probe-vcvio/blob/main/docs/USAGE.md) | [`docs/SCHEMA.md`](https://github.com/Beneficial-AI-Foundation/probe-vcvio/blob/main/docs/SCHEMA.md) | VCVio security-protocol classification fields |
 
 ## Usage
 
 ```bash
-# Build
-cargo build
+# Install the CLI (or use `cargo run -- <subcommand> …` from the repo)
+cargo install --path .
 
 # Merge data files from different probe tools (atoms, specs, or proofs)
 probe merge verus_atoms.json lean_atoms.json -o merged.json
+
+# Project a subgraph around the mapping endpoints (seeds), expanding
+# callees (--forward-depth, default 2) and callers (--reverse-depth,
+# default 0); add --emit-focus for a probegraph focus-set file
+probe project merged.json --mappings mappings.json -o projected.json
 
 # Enrich verification status (upgrade "verified" → "transitively-verified"
 # for atoms whose entire transitive closure is verified or trusted)
@@ -65,11 +70,9 @@ cargo test
 
 ## JSON Schema
 
-[`schemas/atom-envelope.schema.json`](schemas/atom-envelope.schema.json) is a
-[JSON Schema (draft 2020-12)](https://json-schema.org/draft/2020-12/schema) validating both
-single-tool and merged-atoms envelopes -- the machine-readable contract all `probe-*`
-codebases should validate against. See [docs/schema-validation.md](docs/schema-validation.md)
-for validation examples (Rust, Lean, CI) and what the schema covers.
+[`schemas/atom-envelope.schema.json`](schemas/atom-envelope.schema.json) validates
+single-tool and merged envelopes; see [docs/schema-validation.md](docs/schema-validation.md)
+for what it covers and how to validate (Rust, CLI, CI).
 
 ## Acknowledgements
 

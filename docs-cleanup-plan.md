@@ -6,11 +6,12 @@ it has the evidence and exact line references; this plan only adds
 execution order, grouping, and the decisions that need a human.
 
 Status: PR A merged (issue #66, PR #67; the whole #63 → #65 → #67 stack
-landed on main 2026-09-29). PR B + housekeeping executed (issue #68,
-branch `la/docs-cleanup-pr-b`). Remaining: C+D combined, then the
-optional drift guard. No more stacking — the remaining PRs touch files
-disjoint from each other and from main-line work, so each branches off
-`main` independently. C and D are folded into one PR: they share
+landed on main 2026-09-29). PR B + housekeeping merged (issue #68,
+PR #69). PR C+D executed (issue #70, branch `la/docs-cleanup-pr-cd`);
+during it, W6's "verify again" check confirmed no sibling repo has
+added jsonschema validation, and `probe-vcvio/extract` was added to the
+unregistered-schema list alongside the report's five. Remaining: the
+optional drift guard. C and D were folded into one PR: they share
 `README.md`/`docs/consumer-guide.md` and the split was only by report
 finding IDs.
 
@@ -157,8 +158,8 @@ Folded into PR C (one issue + PR covering both; see Status).
    (`lean_ExampleProject_0.1.0.json`; the Curve25519Dalek file is
    probe-aeneas's); soften "All examples use curve25519-dalek"; add a
    one-line `probe project` mention in the progress section.
-3. probe-vcvio listing in README + consumer-guide tool tables —
-   **decision needed** (it is status: draft).
+3. probe-vcvio listing in README + consumer-guide tool tables: add it,
+   labelled as a proof of concept (decision 2, 2026-09-29).
 
 ## Housekeeping — tracking + scratch (C3, W11, I1, I2, I3, I6)
 
@@ -208,12 +209,13 @@ dumb (fixed string list, allowlist for the glossary/ADRs if needed).
 
 ## Decisions needed from lacra (collected)
 
-Decided 2026-09-29 (all but #2, which gates PR C+D):
+All decided 2026-09-29:
 
 1. `docs/web-cli-probe/001_motivation.md`: **archived** with outcome
    header.
-2. probe-vcvio in the public tool tables now, or wait until it leaves
-   draft? — **still open**.
+2. probe-vcvio in the public tool tables: **list it now, labelled as a
+   proof of concept** (README ecosystem table + consumer-guide tool
+   table, in PR C+D).
 3. `docs/probe-dispatch-plan.md`: **kept local-only** (gitignored). Not
    needed for the probe-merge work (it covers upload→probe routing, not
    the merge algorithm). Promote to `kb/tools/` + ADR later if wanted.
