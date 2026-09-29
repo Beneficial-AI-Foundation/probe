@@ -283,8 +283,8 @@ pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
     // Fail closed on out-of-enum status-origin markers (ADR-006 Decision 2):
     // the runtime does not schema-validate, and a malformed marker must not
     // silently read as absent.
-    if let Err(e) = crate::types::validate_status_origins(&atoms, &origin) {
-        eprintln!("Error: {e}");
+    if let Err(e) = crate::types::validate_status_origins(&atoms) {
+        eprintln!("Error: {origin}: {e}");
         std::process::exit(1);
     }
 

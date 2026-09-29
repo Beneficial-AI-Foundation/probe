@@ -93,3 +93,24 @@ verified against the amended KB text (spec and code moved together):
   the §10 settled decision), testing guide (fail-closed rejections),
   CHANGELOG, P8/schema.md/probe-summary.md amendments — all agree with
   the code; `./scripts/check-kb-links.sh` and the enum drift guard pass.
+
+## Verification pass (2026-09-29, targeted codex re-review of the fix diff)
+
+Codex verified the four review fixes against its own recommendations
+(42 adversarial CLI cases, map-level checks; recommendations (1)–(4)
+confirmed faithfully implemented) and raised two residuals, both closed
+in the follow-up commit:
+
+- **Public `summarize_atoms` was still fail-open for library callers**
+  (the `load_validated_atom_file` → `summarize_atoms` sequence bypassed
+  the CLI-level check). The marker validation now lives inside
+  `summarize_atoms`, which returns `Result` — unchecked partitioning is
+  no longer reachable; `cmd_summary` prefixes the input path on error.
+  `validate_status_origins` dropped its `origin` parameter (callers
+  prefix context).
+- **`normalize_code_name` stripped only one trailing dot**, contradicting
+  P8's "strips trailing `.` characters" and letting a repeated-dot alias
+  (`g()..` vs `g()`) evade the collision guard for one pass (prepared
+  output was not a normalization fixed point). Pre-existing, not a
+  regression of the fixes; now `trim_end_matches('.')` — normalization is
+  a fixed point and the collision is caught in the same pass.

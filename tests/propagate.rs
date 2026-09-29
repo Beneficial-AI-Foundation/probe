@@ -278,6 +278,9 @@ fn test_enrich_rejects_normalization_collision() {
     }));
     std::fs::write(&input, serde_json::to_string_pretty(&envelope).unwrap()).unwrap();
 
+    // Pre-existing output must survive a rejection untouched.
+    std::fs::write(&out, "sentinel").unwrap();
+
     let (ok, stderr) = run_enrich_raw(input.to_str().unwrap(), &out);
     assert!(
         !ok,
@@ -287,7 +290,43 @@ fn test_enrich_rejects_normalization_collision() {
         stderr.contains("probe:t/1.0/g().") && stderr.contains("probe:t/1.0/g()"),
         "collision message should name both keys: {stderr}"
     );
-    assert!(!out.exists(), "no output on rejection");
+    assert_eq!(
+        std::fs::read_to_string(&out).unwrap(),
+        "sentinel",
+        "rejection must not clobber existing output"
+    );
+}
+
+// The benign halves of the collision rule stay accepted end to end: an
+// identical duplicate collapses (dedup) and a stub alias is absorbed —
+// neither is a distinct-atom collision (P8).
+#[test]
+fn test_enrich_accepts_identical_duplicate_and_stub_collisions() {
+    let tmp = TempDir::new().unwrap();
+    let input = tmp.path().join("benign.json");
+    let out = tmp.path().join("output.json");
+
+    let mut stub = atom_json(Some("verified"), &[]);
+    stub["code-path"] = serde_json::json!("");
+    stub["code-text"] = serde_json::json!({ "lines-start": 0, "lines-end": 0 });
+    let envelope = envelope_with(serde_json::json!({
+        // identical duplicate pair
+        "probe:t/1.0/g()": atom_json(Some("verified"), &[]),
+        "probe:t/1.0/g().": atom_json(Some("verified"), &[]),
+        // stub alias absorbed by the real atom
+        "probe:t/1.0/h()": atom_json(Some("verified"), &[]),
+        "probe:t/1.0/h().": stub,
+    }));
+    std::fs::write(&input, serde_json::to_string_pretty(&envelope).unwrap()).unwrap();
+
+    run_enrich(input.to_str().unwrap(), &out);
+    let atoms = load_atoms(&out);
+    assert_eq!(atoms.len(), 2);
+    assert_eq!(
+        get_vs(atoms.get("probe:t/1.0/g()").unwrap()),
+        Some("transitively-verified")
+    );
+    assert!(!atoms.get("probe:t/1.0/h()").unwrap().code_path.is_empty());
 }
 
 // ADR-006 Decision 2 fail-closed: a status-origin outside the two-value enum

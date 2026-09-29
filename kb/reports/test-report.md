@@ -114,3 +114,22 @@ behavior it pins:
   merged-map assertions.
 - Updated totals: 102 unit tests, 55 binary-level integration tests
   (tests/{merge,propagate,authority,schema_validation}.rs).
+
+## Verification pass (2026-09-29, targeted codex re-review of the fix diff)
+
+Codex's test-sufficiency gaps, all closed:
+
+- Library-boundary rejection: summary.rs
+  `test_summarize_atoms_rejects_invalid_status_origin` (unknown string
+  and non-string, direct `summarize_atoms` call).
+- P8 fixed point: merge.rs `test_repeated_trailing_dots_normalize_in_one_pass`
+  (`g()..` collides with `g()` in one pass, reported as dropped).
+- Conflict counting in subsequent inputs and the benign zero-count:
+  extended merge.rs `test_normalization_collision_reporting`.
+- Rejection preserves pre-existing output: sentinel-content assertion in
+  tests/propagate.rs `test_enrich_rejects_normalization_collision`.
+- Benign collision acceptance end to end: tests/propagate.rs
+  `test_enrich_accepts_identical_duplicate_and_stub_collisions`
+  (identical duplicate collapses, stub alias absorbed).
+
+Updated totals: 104 unit tests, 56 binary-level integration tests.

@@ -123,18 +123,19 @@ impl Atom {
 /// (ADR-006 Decision 2: `"translation"` or `"kernel-taint"`).
 ///
 /// The executable schema constrains the marker, but the runtime load paths do
-/// not schema-validate, so `probe enrich` and `probe summary` call this at
-/// their boundaries: an out-of-contract marker fails closed here instead of
-/// silently reading as absent (non-string values) or being presented as local
-/// evidence (unknown strings).
-pub fn validate_status_origins(atoms: &BTreeMap<String, Atom>, origin: &str) -> Result<(), String> {
+/// not schema-validate, so the recomputation and summary boundaries
+/// (`cmd_enrich`, `summarize_atoms`) call this: an out-of-contract marker
+/// fails closed here instead of silently reading as absent (non-string
+/// values) or being presented as local evidence (unknown strings). The error
+/// names the offending atom; callers prefix their input context.
+pub fn validate_status_origins(atoms: &BTreeMap<String, Atom>) -> Result<(), String> {
     for (code_name, atom) in atoms {
         if let Some(value) = atom.extensions.get("status-origin") {
             match value.as_str() {
                 Some("translation" | "kernel-taint") => {}
                 _ => {
                     return Err(format!(
-                        "{origin}: atom {code_name:?} carries invalid status-origin {value} \
+                        "atom {code_name:?} carries invalid status-origin {value} \
                          (expected \"translation\" or \"kernel-taint\", ADR-006)"
                     ));
                 }
@@ -474,7 +475,7 @@ mod tests {
 
         for good in ["translation", "kernel-taint"] {
             let atoms = atom_with(serde_json::json!(good));
-            assert!(validate_status_origins(&atoms, "t").is_ok(), "{good}");
+            assert!(validate_status_origins(&atoms).is_ok(), "{good}");
         }
 
         // Absent marker passes.
@@ -484,7 +485,7 @@ mod tests {
             .unwrap()
             .extensions
             .remove("status-origin");
-        assert!(validate_status_origins(&unmarked, "t").is_ok());
+        assert!(validate_status_origins(&unmarked).is_ok());
 
         for bad in [
             serde_json::json!("graph-taint"),
@@ -494,7 +495,7 @@ mod tests {
             serde_json::json!({}),
         ] {
             let atoms = atom_with(bad.clone());
-            let err = validate_status_origins(&atoms, "t").unwrap_err();
+            let err = validate_status_origins(&atoms).unwrap_err();
             assert!(err.contains("invalid status-origin"), "{bad}: {err}");
             assert!(err.contains("\"f\""), "{err}");
         }

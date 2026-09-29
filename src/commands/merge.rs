@@ -7,9 +7,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 // @kb: kb/engineering/properties.md#p8-code-name-normalization
-/// Strip trailing `.` from a code-name (legacy verus-analyzer artifact).
+/// Strip all trailing `.` characters from a code-name (legacy verus-analyzer
+/// artifact). Stripping every trailing dot makes normalization a fixed point,
+/// so one pass suffices and the collision guard cannot be evaded by a
+/// repeated suffix (`"g().."` and `"g()"` collide immediately).
 fn normalize_code_name(name: &str) -> String {
-    name.strip_suffix('.').unwrap_or(name).to_string()
+    name.trim_end_matches('.').to_string()
 }
 
 /// Merge statistics reported after the operation.
@@ -670,23 +673,67 @@ mod tests {
         assert!(dropped.is_empty());
 
         // Through merge, an intra-input distinct-real collision is counted in
-        // `conflicts` (kb/tools/probe-merge.md Phase 2).
-        let mut colliding = BTreeMap::new();
-        colliding.insert(
+        // `conflicts` (kb/tools/probe-merge.md Phase 2) — in the first input
+        // and in subsequent inputs alike; a benign merge counts zero.
+        let colliding = || {
+            let mut m = BTreeMap::new();
+            m.insert(
+                "probe:a/1.0/g()".to_string(),
+                make_real_atom("g", "src/lib.rs", "rust", "exec"),
+            );
+            m.insert(
+                "probe:a/1.0/g().".to_string(),
+                make_real_atom("g", "src/other.rs", "rust", "exec"),
+            );
+            m
+        };
+        let partner = || {
+            let mut m = BTreeMap::new();
+            m.insert(
+                "probe:a/1.0/h()".to_string(),
+                make_real_atom("h", "src/lib.rs", "rust", "exec"),
+            );
+            m
+        };
+        let (_, stats) = merge_atom_maps(vec![colliding(), partner()], None);
+        assert_eq!(stats.conflicts, 1);
+        let (_, stats) = merge_atom_maps(vec![partner(), colliding()], None);
+        assert_eq!(stats.conflicts, 1);
+        let mut other = BTreeMap::new();
+        other.insert(
+            "probe:a/1.0/i()".to_string(),
+            make_real_atom("i", "src/lib.rs", "rust", "exec"),
+        );
+        let (_, stats) = merge_atom_maps(vec![partner(), other], None);
+        assert_eq!(stats.conflicts, 0);
+    }
+
+    // P8: normalization strips *all* trailing dots, so it is a fixed point —
+    // a repeated-dot alias ("g()..") collides with "g()" in the same pass and
+    // cannot smuggle a distinct atom past the collision guard.
+    #[test]
+    fn test_repeated_trailing_dots_normalize_in_one_pass() {
+        assert_eq!(normalize_code_name("g().."), "g()");
+        assert_eq!(normalize_code_name("g()"), "g()");
+
+        let mut atoms = BTreeMap::new();
+        atoms.insert(
             "probe:a/1.0/g()".to_string(),
             make_real_atom("g", "src/lib.rs", "rust", "exec"),
         );
-        colliding.insert(
-            "probe:a/1.0/g().".to_string(),
+        atoms.insert(
+            "probe:a/1.0/g()..".to_string(),
             make_real_atom("g", "src/other.rs", "rust", "exec"),
         );
-        let mut partner = BTreeMap::new();
-        partner.insert(
-            "probe:a/1.0/h()".to_string(),
-            make_real_atom("h", "src/lib.rs", "rust", "exec"),
+        let (out, _, dropped) = normalize_atoms(atoms);
+        assert_eq!(out.len(), 1);
+        assert_eq!(
+            dropped,
+            vec![(
+                "probe:a/1.0/g()..".to_string(),
+                "probe:a/1.0/g()".to_string()
+            )]
         );
-        let (_, stats) = merge_atom_maps(vec![colliding, partner], None);
-        assert_eq!(stats.conflicts, 1);
     }
 
     #[test]

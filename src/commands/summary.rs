@@ -85,7 +85,14 @@ fn is_rust_exec(atom: &Atom) -> bool {
 /// **Verified lemmas**: locally verified non-(Rust `exec`) code atoms.
 ///
 /// The four lists partition all verified code atoms.
-pub fn summarize_atoms(atoms: &BTreeMap<String, Atom>) -> SummaryResult {
+///
+/// Errors when any atom carries a `status-origin` outside the two-value enum
+/// (ADR-006 Decision 2): an unknown origin proves neither local nor imported
+/// evidence, so this boundary is checked here rather than trusting callers to
+/// validate — the CLI adds its input path to the error.
+pub fn summarize_atoms(atoms: &BTreeMap<String, Atom>) -> Result<SummaryResult, String> {
+    crate::types::validate_status_origins(atoms)?;
+
     let depended_upon: BTreeSet<&str> = atoms
         .values()
         .filter(|atom| !is_test(atom) && !is_blueprint(atom))
@@ -120,12 +127,12 @@ pub fn summarize_atoms(atoms: &BTreeMap<String, Atom>) -> SummaryResult {
         }
     }
 
-    SummaryResult {
+    Ok(SummaryResult {
         verified_entrypoints,
         verified_functions,
         verified_lemmas,
         imported_verified,
-    }
+    })
 }
 
 /// Derive a default output filename from provenance: `summary_<package>_<version>.json`.
@@ -156,15 +163,14 @@ pub fn cmd_summary(input: &Path, output: Option<&Path>) {
         }
     };
 
-    // Fail closed on out-of-enum status-origin markers (ADR-006 Decision 2):
-    // an unknown origin proves neither local nor imported evidence, so it
-    // must not be silently classified into the local partitions.
-    if let Err(e) = crate::types::validate_status_origins(&atoms, &input.display().to_string()) {
-        eprintln!("Error: {e}");
+    // summarize_atoms fails closed on out-of-enum status-origin markers
+    // (ADR-006 Decision 2): an unknown origin proves neither local nor
+    // imported evidence, so it must not be classified into the local
+    // partitions.
+    let result = summarize_atoms(&atoms).unwrap_or_else(|e| {
+        eprintln!("Error: {}: {e}", input.display());
         std::process::exit(1);
-    }
-
-    let result = summarize_atoms(&atoms);
+    });
 
     let total = result.verified_entrypoints.len()
         + result.verified_functions.len()
@@ -264,6 +270,23 @@ mod tests {
             .collect()
     }
 
+    // The public library boundary is itself fail-closed (ADR-006 Decision 2):
+    // a caller that skips CLI validation still cannot get an invalid marker
+    // classified into the local partitions.
+    #[test]
+    fn test_summarize_atoms_rejects_invalid_status_origin() {
+        for bad in [serde_json::json!("future-import"), serde_json::json!(null)] {
+            let mut atoms = BTreeMap::new();
+            let mut atom = make_atom("rust", "exec", "src/lib.rs", "f");
+            set_verified(&mut atom);
+            atom.extensions.insert("status-origin".to_string(), bad);
+            atoms.insert("probe:pkg/1.0/f()".to_string(), atom);
+
+            let err = summarize_atoms(&atoms).unwrap_err();
+            assert!(err.contains("invalid status-origin"), "{err}");
+        }
+    }
+
     // Wire contract (kb/tools/probe-summary.md § Output format): the four
     // lists serialize under exactly these snake_case field names.
     #[test]
@@ -310,7 +333,7 @@ mod tests {
         add_dep(&mut caller, "probe:pkg/1.0/reduce()");
         atoms.insert("probe:pkg/1.0/caller()".to_string(), caller);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert_eq!(
             result.verified_entrypoints.len()
                 + result.verified_functions.len()
@@ -327,7 +350,7 @@ mod tests {
         set_verified(&mut stub);
         atoms.insert("probe:alloc/1.0/alloc_fn()".to_string(), stub);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert!(result.verified_entrypoints.is_empty());
         assert_eq!(result.verified_functions.len(), 1);
         assert!(result.verified_lemmas.is_empty());
@@ -345,7 +368,7 @@ mod tests {
             test_atom,
         );
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert!(result.verified_entrypoints.is_empty());
         assert_eq!(result.verified_functions.len(), 1);
         assert!(result.verified_lemmas.is_empty());
@@ -363,7 +386,7 @@ mod tests {
         set_verified(&mut proof);
         atoms.insert("probe:pkg/1.0/lemmas/my_lemma()".to_string(), proof);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert!(result.verified_entrypoints.is_empty());
         assert!(result.verified_functions.is_empty());
         assert_eq!(result.verified_lemmas.len(), 2);
@@ -376,7 +399,7 @@ mod tests {
         let unverified = make_atom("rust", "exec", "src/lib.rs", "foo");
         atoms.insert("probe:pkg/1.0/foo()".to_string(), unverified);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert!(result.verified_entrypoints.is_empty());
         assert!(result.verified_functions.is_empty());
         assert!(result.verified_lemmas.is_empty());
@@ -396,7 +419,7 @@ mod tests {
         add_dep(&mut test_fn, "probe:pkg/1.0/compress()");
         atoms.insert("probe:pkg/1.0/tests/test_compress()".to_string(), test_fn);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert_eq!(
             result.verified_entrypoints,
             vec!["probe:pkg/1.0/compress()"]
@@ -424,7 +447,7 @@ mod tests {
                 set_origin(&mut atom, origin);
                 atoms.insert("probe:pkg/1.0/f()".to_string(), atom);
 
-                let result = summarize_atoms(&atoms);
+                let result = summarize_atoms(&atoms).unwrap();
                 let verified_status = status == "verified" || status == "transitively-verified";
                 match (origin, verified_status) {
                     ("translation", true) => {
@@ -468,7 +491,7 @@ mod tests {
         set_origin(&mut lean, "translation");
         atoms.insert("probe:Pkg.thm".to_string(), lean);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert!(result.verified_lemmas.is_empty());
         assert_eq!(result.imported_verified, vec!["probe:Pkg.thm"]);
     }
@@ -488,7 +511,7 @@ mod tests {
         add_dep(&mut node, "probe:Pkg.main_theorem");
         atoms.insert("probe:blueprint/thm:main".to_string(), node);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert_eq!(result.verified_lemmas, vec!["probe:Pkg.main_theorem"]);
         assert!(result.verified_entrypoints.is_empty());
         assert!(result.verified_functions.is_empty());
@@ -515,7 +538,7 @@ mod tests {
         add_dep(&mut node, "probe:pkg/1.0/compress()");
         atoms.insert("probe:blueprint/def:compress".to_string(), node);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert_eq!(
             result.verified_entrypoints,
             vec!["probe:pkg/1.0/compress()"]
@@ -535,7 +558,7 @@ mod tests {
         add_dep(&mut outer, "probe:pkg/1.0/reduce()");
         atoms.insert("probe:pkg/1.0/compress()".to_string(), outer);
 
-        let result = summarize_atoms(&atoms);
+        let result = summarize_atoms(&atoms).unwrap();
         assert_eq!(
             result.verified_entrypoints,
             vec!["probe:pkg/1.0/compress()"]
