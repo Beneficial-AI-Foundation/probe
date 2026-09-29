@@ -1,6 +1,12 @@
+---
+title: Categorical Framework for Probe Tools
+last-updated: 2026-09-28
+status: reference
+---
+
 # Categorical Framework for Probe Tools
 
-Below, a few notes following the input from Shaowei. Credit goes to Shaowei. Errors are mine. 
+Non-normative companion to the merge laws in [properties.md](properties.md#p4-merge-associativity-on-the-carrier) (P4/P5). Below, a few notes following the input from Shaowei. Credit goes to Shaowei. Errors are mine.
 
 ---
 
@@ -9,7 +15,7 @@ The categorical structure underlying the probe tools architecture, drawing on tw
 - **DOTS** (Double Operadic Theory of Systems) by Libkind & Myers ([arXiv 2505.18329](https://arxiv.org/abs/2505.18329))
 - **SSProve** (State-Separating Proofs) by Spitters et al. ([ePrint 2021/397](https://eprint.iacr.org/2021/397))
 
-Both frameworks describe composable units with typed interfaces governed by algebraic laws. The probe tools instantiate this pattern: `probe merge` is the universal composition operator and each probe tool is a doctrine. The DOTS/SSProve tables below are architectural **analogies**, not implemented mechanisms: the implemented algebra is annotation-preserving composition — cross-language mappings attach correspondence records carried alongside the composition ([ADR-006](../kb/decisions/006-correspondence-records.md)); cross-language *linking* (resolution) is a derived consumer view and a deferred capability, not an achieved one.
+Both frameworks describe composable units with typed interfaces governed by algebraic laws. The probe tools instantiate this pattern: `probe merge` is the universal composition operator and each probe tool is a doctrine. The DOTS/SSProve tables below are architectural **analogies**, not implemented mechanisms: the implemented algebra is annotation-preserving composition — cross-language mappings attach correspondence records carried alongside the composition ([ADR-006](../decisions/006-correspondence-records.md)); cross-language *linking* (resolution) is a derived consumer view and a deferred capability, not an achieved one.
 
 ## Core Correspondence
 
@@ -45,7 +51,7 @@ In SSProve, "interactions" are "packages" — composable units with import/expor
 ## Algebraic Laws
 
 Merge factors into two operations (normative statement:
-[P4](../kb/engineering/properties.md#p4-merge-associativity-on-the-carrier)/[P5](../kb/engineering/properties.md#p5-merge-identity-exact-on-the-carrier)):
+[P4](properties.md#p4-merge-associativity-on-the-carrier)/[P5](properties.md#p5-merge-identity-exact-on-the-carrier)):
 
 - `μ(A, B)` — plain merge: normalize each input (per input, before conflict
   resolution), union with the category's conflict rule, then enrichment
@@ -86,7 +92,7 @@ envelope meta and over provenance as a deduplicated source inventory.
 
 ### `probe merge` — The Universal Composition Operator
 
-`probe merge` is the single composition operator for authoritative, same-category probe outputs satisfying the evidence contract — i.e. the carrier (projections and pre-contract envelopes are rejected, [ADR-006](../kb/decisions/006-correspondence-records.md)). It handles:
+`probe merge` is the single composition operator for authoritative, same-category probe outputs satisfying the evidence contract — i.e. the carrier (projections and pre-contract envelopes are rejected, [ADR-006](../decisions/006-correspondence-records.md)). It handles:
 
 - **Homogeneous merging** (rust+rust, lean+lean): no mappings needed, composition via stub replacement and key-based union.
 - **Heterogeneous merging** (rust+lean): supply `--mappings` to attach correspondence records linking counterpart atoms across languages; consumers derive cross-language views from the records.
@@ -130,7 +136,7 @@ This categorical structure provides:
 
 Adding a new probe (e.g. `probe-haskell`) requires:
 - Implement the extractor (the doctrine): produce atoms in the standard envelope format.
-- **Evidence obligation**: a producer whose verification evidence is not expressible in the emitted dependency graph must stamp `status-origin` on the affected statuses ([ADR-006](../kb/decisions/006-correspondence-records.md)) — otherwise hub enrichment over its output is unsound.
+- **Evidence obligation**: a producer whose verification evidence is not expressible in the emitted dependency graph must stamp `status-origin` on the affected statuses ([ADR-006](../decisions/006-correspondence-records.md)) — otherwise hub enrichment over its output is unsound.
 - `probe merge` handles same-language composition automatically.
 - For cross-language support: build a mapping generator that produces `mappings.json`; `probe merge --mappings` attaches the correspondence, and consumers derive linkage from the records.
 

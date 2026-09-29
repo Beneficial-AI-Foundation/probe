@@ -42,10 +42,14 @@ Authority validation (steps 3–4) is one shared validator invoked at every enve
 
 Strip trailing `.` from all code-name keys, dependency references, code-name-bearing extension arrays, and mapping endpoints ([P8](../engineering/properties.md#p8-code-name-normalization)). Per-input ordering is semantic: it selects which atom wins a post-normalization collision before evidence from other inputs is considered.
 
+If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules); if both are real atoms, the first is kept with a warning (counted in `conflicts`). Correspondence records are unioned across the collision ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
+
 ### Phase 3: Merge
 
 - **Atoms**: `merge_atom_maps()` — first-wins with [stub](../engineering/glossary.md#stub) replacement. See [P6](../engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement). On every equal-key resolution, `maps-to`/`mapped-from` records are unioned ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
 - **Specs/Proofs**: `merge_generic_maps()` — last-wins. See [P7](../engineering/properties.md#p7-specsproofs-merge-is-last-wins).
+
+Matching is purely by code-name string equality, regardless of language. Atoms with different `language` values coexist in the merged `data` dictionary, and a stub in one language is never resolved against an atom in another — the two stay distinct atoms, linked (if at all) by a correspondence record.
 
 ### Phase 4: Attach correspondence records (optional)
 
@@ -75,7 +79,7 @@ After merging, the tool prints:
 
 ## Categorical framework
 
-`probe merge` is described algebraically in `probe/docs/categorical-framework.md`. Merge factors as `F_M ∘ μ` (plain merge, then correspondence-record attachment for fixed mappings M). On the **carrier** — normalized, enrichment-consistent atom maps — μ satisfies [associativity](../engineering/properties.md#p4-merge-associativity-on-the-carrier), [identity](../engineering/properties.md#p5-merge-identity-exact-on-the-carrier) (exact on the carrier; up to normalization+enrichment on legacy inputs), and commutativity for disjoint keys; F_M is idempotent and compatible with μ (`F_M(μ(A, B)) = μ(F_M(A), F_M(B))`). Projected artifacts are outside μ's domain (rejected). Laws are stated modulo envelope meta and over provenance as a deduplicated source inventory. Each probe tool is a [doctrine](../engineering/glossary.md#doctrine); probe-aeneas is a [functor](../engineering/glossary.md#functor) factory.
+`probe merge` is described algebraically in [categorical-framework.md](../engineering/categorical-framework.md). Merge factors as `F_M ∘ μ` (plain merge, then correspondence-record attachment for fixed mappings M). On the **carrier** — normalized, enrichment-consistent atom maps — μ satisfies [associativity](../engineering/properties.md#p4-merge-associativity-on-the-carrier), [identity](../engineering/properties.md#p5-merge-identity-exact-on-the-carrier) (exact on the carrier; up to normalization+enrichment on legacy inputs), and commutativity for disjoint keys; F_M is idempotent and compatible with μ (`F_M(μ(A, B)) = μ(F_M(A), F_M(B))`). Projected artifacts are outside μ's domain (rejected). Laws are stated modulo envelope meta and over provenance as a deduplicated source inventory. Each probe tool is a [doctrine](../engineering/glossary.md#doctrine); probe-aeneas is a [functor](../engineering/glossary.md#functor) factory.
 
 ## probe-extract-check
 

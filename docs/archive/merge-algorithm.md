@@ -1,5 +1,10 @@
 # Probe Merge Algorithm
 
+> **Archived 2026-09-28.** Superseded by
+> [kb/engineering/schema.md § Merge algorithm](../../kb/engineering/schema.md#merge-algorithm)
+> (normative) and [kb/tools/probe-merge.md](../../kb/tools/probe-merge.md)
+> (phase-by-phase detail). Kept for historical reference; not updated.
+
 Version: draft
 Date: 2026-09-28
 Parent document: [SCHEMA.md](SCHEMA.md)

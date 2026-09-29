@@ -118,7 +118,7 @@ and render it appropriately based on `schema` and `source.language`.
 Identifies the producing tool and data type. Format: `<tool>/<type>`.
 
 The registered `schema` values (and which are legacy) are listed in
-[SCHEMA.md § Registered `schema` Values](SCHEMA.md#registered-schema-values).
+[schema.md § Registered schema values](../kb/engineering/schema.md#registered-schema-values).
 
 #### `schema-version` (string, required)
 
@@ -277,7 +277,9 @@ When `probe merge` produces a merged file, the envelope differs from single-tool
 }
 ```
 
-The full merge algorithm is specified in [merge-algorithm.md](merge-algorithm.md).
+The full merge algorithm is specified in
+[schema.md § Merge algorithm](../kb/engineering/schema.md#merge-algorithm) and
+[kb/tools/probe-merge.md](../kb/tools/probe-merge.md).
 
 ## Rollout
 

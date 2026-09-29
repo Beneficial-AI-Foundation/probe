@@ -39,8 +39,7 @@ Emits `probe-aeneas/extract`.
   **1-to-many** and attaches correspondence records
   ([P13](../engineering/properties.md#p13-correspondence-records-attach-unconditionally),
   [P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert),
-  [schema.md#mappings-file-format](../engineering/schema.md#mappings-file-format),
-  [mappings-spec.md](../../docs/mappings-spec.md)). The generated
+  [schema.md#mappings-file-format](../engineering/schema.md#mappings-file-format)). The generated
   `Vec<Mapping>` stays authoritative through its pipeline — endpoint-only
   maps are derived indexes over the P8-normalized records; `confidence`/
   `method` are never discarded or reconstructed from endpoints.

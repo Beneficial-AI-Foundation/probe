@@ -92,7 +92,7 @@ Tool-specific fields on an [atom](#atom) that go beyond the core schema. Seriali
 
 ## doctrine
 
-Categorical algebra term. Each probe tool is a doctrine: it defines what [atoms](#atom) look like in its language, what [extensions](#extensions) are available, and how extraction works. The [merge](#merge) operator composes across doctrines. See `probe/docs/categorical-framework.md`.
+Categorical algebra term. Each probe tool is a doctrine: it defines what [atoms](#atom) look like in its language, what [extensions](#extensions) are available, and how extraction works. The [merge](#merge) operator composes across doctrines. See [categorical-framework.md](categorical-framework.md).
 
 ## functor
 

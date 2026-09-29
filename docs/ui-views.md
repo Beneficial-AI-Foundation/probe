@@ -54,7 +54,7 @@ Rust atoms, a link to the specification theorem for Lean atoms.
 
 In combined view, atoms from different languages may be connected by
 mapping edges (created via a
-[mappings file](mappings-spec.md)). These edges deserve
+[mappings file](../kb/engineering/schema.md#mappings-file-format)). These edges deserve
 distinct styling (e.g. dashed lines, a different color) to distinguish
 them from intra-language dependency edges.
 
