@@ -11,15 +11,32 @@ fn get_verification_status(atom: &Atom) -> Option<&str> {
         .and_then(|v| v.as_str())
 }
 
+fn get_status_origin(atom: &Atom) -> Option<&str> {
+    atom.extensions
+        .get("status-origin")
+        .and_then(|v| v.as_str())
+}
+
 fn is_verified(atom: &Atom) -> bool {
     get_verification_status(atom).is_some_and(|s| s == "verified" || s == "transitively-verified")
 }
 
-/// Only atoms with explicit "unverified" or "failed" status are contamination
-/// sources. Atoms with missing status (untracked/Grey) and "trusted" atoms
-/// do not contaminate — they are outside the verification scope.
-fn is_contamination_source(atom: &Atom) -> bool {
+// @kb: kb/engineering/schema.md#common-optional-fields — status-origin marker
+/// Blocker/contamination seeds (P23, ADR-006): atoms with explicit
+/// "unverified" or "failed" status, plus every `status-origin`-bearing atom
+/// (imported or graph-inexpressible evidence — never promotable). Atoms with
+/// missing status are transparent, not seeds; plain "trusted" atoms are
+/// boundaries, not seeds.
+fn is_seed(atom: &Atom) -> bool {
     matches!(get_verification_status(atom), Some("unverified" | "failed"))
+        || get_status_origin(atom).is_some()
+}
+
+/// A "trusted" atom is a trust boundary only when it carries no
+/// `status-origin`: copied trust must not shield callers (ADR-006). The
+/// boundary covers the atom's entire dependency closure (whole-atom trust).
+fn is_trusted_boundary(atom: &Atom) -> bool {
+    get_verification_status(atom) == Some("trusted") && get_status_origin(atom).is_none()
 }
 
 /// Kinds whose members (enum constructors, struct fields/projections, class
@@ -42,18 +59,24 @@ fn is_extracted_type_member(dep: &str, atoms: &BTreeMap<String, Atom>) -> bool {
         .is_some_and(|parent| is_type_definition(&parent.kind))
 }
 
-/// Enrich verification status through the dependency graph using
-/// reverse-BFS contamination.
+/// Recompute verification labels through the dependency graph (P23).
 ///
-/// For each verified atom, determines whether it is **transitively verified**
-/// (all transitive dependencies are verified or trusted) or only
-/// **locally verified** (the atom itself is verified but at least one
-/// transitive dependency is not).
+/// This is a **recomputation**, not an upgrade pass: one reverse BFS from one
+/// seed set — explicit `"failed"`/`"unverified"` atoms plus every
+/// `status-origin`-bearing atom — then every atom whose status is
+/// `"verified"` or `"transitively-verified"` has its label set fresh:
+/// reaches a seed along a path with no trusted boundary, or is itself a
+/// seed → `"verified"`; otherwise → `"transitively-verified"`. A contaminated
+/// atom arriving as `"transitively-verified"` is downgraded, and a
+/// `status-origin`-bearing `"transitively-verified"` is rewritten to
+/// `"verified"` unconditionally. The result is a function of the final graph
+/// and base statuses only.
 ///
-/// Upgrades `verification-status` from `"verified"` to `"transitively-verified"`
-/// on atoms whose entire transitive dependency closure is verified or trusted.
-/// Atoms that remain `"verified"` are only locally verified. Non-verified atoms
-/// are untouched.
+/// Contamination flows through missing-status atoms (transparent by
+/// construction) and stops only at trusted boundaries (`"trusted"` with no
+/// `status-origin`). Seeds keep their own base status — blocking never
+/// downgrades below `"verified"`, and `"failed"`/`"unverified"`/`"trusted"`
+/// atoms are never rewritten.
 ///
 /// Returns `(transitive_count, local_count, missing_deps)` for reporting.
 /// `missing_deps` lists only *genuine orphans* — dependency code-names absent
@@ -71,13 +94,13 @@ pub fn enrich_verification_status(
     // 1. Build reverse dependency index: for each dep, who depends on it?
     //    Uses BTreeMap/BTreeSet for deterministic iteration (P14).
     let mut reverse_deps: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let mut verified_set: BTreeSet<String> = BTreeSet::new();
+    let mut candidates: BTreeSet<String> = BTreeSet::new();
     // BTreeSet keeps iteration sorted + deduped for deterministic output (P14).
     let mut all_missing: BTreeSet<String> = BTreeSet::new();
 
     for (code_name, atom) in atoms.iter() {
         if is_verified(atom) {
-            verified_set.insert(code_name.clone());
+            candidates.insert(code_name.clone());
         }
         for dep in &atom.dependencies {
             if !atoms.contains_key(dep.as_str()) {
@@ -112,67 +135,96 @@ pub fn enrich_verification_status(
         );
     }
 
-    // 2. Seed contamination: only atoms with explicit "unverified" or "failed" status.
-    //    Atoms with missing verification-status (untracked/Grey) and "trusted" atoms
-    //    do not contaminate — they are outside the verification scope.
-    let mut contaminated: BTreeSet<String> = BTreeSet::new();
+    // 2. One seed set (P23): explicit "unverified"/"failed" atoms plus every
+    //    status-origin-bearing atom. A zero-length path counts — a seed is
+    //    never promoted — so seeds start out blocked.
+    let mut blocked: BTreeSet<String> = BTreeSet::new();
     let mut worklist: VecDeque<String> = VecDeque::new();
 
     for (code_name, atom) in atoms.iter() {
-        if is_contamination_source(atom) {
-            contaminated.insert(code_name.clone());
+        if is_seed(atom) {
+            blocked.insert(code_name.clone());
+            worklist.push_back(code_name.clone());
         }
     }
 
-    // 3. Find direct contacts: verified atoms that depend on a contaminated atom.
-    let initial_sources: Vec<String> = contaminated.iter().cloned().collect();
-    for source in &initial_sources {
-        if let Some(callers) = reverse_deps.get(source) {
-            for caller in callers {
-                if verified_set.contains(caller) && !contaminated.contains(caller) {
-                    contaminated.insert(caller.clone());
-                    worklist.push_back(caller.clone());
-                }
-            }
-        }
-    }
-
-    // 4. Propagate via reverse edges.
+    // 3. One reverse BFS. Contamination flows through every caller that is
+    //    not a trusted boundary — including missing-status atoms, which are
+    //    transparent by construction — and stops at trusted boundaries.
     while let Some(atom_name) = worklist.pop_front() {
         if let Some(callers) = reverse_deps.get(&atom_name) {
             for caller in callers {
-                if verified_set.contains(caller) && !contaminated.contains(caller) {
-                    contaminated.insert(caller.clone());
-                    worklist.push_back(caller.clone());
+                if blocked.contains(caller) || is_trusted_boundary(&atoms[caller]) {
+                    continue;
                 }
+                blocked.insert(caller.clone());
+                worklist.push_back(caller.clone());
             }
         }
     }
 
-    // 5. Upgrade non-contaminated verified atoms to "transitively-verified".
+    // 4. Set every candidate's label fresh: blocked (reaches a seed along a
+    //    non-trusted path, or is itself a seed) → "verified"; otherwise →
+    //    "transitively-verified". This downgrades a contaminated
+    //    "transitively-verified" and rewrites a status-origin-bearing
+    //    "transitively-verified" to "verified" unconditionally.
     let mut transitive_count = 0;
     let mut local_count = 0;
 
-    for code_name in &verified_set {
-        if contaminated.contains(code_name) {
+    for code_name in &candidates {
+        let label = if blocked.contains(code_name) {
             local_count += 1;
+            "verified"
         } else {
             transitive_count += 1;
-            atoms.get_mut(code_name).unwrap().extensions.insert(
-                "verification-status".to_string(),
-                serde_json::Value::String("transitively-verified".to_string()),
-            );
-        }
+            "transitively-verified"
+        };
+        atoms.get_mut(code_name).unwrap().extensions.insert(
+            "verification-status".to_string(),
+            serde_json::Value::String(label.to_string()),
+        );
     }
 
     (transitive_count, local_count, missing_deps)
+}
+
+/// Statistics from carrier preparation (`prepare = enrich ∘ normalize`).
+pub struct PrepareStats {
+    pub keys_normalized: usize,
+    pub transitive: usize,
+    pub local: usize,
+    pub missing_deps: Vec<String>,
+}
+
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
+// @kb: kb/engineering/properties.md#p23-transitive-verification
+/// Carrier preparation for unary recomputation boundaries (ADR-006):
+/// normalize code-names (P8), then recompute enrichment (P23). With a single
+/// input there is no conflict resolution, so this ordering coincides with
+/// merge's per-input normalization. Enrichment over an unnormalized map can
+/// resolve names differently (a dotted-alias dependency dangles instead of
+/// reaching its contamination source), so normalization must run first.
+pub fn prepare_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, PrepareStats) {
+    let (mut atoms, keys_normalized) = crate::commands::merge::normalize_atoms(atoms);
+    let (transitive, local, missing_deps) = enrich_verification_status(&mut atoms);
+    (
+        atoms,
+        PrepareStats {
+            keys_normalized,
+            transitive,
+            local,
+            missing_deps,
+        },
+    )
 }
 
 /// CLI entry point: load atom file, enrich verification status, write JSON.
 ///
 /// The input passes the envelope schema check and the shared authority
 /// validator (projection rejection + version gate, ADR-006) before any
-/// recomputation. The output preserves the input envelope structure exactly.
+/// recomputation, then carrier preparation (`prepare = enrich ∘ normalize`)
+/// recomputes the labels. The output preserves the input envelope structure
+/// exactly, up to normalized code-names.
 // @kb: kb/engineering/schema.md#authority-validation-and-re-enrichment
 pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
     let content = std::fs::read_to_string(input).unwrap_or_else(|e| {
@@ -206,17 +258,21 @@ pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
         std::process::exit(1);
     }
 
-    let mut atoms: BTreeMap<String, Atom> =
+    let atoms: BTreeMap<String, Atom> =
         serde_json::from_value(meta.data_value).unwrap_or_else(|e| {
             eprintln!("Error deserializing atoms from {}: {e}", input.display());
             std::process::exit(1);
         });
 
-    let (transitive, local, _missing) = enrich_verification_status(&mut atoms);
-    let not_verified = atoms.len() - transitive - local;
+    let (atoms, stats) = prepare_atoms(atoms);
+    let not_verified = atoms.len() - stats.transitive - stats.local;
 
+    if stats.keys_normalized > 0 {
+        eprintln!("Keys normalized: {}", stats.keys_normalized);
+    }
     eprintln!(
-        "Transitively verified: {transitive}  |  Locally-scoped verified: {local}  |  Not verified: {not_verified}"
+        "Transitively verified: {}  |  Locally-scoped verified: {}  |  Not verified: {not_verified}",
+        stats.transitive, stats.local
     );
 
     let enriched_data = serde_json::to_value(&atoms).expect("failed to serialize atoms");
@@ -729,6 +785,317 @@ mod tests {
         let json1 = serde_json::to_string(&atoms1).unwrap();
         let json2 = serde_json::to_string(&atoms2).unwrap();
         assert_eq!(json1, json2);
+    }
+
+    fn set_origin(atom: &mut Atom, origin: &str) {
+        atom.extensions.insert(
+            "status-origin".to_string(),
+            serde_json::Value::String(origin.to_string()),
+        );
+    }
+
+    // Plan §3 test (a): recomputation downgrades a stale label.
+    #[test]
+    fn test_contaminated_transitively_verified_is_downgraded() {
+        let mut atoms = BTreeMap::new();
+
+        let mut a = make_atom("a");
+        set_status(&mut a, "transitively-verified");
+        add_dep(&mut a, "b");
+        atoms.insert("a".to_string(), a);
+
+        let mut b = make_atom("b");
+        set_status(&mut b, "unverified");
+        atoms.insert("b".to_string(), b);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("a").unwrap()), Some("verified"));
+    }
+
+    // Plan §3 test (b): missing-status atoms are transparent — contamination
+    // flows through them (P23).
+    #[test]
+    fn test_contamination_flows_through_missing_status() {
+        let mut atoms = BTreeMap::new();
+
+        let mut v = make_atom("v");
+        set_verified(&mut v);
+        add_dep(&mut v, "helper");
+        atoms.insert("v".to_string(), v);
+
+        let mut helper = make_atom("helper");
+        add_dep(&mut helper, "bad");
+        atoms.insert("helper".to_string(), helper);
+
+        let mut bad = make_atom("bad");
+        set_status(&mut bad, "unverified");
+        atoms.insert("bad".to_string(), bad);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("v").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("helper").unwrap()), None);
+    }
+
+    // Plan §3 test (c): a trusted atom is a whole-atom boundary — nothing
+    // behind it contaminates, including a dep listed in its spec-position
+    // extension arrays (enrichment traverses the unified `dependencies` set).
+    #[test]
+    fn test_trusted_boundary_blocks_contamination() {
+        let mut atoms = BTreeMap::new();
+
+        let mut v = make_atom("v");
+        set_verified(&mut v);
+        add_dep(&mut v, "t");
+        atoms.insert("v".to_string(), v);
+
+        let mut t = make_atom("t");
+        set_trusted(&mut t);
+        add_dep(&mut t, "bad");
+        t.extensions.insert(
+            "requires-dependencies".to_string(),
+            serde_json::json!(["bad"]),
+        );
+        atoms.insert("t".to_string(), t);
+
+        let mut bad = make_atom("bad");
+        set_status(&mut bad, "failed");
+        atoms.insert("bad".to_string(), bad);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("v").unwrap()),
+            Some("transitively-verified")
+        );
+        assert_eq!(get_vs(atoms.get("t").unwrap()), Some("trusted"));
+    }
+
+    // Plan §3 test (d): correspondence records are not dependencies and never
+    // participate in the BFS (P27).
+    #[test]
+    fn test_maps_to_records_do_not_contaminate() {
+        let mut atoms = BTreeMap::new();
+
+        let mut a = make_atom("a");
+        set_verified(&mut a);
+        a.extensions.insert(
+            "maps-to".to_string(),
+            serde_json::json!([{ "target": "bad", "confidence": "exact" }]),
+        );
+        a.extensions.insert(
+            "mapped-from".to_string(),
+            serde_json::json!([{ "target": "bad", "confidence": "exact" }]),
+        );
+        atoms.insert("a".to_string(), a);
+
+        let mut bad = make_atom("bad");
+        set_status(&mut bad, "unverified");
+        atoms.insert("bad".to_string(), bad);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            get_vs(atoms.get("a").unwrap()),
+            Some("transitively-verified")
+        );
+    }
+
+    // Plan §3 test (g): a translation-origin atom is never promoted; its own
+    // base status survives contamination unchanged (seeds keep their status).
+    #[test]
+    fn test_translation_origin_never_promoted() {
+        let mut atoms = BTreeMap::new();
+
+        // Leaf with no deps — unmarked it would be promoted.
+        let mut g = make_atom("g");
+        set_verified(&mut g);
+        set_origin(&mut g, "translation");
+        atoms.insert("g".to_string(), g);
+
+        // Marked atom over a contaminated dep stays at its base status.
+        let mut h = make_atom("h");
+        set_verified(&mut h);
+        set_origin(&mut h, "translation");
+        add_dep(&mut h, "bad");
+        atoms.insert("h".to_string(), h);
+
+        let mut bad = make_atom("bad");
+        set_status(&mut bad, "failed");
+        atoms.insert("bad".to_string(), bad);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("g").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("h").unwrap()), Some("verified"));
+    }
+
+    // Plan §3 test (h): translation-origin atoms are promotion blockers — a
+    // locally verified caller is not promoted; the same caller behind a
+    // trusted boundary is.
+    #[test]
+    fn test_translation_origin_blocks_caller_promotion() {
+        let mut atoms = BTreeMap::new();
+
+        let mut f = make_atom("f");
+        set_verified(&mut f);
+        add_dep(&mut f, "g");
+        atoms.insert("f".to_string(), f);
+
+        let mut g = make_atom("g");
+        set_verified(&mut g);
+        set_origin(&mut g, "translation");
+        atoms.insert("g".to_string(), g);
+
+        // f2 reaches the marked atom only through a plain trusted boundary.
+        let mut f2 = make_atom("f2");
+        set_verified(&mut f2);
+        add_dep(&mut f2, "t");
+        atoms.insert("f2".to_string(), f2);
+
+        let mut t = make_atom("t");
+        set_trusted(&mut t);
+        add_dep(&mut t, "g");
+        atoms.insert("t".to_string(), t);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("f").unwrap()), Some("verified"));
+        assert_eq!(
+            get_vs(atoms.get("f2").unwrap()),
+            Some("transitively-verified")
+        );
+    }
+
+    // Plan §3 test (i): an imported "transitively-verified" is rewritten to
+    // "verified" unconditionally, not only when contaminated.
+    #[test]
+    fn test_translation_origin_transitively_verified_rewritten() {
+        let mut atoms = BTreeMap::new();
+
+        let mut g = make_atom("g");
+        set_status(&mut g, "transitively-verified");
+        set_origin(&mut g, "translation");
+        atoms.insert("g".to_string(), g);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("g").unwrap()), Some("verified"));
+    }
+
+    // Plan §3 test (j): trusted-boundary precedence — copied trust
+    // (trusted + status-origin) seeds and must not shield its callers;
+    // plain local trusted is a boundary.
+    #[test]
+    fn test_copied_trusted_is_seed_not_boundary() {
+        let mut atoms = BTreeMap::new();
+
+        let mut caller1 = make_atom("caller1");
+        set_verified(&mut caller1);
+        add_dep(&mut caller1, "copied_trusted");
+        atoms.insert("caller1".to_string(), caller1);
+
+        let mut copied = make_atom("copied_trusted");
+        set_trusted(&mut copied);
+        set_origin(&mut copied, "translation");
+        atoms.insert("copied_trusted".to_string(), copied);
+
+        let mut caller2 = make_atom("caller2");
+        set_verified(&mut caller2);
+        add_dep(&mut caller2, "local_trusted");
+        atoms.insert("caller2".to_string(), caller2);
+
+        let mut local = make_atom("local_trusted");
+        set_trusted(&mut local);
+        atoms.insert("local_trusted".to_string(), local);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("caller1").unwrap()), Some("verified"));
+        assert_eq!(
+            get_vs(atoms.get("caller2").unwrap()),
+            Some("transitively-verified")
+        );
+        // Seeds keep their own base status.
+        assert_eq!(
+            get_vs(atoms.get("copied_trusted").unwrap()),
+            Some("trusted")
+        );
+    }
+
+    // Plan §3 test (k): kernel-taint synthetic replicas of the probe-lean
+    // aux-fold fixtures — a marked "verified" with empty deps (ownSorry) or
+    // with its taint path through a non-emitted node (viaNoRange) stays
+    // "verified", and a locally verified caller of either is not promoted.
+    #[test]
+    fn test_kernel_taint_replicas() {
+        let mut atoms = BTreeMap::new();
+
+        // ownSorry replica: verified, empty dependency list, marked.
+        let mut own_sorry = make_atom("ownSorry");
+        set_verified(&mut own_sorry);
+        set_origin(&mut own_sorry, "kernel-taint");
+        atoms.insert("ownSorry".to_string(), own_sorry);
+
+        // viaNoRange replica: verified, taint dep absent from the map.
+        let mut via = make_atom("viaNoRange");
+        set_verified(&mut via);
+        set_origin(&mut via, "kernel-taint");
+        add_dep(&mut via, "nonEmittedAux");
+        atoms.insert("viaNoRange".to_string(), via);
+
+        let mut caller = make_atom("caller");
+        set_verified(&mut caller);
+        add_dep(&mut caller, "ownSorry");
+        atoms.insert("caller".to_string(), caller);
+
+        let mut caller2 = make_atom("caller2");
+        set_verified(&mut caller2);
+        add_dep(&mut caller2, "viaNoRange");
+        atoms.insert("caller2".to_string(), caller2);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("ownSorry").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("viaNoRange").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("caller").unwrap()), Some("verified"));
+        assert_eq!(get_vs(atoms.get("caller2").unwrap()), Some("verified"));
+    }
+
+    // Carrier preparation (ADR-006): the dotted-alias contamination
+    // regression — without P8 normalization the dep "g." dangles (treated as
+    // trusted) and f is wrongly promoted; prepared, it reaches g [failed].
+    #[test]
+    fn test_prepare_normalizes_before_enrichment() {
+        let mut atoms = BTreeMap::new();
+
+        let mut f = make_atom("f");
+        set_verified(&mut f);
+        add_dep(&mut f, "g.");
+        atoms.insert("f".to_string(), f);
+
+        let mut g = make_atom("g");
+        set_status(&mut g, "failed");
+        atoms.insert("g".to_string(), g);
+
+        let (prepared, stats) = prepare_atoms(atoms);
+        assert_eq!(get_vs(prepared.get("f").unwrap()), Some("verified"));
+        assert_eq!(stats.local, 1);
+        assert_eq!(stats.transitive, 0);
+        assert!(stats.missing_deps.is_empty());
+    }
+
+    // Carrier preparation also normalizes dotted keys (P8), so a legacy
+    // "g()."-keyed atom is reachable by its normalized name.
+    #[test]
+    fn test_prepare_normalizes_keys() {
+        let mut atoms = BTreeMap::new();
+
+        let mut f = make_atom("f");
+        set_verified(&mut f);
+        add_dep(&mut f, "g()");
+        atoms.insert("f".to_string(), f);
+
+        let mut g = make_atom("g");
+        set_status(&mut g, "unverified");
+        atoms.insert("g().".to_string(), g);
+
+        let (prepared, stats) = prepare_atoms(atoms);
+        assert_eq!(stats.keys_normalized, 1);
+        assert!(prepared.contains_key("g()"));
+        assert_eq!(get_vs(prepared.get("f").unwrap()), Some("verified"));
     }
 
     #[test]

@@ -250,6 +250,11 @@
           "type": "string",
           "enum": ["rust", "lean", "verus", "blueprint"],
           "description": "Source language of this atom."
+        },
+        "status-origin": {
+          "type": "string",
+          "enum": ["translation", "kernel-taint"],
+          "description": "Optional evidence marker on verification-status (ADR-006): \"translation\" = imported evidence copied from a corresponding atom in another language (probe-aeneas); \"kernel-taint\" = local evidence reflecting a producer-known negative finding the emitted graph cannot express (probe-lean). Bearing atoms are enrichment blocker seeds."
         }
       },
       "required": [

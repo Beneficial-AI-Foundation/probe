@@ -29,7 +29,9 @@ pub struct MergeStats {
 
 /// Normalize all keys and dependency references in an atom map.
 /// Returns the normalized map and a count of keys that changed.
-fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, usize) {
+/// Shared with the unary recomputation boundaries via `prepare_atoms`
+/// (ADR-006 carrier preparation).
+pub(crate) fn normalize_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, usize) {
     let mut out: BTreeMap<String, Atom> = BTreeMap::new();
     let mut changed = 0;
 
