@@ -66,6 +66,10 @@ An enumerated atom extension marking whose evidence a `verification-status` is: 
 
 A seed of the enrichment BFS ([P23](properties.md#p23-transitive-verification)): an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom. A locally verified atom that reaches a blocker seed along a dependency path with no trusted boundary is labelled `"verified"`, not `"transitively-verified"`; a seed itself is never promoted and keeps its own base status. Not to be confused with a projection's [seed set](#seed-set), which selects atoms for `probe project` and has no verification semantics.
 
+## raw staging primitive
+
+The no-recomputation variant of the hub merge (`merge_atom_maps_raw` / `merge_atom_files_raw` in `probe/src/commands/merge.rs`) for multi-step pipelines that mutate verification statuses between merge steps and enrich exactly once at the end (probe-aeneas). Identical normalization, conflict resolution, and record attachment; only the final enrichment recomputation is deferred, so its output is off-[carrier](#carrier) (potentially stale derived statuses) until enriched. Raw means skip recomputation, never skip validation: the file-level entry point applies the same authority and `status-origin` rejection as the public paths ([ADR-006](../decisions/006-correspondence-records.md)).
+
 ## carrier
 
 The set of normalized, enrichment-consistent atom maps — the domain on which the merge laws hold ([P4](properties.md#p4-merge-associativity-on-the-carrier), [P5](properties.md#p5-merge-identity-exact-on-the-carrier)). A precondition established by normalization + enrichment, not an automatic property of tool outputs (`--skip-enrich` output is off-carrier). Projected artifacts are outside the carrier and outside merge's domain entirely.

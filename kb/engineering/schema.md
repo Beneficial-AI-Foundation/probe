@@ -1,6 +1,6 @@
 ---
 title: Schema 3.1 Interchange Specification
-last-updated: 2026-09-28
+last-updated: 2026-09-29
 status: draft
 ---
 
@@ -59,8 +59,8 @@ When `probe merge` produces output, `source` is replaced by `inputs`:
 ```json
 {
   "schema": "probe/merged-atoms",
-  "schema-version": "3.0",
-  "tool": { "name": "probe", "version": "0.1.0", "command": "merge" },
+  "schema-version": "3.1",
+  "tool": { "name": "probe", "version": "0.5.0", "command": "merge" },
   "inputs": [
     { "schema": "probe-verus/atoms", "source": { ... } },
     { "schema": "probe-lean/atoms", "source": { ... } }

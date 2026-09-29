@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-09-28
+last-updated: 2026-09-29
 status: draft
 ---
 

@@ -2220,6 +2220,60 @@ mod tests {
         assert_eq!(mappings[0].method.as_deref(), Some("hand-written"));
     }
 
+    // P8: `dependencies-with-locations` code-names are normalized alongside
+    // keys and the dependencies set.
+    #[test]
+    fn test_dependencies_with_locations_normalized() {
+        let mut atom = make_real_atom("f", "src/lib.rs", "rust", "exec");
+        atom.extensions.insert(
+            "dependencies-with-locations".to_string(),
+            serde_json::json!([{"code-name": "probe:a/1.0/g().", "location": "inner"}]),
+        );
+        let mut atoms = BTreeMap::new();
+        atoms.insert("probe:a/1.0/f()".to_string(), atom);
+
+        let (out, _, _) = normalize_atoms(atoms);
+        let dwl = out["probe:a/1.0/f()"]
+            .extensions
+            .get("dependencies-with-locations")
+            .unwrap();
+        assert_eq!(dwl[0]["code-name"], "probe:a/1.0/g()");
+    }
+
+    // P14 at the envelope level: two identical merges serialize to
+    // byte-identical full envelope JSON (fixed meta), records included.
+    #[test]
+    fn test_full_envelope_serialization_deterministic() {
+        let build = || {
+            let (a, b, _, m) = law_fixtures();
+            let (merged, _) = merge_mapped(vec![a, b], &m);
+            let envelope = MergedAtomEnvelope {
+                schema: "probe/merged-atoms".to_string(),
+                schema_version: "3.1".to_string(),
+                tool: Tool {
+                    name: "probe".to_string(),
+                    version: "0.5.0".to_string(),
+                    command: "merge".to_string(),
+                },
+                inputs: vec![InputProvenance {
+                    schema: "probe-verus/atoms".to_string(),
+                    source: crate::types::Source {
+                        repo: "r".to_string(),
+                        commit: "c".to_string(),
+                        language: "rust".to_string(),
+                        package: "p".to_string(),
+                        package_version: "1.0".to_string(),
+                        extensions: BTreeMap::new(),
+                    },
+                }],
+                timestamp: "2026-09-29T12:00:00Z".to_string(),
+                data: merged,
+            };
+            serde_json::to_string_pretty(&envelope).unwrap()
+        };
+        assert_eq!(build(), build());
+    }
+
     #[test]
     fn test_load_mappings_rejects_legacy_translations_schema() {
         let dir = tempfile::tempdir().unwrap();

@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe (merge operator)"
-last-updated: 2026-09-28
+last-updated: 2026-09-29
 status: draft
 ---
 
@@ -40,7 +40,7 @@ Authority validation (steps 3–4) is one shared validator invoked at every enve
 
 ### Phase 2: Normalize (per input, before conflict resolution)
 
-Strip trailing `.` from all code-name keys, dependency references, code-name-bearing extension arrays, and mapping endpoints ([P8](../engineering/properties.md#p8-code-name-normalization)). Per-input ordering is semantic: it selects which atom wins a post-normalization collision before evidence from other inputs is considered.
+Strip trailing `.` from all code-name keys, dependency references, code-name-bearing extension arrays, and mapping endpoints ([P8](../engineering/properties.md#p8-code-name-normalization)). Per-input ordering is semantic: aliases collapse within their own input before cross-input conflicts are resolved, so Phase 3 pairs already-normalized atoms.
 
 If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules) and identical-modulo-records duplicates collapse; if both are real atoms and differ beyond their correspondence records, the merge **errors** — a single input offering two distinct atoms for one code-name is producer error, and merge re-enriches (Phase 5), so silently selecting one atom's evidence would launder contamination; the same rule the unary `probe enrich` boundary applies ([P8](../engineering/properties.md#p8-code-name-normalization)). Correspondence records are unioned across benign collisions ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
 
