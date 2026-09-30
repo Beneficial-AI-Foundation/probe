@@ -142,6 +142,8 @@ The `dependencies` field MUST always equal the union of its categorized subsets.
 
 The categorized subsets are sets, like `dependencies`: their order and duplicates carry no meaning, and [P8](#p8-code-name-normalization) normalization puts them in canonical sorted order.
 
+**Accepted loss**: probe-lean may emit one name twice in `dependencies` and its categorized subsets when two distinct private declarations print to the same code-name ([probe-lean#88](https://github.com/Beneficial-AI-Foundation/probe-lean/issues/88)). The hub collapses the duplicate at every boundary that normalizes, so it survives only in the raw producer extract, where probe-lean's own audit reports it. The two declarations already share one code-name, so the hub cannot represent them as distinct atoms either way. Reconciling probe-lean's schema wording is tracked in [probe-lean#116](https://github.com/Beneficial-AI-Foundation/probe-lean/issues/116).
+
 **Scope**: the decomposition equality applies to atoms that carry categorized subsets — plain Rust atoms (probe-rust) carry none, and the equality is vacuous there.
 
 **Preservation**: every transformation (merge, project) must preserve the decomposition where present. In particular, when `probe project` trims `dependencies` to the projected set, it trims the categorized extension arrays with the same filter.
