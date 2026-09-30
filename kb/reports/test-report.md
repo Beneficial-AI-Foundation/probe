@@ -7,7 +7,7 @@ scope: branch la/merge-soundness-pr3b-maps-to-records vs origin/main (merge-soun
 status: 0 critical, 2 warnings, 4 info (I1 closed this round)
 ---
 
-Test surface: inline `#[cfg(test)]` modules (`src/types.rs`, `src/authority.rs`, `src/commands/{merge,project,propagate,summary}.rs` — 120 unit tests), integration suites `tests/{merge,merge_laws,propagate,authority,schema_validation}.rs` (65 tests, binary-level via `CARGO_BIN_EXE_probe` plus jsonschema validation), and the `probe-extract-check` crate (separate scope: extract-vs-source validation).
+Test surface: inline `#[cfg(test)]` modules (`src/types.rs`, `src/authority.rs`, `src/commands/{merge,project,propagate,summary}.rs` — 127 unit tests), integration suites `tests/{merge,merge_laws,propagate,authority,schema_validation}.rs` (65 tests, binary-level via `CARGO_BIN_EXE_probe` plus jsonschema validation), and the `probe-extract-check` crate (separate scope: extract-vs-source validation).
 
 ## Coverage matrix
 

@@ -113,4 +113,4 @@ Checked on the changeset (commit 90c50cc), at these locations:
 - **Docs/architecture** — architecture.md:31 (post-merge enrichment recomputation, record attachment) now describes implemented behavior; kb/tools/probe-merge.md phases 2/4/5, stats table, and key-files row updated; schema.md normalization and status-origin enforcement rows updated; CLI help (src/main.rs) already stated record semantics; `./scripts/check-kb-links.sh` and the enum drift guard pass.
 - **P1, P2, P15, P16, P19, P21, P22, P24, P25** — not touched by this changeset; spot-checked that no changed file affects them (P15's known project-side gap is W2).
 
-Suite: 245 tests green (`cargo test --workspace`, review-fix delta included), clippy clean with `-D warnings`, `cargo fmt --check` clean.
+Suite: 249 tests green (`cargo test --workspace`, review-fix delta included), clippy clean with `-D warnings`, `cargo fmt --check` clean.
