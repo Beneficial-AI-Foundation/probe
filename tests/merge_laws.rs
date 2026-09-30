@@ -260,15 +260,21 @@ fn runtime_acceptance_matches_schema_validity_at_every_boundary() {
     }
 }
 
-/// Binary boundary for the record rejections: `probe merge` and
-/// `probe enrich` exit non-zero on every malformed shape in either field,
-/// write no output, and name the offending field (merge also names the
-/// input ordinal) on stderr.
+/// Binary boundary for the record rejections: `probe merge`, `probe enrich`
+/// and `probe project` exit non-zero on every malformed shape in either
+/// field, write no output, and name the offending field (merge also names
+/// the input ordinal) on stderr.
 #[test]
-fn cli_merge_and_enrich_reject_malformed_records_before_writing() {
+fn cli_boundaries_reject_malformed_records_before_writing() {
     let directory = tempfile::tempdir().unwrap();
     let input = directory.path().join("input.json");
     let output = directory.path().join("output.json");
+    let mappings = directory.path().join("mappings.json");
+    std::fs::write(
+        &mappings,
+        json!({"schema": "probe/mappings", "schema-version": "1.0", "mappings": []}).to_string(),
+    )
+    .unwrap();
     let fixture = "tests/fixtures/merge_test/atoms_a.json";
     let original: Value = serde_json::from_str(&std::fs::read_to_string(fixture).unwrap()).unwrap();
     for field in ["maps-to", "mapped-from"] {
@@ -288,13 +294,17 @@ fn cli_merge_and_enrich_reject_malformed_records_before_writing() {
                 .next()
                 .unwrap()[field] = invalid;
             std::fs::write(&input, document.to_string()).unwrap();
-            for command in ["merge", "enrich"] {
+            for command in ["merge", "enrich", "project"] {
                 let mut process = std::process::Command::new(env!("CARGO_BIN_EXE_probe"));
                 process.arg(command);
                 if command == "merge" {
                     process.arg(fixture);
                 }
-                let result = process.arg(&input).arg("-o").arg(&output).output().unwrap();
+                process.arg(&input);
+                if command == "project" {
+                    process.arg("--mappings").arg(&mappings);
+                }
+                let result = process.arg("-o").arg(&output).output().unwrap();
                 assert!(!result.status.success(), "{command}: {field}");
                 assert!(!output.exists());
                 let error = String::from_utf8_lossy(&result.stderr);
