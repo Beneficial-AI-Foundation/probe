@@ -274,6 +274,233 @@ fn projection_readable_by_consumers_rejected_by_recomputation() {
     assert!(!stderr.contains("pre-contract"), "{stderr}");
 }
 
+/// Merge the two `write_inputs` extracts and project the result; returns the
+/// real projection (seeded at `f()`) and the mappings file that produced it.
+fn write_real_projection(dir: &Path) -> (PathBuf, PathBuf) {
+    let (a, b) = write_inputs(dir);
+    let merged = dir.join("merged.json");
+    let out = run_probe(&[
+        "merge",
+        a.to_str().unwrap(),
+        b.to_str().unwrap(),
+        "-o",
+        merged.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", stderr_of(&out));
+
+    let mappings = dir.join("m.json");
+    write_json(
+        &mappings,
+        &mappings_file(&[("probe:app/1.0/f()", "probe:Lean.T")]),
+    );
+    let projected = dir.join("projected.json");
+    let out = run_probe(&[
+        "project",
+        merged.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "-o",
+        projected.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", stderr_of(&out));
+    (projected, mappings)
+}
+
+/// A legacy-format projection (`probe/merged-atoms` plus a `projection`
+/// field) is still a view: `probe project` must inherit its labels, not
+/// recompute them over the trimmed graph (ADR-006).
+#[test]
+fn project_inherits_labels_of_legacy_format_projection() {
+    let dir = tempfile::tempdir().unwrap();
+    let (projected, mappings) = write_real_projection(dir.path());
+
+    // Rewrite the real projection into the pre-3a shape, with a label only a
+    // recomputation would change: f reaches no seed, so enrichment would
+    // promote this `verified` to `transitively-verified`.
+    let mut legacy = read_json(&projected);
+    assert!(legacy.get("projection").is_some(), "{legacy}");
+    legacy["schema"] = serde_json::json!("probe/merged-atoms");
+    legacy["data"]["probe:app/1.0/f()"]["verification-status"] = serde_json::json!("verified");
+    let legacy_path = dir.path().join("legacy_projection.json");
+    write_json(&legacy_path, &legacy);
+
+    let reprojected = dir.path().join("p2.json");
+    let out = run_probe(&[
+        "project",
+        legacy_path.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "-o",
+        reprojected.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", stderr_of(&out));
+    assert!(
+        stderr_of(&out).contains("labels inherited"),
+        "legacy projection skips recomputation: {}",
+        stderr_of(&out)
+    );
+    assert_eq!(
+        read_json(&reprojected)["data"]["probe:app/1.0/f()"]["verification-status"],
+        "verified",
+        "inherited label kept, not recomputed over the view"
+    );
+}
+
+/// P8 holds for already-projected inputs too: they are normalized (without
+/// re-enrichment) before seed matching, so a dotted key in a view is still
+/// found by its normalized mapping seed.
+#[test]
+fn project_normalizes_keys_of_projected_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let (projected, mappings) = write_real_projection(dir.path());
+
+    let mut view = read_json(&projected);
+    let data = view["data"].as_object_mut().unwrap();
+    let f = data.remove("probe:app/1.0/f()").expect("f in projection");
+    data.insert("probe:app/1.0/f().".to_string(), f);
+    let dotted = dir.path().join("dotted_view.json");
+    write_json(&dotted, &view);
+
+    let reprojected = dir.path().join("p2.json");
+    let out = run_probe(&[
+        "project",
+        dotted.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "-o",
+        reprojected.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", stderr_of(&out));
+    assert!(stderr_of(&out).contains("labels inherited"));
+    let data = &read_json(&reprojected)["data"];
+    assert!(
+        data.get("probe:app/1.0/f()").is_some(),
+        "dotted key in a projected input selected by its normalized seed (P8): {data}"
+    );
+}
+
+/// The fail-closed checks apply to already-projected inputs too: a view
+/// carrying an out-of-enum `status-origin`, or a dotted alias colliding with
+/// a distinct real atom, is rejected before any output is written.
+#[test]
+fn project_rejects_invalid_projected_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let (projected, mappings) = write_real_projection(dir.path());
+
+    let mut bogus_marker = read_json(&projected);
+    bogus_marker["data"]["probe:app/1.0/f()"]["status-origin"] = serde_json::json!("bogus");
+
+    let mut collision = read_json(&projected);
+    let mut alias = collision["data"]["probe:app/1.0/f()"].clone();
+    alias["verification-status"] = serde_json::json!("failed");
+    collision["data"]["probe:app/1.0/f()."] = alias;
+
+    for (name, view, expected) in [
+        ("bogus_marker", bogus_marker, "invalid status-origin"),
+        ("collision", collision, "refusing to project"),
+    ] {
+        let input = dir.path().join(format!("{name}.json"));
+        write_json(&input, &view);
+        let output = dir.path().join(format!("{name}_out.json"));
+        let out = run_probe(&[
+            "project",
+            input.to_str().unwrap(),
+            "--mappings",
+            mappings.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ]);
+        let stderr = stderr_of(&out);
+        assert!(!out.status.success(), "{name}: must be rejected: {stderr}");
+        assert!(stderr.contains(expected), "{name}: {stderr}");
+        assert!(!output.exists(), "{name}: rejection writes no output");
+    }
+}
+
+/// ADR-006 Decision 2 fail-closed at the projection boundary: an out-of-enum
+/// `status-origin` is rejected rather than copied into the view.
+#[test]
+fn project_rejects_invalid_status_origin() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut bogus = atom(&[], Some("verified"));
+    bogus["status-origin"] = serde_json::json!("bogus");
+    let extract = dir.path().join("bogus.json");
+    write_json(
+        &extract,
+        &single_tool_envelope(
+            "probe-aeneas/extract",
+            "probe-aeneas",
+            "9.0.0",
+            "pkg-x",
+            serde_json::json!({ "probe:app/1.0/f()": bogus }),
+        ),
+    );
+    let mappings = dir.path().join("m.json");
+    write_json(
+        &mappings,
+        &mappings_file(&[("probe:app/1.0/f()", "probe:Lean.f")]),
+    );
+
+    let projected = dir.path().join("projected.json");
+    let out = run_probe(&[
+        "project",
+        extract.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "-o",
+        projected.to_str().unwrap(),
+    ]);
+    assert!(!out.status.success(), "project must reject the marker");
+    let stderr = stderr_of(&out);
+    assert!(stderr.contains("invalid status-origin"), "{stderr}");
+    assert!(!projected.exists(), "rejection writes no output");
+}
+
+/// P8 fail-closed at the projection boundary: a post-normalization collision
+/// between two distinct real atoms rejects the input, as `probe enrich` does,
+/// and writes no output.
+#[test]
+fn project_rejects_distinct_real_normalization_collision() {
+    let dir = tempfile::tempdir().unwrap();
+    let extract = dir.path().join("collision.json");
+    write_json(
+        &extract,
+        &single_tool_envelope(
+            "probe-verus/atoms",
+            "probe-verus",
+            "2.0.0",
+            "pkg-v",
+            serde_json::json!({
+                "probe:app/1.0/g()": atom(&[], Some("verified")),
+                "probe:app/1.0/g().": atom(&[], Some("failed")),
+            }),
+        ),
+    );
+    let mappings = dir.path().join("m.json");
+    write_json(
+        &mappings,
+        &mappings_file(&[("probe:app/1.0/g()", "probe:Lean.g")]),
+    );
+
+    let projected = dir.path().join("projected.json");
+    let out = run_probe(&[
+        "project",
+        extract.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "-o",
+        projected.to_str().unwrap(),
+    ]);
+    assert!(!out.status.success(), "project must reject the collision");
+    let stderr = stderr_of(&out);
+    assert!(stderr.contains("refusing to project"), "{stderr}");
+    assert!(
+        stderr.contains("probe:app/1.0/g().") && stderr.contains("probe:app/1.0/g()"),
+        "collision message names both keys: {stderr}"
+    );
+    assert!(!projected.exists(), "rejection writes no output");
+}
+
 /// Envelope idempotence (P4/P9): re-merging the merged output with one of its
 /// inputs changes neither the data nor the deduplicated source inventory.
 #[test]

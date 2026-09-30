@@ -3,145 +3,176 @@ auditor: ambiguity-auditor
 date: 2026-09-30
 repo: probe (hub)
 kb: kb/ (own KB)
-scope: branch la/merge-soundness-pr3b-maps-to-records (merge-soundness PR 3b —
-  correspondence records, merge re-enrichment, raw staging, P8 reconciliation),
-  delta audit over the PR 2 report; every KB surface this PR touches or
-  implements re-checked against the code. Second pass 2026-09-30 over the
-  PR #81 review-fix surfaces (P27 canonical form + fail-closed validation:
-  P27, schema.md §§ Correspondence records / Mappings file format, ADR-006
-  Decision 1, probe-merge.md Phase 2, glossary).
-status: 0 critical, 3 warnings, 2 info
+scope: branch la/merge-soundness-pr3c-collision-warnings-projection vs
+  origin/main (merge-soundness PR 3c, issue #82 — specs/proofs intra-input
+  collision warnings, provenance dedup, minItems 2→1, P8 categorized-array
+  normalization, P15 projection trim, carrier preparation in probe project,
+  ValidatedAtomFile.projected, 0.5.0 contract release, round-trip tests).
+  Per §2b: audited against origin/main's KB text; main already carried the
+  PR 3b spec-ahead statements (the previous report's W3 window: P9 dedup,
+  P15 trim clause, P23 project enrich-then-trim, glossary projection entry,
+  probe-project.md steps 4–5), which this branch's code implements. The
+  branch's own KB edits (P8 specs/proofs paragraph + project rejection
+  clause, probe-merge.md Phase 2 addition, probe-project.md Step 2 rejection
+  sentence) land in the same PR as the implementing code — same-PR
+  consistency is the relevant check, and it holds; no cross-PR merge-order
+  constraint arises.
+status: 0 critical, 2 warnings, 2 info
 ---
 
 ## Critical
 
-### [C2 of the PR 2 report] ~~`merge --mappings` injects dependency edges, contradicting revised P13~~ — CLOSED by this branch
-- **Resolution**: the edge-injection block is removed; `attach_correspondence_records`
-  (src/commands/merge.rs) implements P13's unconditional/key-local/set-like
-  attachment, with the union rule (P27) on every equal-key resolution and the
-  record definitions in the executable schema. The old tests pinning the
-  superseded semantics were replaced, not amended. Retained this round so the
-  closure is on record; drops off next run.
+### [W3 of the PR 3b report] ~~Remaining spec-ahead-of-code statements, all PR 3c~~ — CLOSED by this branch
+- **Resolution**: every item in the window is now implemented and verified
+  against the code: P8's extended arrays (`CATEGORIZED_DEPENDENCY_ARRAYS` in
+  src/types.rs, normalized in `normalize_atoms`, matching P8's five-entry
+  list exactly), P9's dedup clause (`dedup_provenance`, applied in
+  `merge_atom_files` and `cmd_merge`), P15's projection trim
+  (src/commands/project.rs, same filter as `dependencies`, non-string
+  entries untouched), P23's projection enrich-then-trim (`prepare_atoms` on
+  authoritative inputs in `cmd_project`, skipped for projected inputs via
+  the new `ValidatedAtomFile.projected` flag), and the glossary/tool-page
+  statements those properties anchor.
+- **The known interim window is verified closed**: `load_mappings`
+  normalizes endpoints and `prepare_atoms` normalizes atom keys before seed
+  matching, so a dotted-key legacy atom now selects its normalized seed —
+  pinned by tests/roundtrip.rs::`projection_seeds_match_normalized_keys`
+  over the real binary (passes; full `cargo test` green, 205 tests).
+  Retained this round so the closure is on record; drops off next run.
 
-No new criticals: the P8/P27 text amendments on this branch and the code that
-implements them were written together, and the amendment is the reconciliation
-the plan's §9 row 3b explicitly mandates (recorded in ADR-006 Decision 3 and
-plan §10). The quality report carries the merge-order constraint.
+No new criticals. The branch's new KB text (P8 ¶2 project-rejection
+extension, P8 ¶3 specs/proofs warn-and-count, probe-merge.md Phase 2,
+probe-project.md Step 2) *extends* origin/main's text — main's P8 was silent
+on `probe project`'s collision handling and on specs/proofs collisions — and
+each clause was verified against the implementing code: `cmd_project`
+rejects on non-empty `PrepareStats::dropped_atoms` exactly as `cmd_enrich`
+does; `normalize_generic` warns and feeds `stats.conflicts` while keeping
+last-wins (P7), pinned by unit test and by
+tests/roundtrip.rs::`specs_intra_input_collision_warned_and_counted`.
 
 ## Warnings
 
 ### [W1] probe-verus spec-position dependency arrays are empty in real artifacts
-Carried over unchanged (producer defect, filed in the probe-verus rollout
-issue; recorded in ADR-006 Decision 4). Not a hub KB defect.
+Carried over, re-verified: ADR-006 Decision 4 still records that the
+producer audit found `requires-dependencies`/`ensures-dependencies` empty in
+real probe-verus artifacts, and no probe-verus change lands with this PR.
+Now mildly sharper: this PR's P8 normalization and P15 trimming of exactly
+those arrays are vacuous on real Verus output until the producer emits them
+(the hub-side machinery is tested on synthetic atoms). Producer defect, not
+a hub KB defect; tracked on the probe-verus side.
 
 ### [W2] Presentation decks still describe edge injection
-Carried over unchanged (local-only decks, updated when next regenerated).
-
-### [W3] Remaining spec-ahead-of-code statements, all PR 3c
-- **Location**: properties.md P8 (extended arrays `requires-dependencies` etc.;
-  project boundary), P9 (dedup clause), P15 (projection trims categorized
-  arrays), P23 (projection enrich-then-trim); glossary `projection`
-  ("recomputed on the full input before trimming"); kb/tools/probe-project.md
-  steps 3–4 and the `prepare = enrich ∘ normalize` step.
-- **Issue**: these describe PR 3c behavior. After PR 3b the merge-side
-  statements — P4/P5 law statements, P13/P27 attachment and union, P23's
-  "merge re-enriches", schema.md § Correspondence records and the
-  re-enrichment clause, kb/tools/probe-merge.md phases 2/4/5 and its stats
-  table, the glossary's `merge`/`mapping`/`correspondence record`/`carrier`
-  entries, and kb/tools/probe-aeneas.md's hub-API description (records-first
-  `load_mappings`, derived endpoint indexes) — are implemented and verified
-  against the code; they leave the divergence list.
-- **Sharpened within the window**: kb/tools/probe-project.md step 4 ("seeds …
-  normalized, that exist in the (normalized) atom data") now *actively*
-  diverges rather than merely leading the code: this PR's `load_mappings`
-  normalizes endpoints, but `project_atoms` still matches them against raw
-  atom keys, so a dotted-*key* legacy atom selects zero seeds — the interim
-  regression plan §3d predicted and assigns to 3c. Land 3c promptly.
-- **Recommendation**: none beyond executing PR 3c; listed so the window stays
-  explicit.
+Carried over, re-verified: on branch `la/probes-slides`,
+`docs/slides-lean-verification-landscape.md` line 135 still says "computed
+from the cross-language edges the merge flattened through the proof graph" —
+the pre-ADR-006 edge-injection semantics. Local-only decks, updated when
+next regenerated; not on this PR's surface.
 
 ## Info
 
-### [I1] "identical-modulo-records" defined inline, used in three files
-P8 defines distinctness as "judged ignoring `maps-to`/`mapped-from`" and P27,
-probe-merge.md Phase 2, and ADR-006 Decision 3 reuse the phrase (probe-merge
-paraphrases as "differ beyond their correspondence records"). Consistent at
-every use site and anchored by P8's definition; below the glossary-entry bar
-since it is a predicate of one property, not a standalone domain term. No
-action.
+### [I1] P9's "not … in what order" vs first-occurrence inventory order
+- **Location**: kb/engineering/properties.md P9 ¶2; src/types.rs
+  `dedup_provenance`.
+- **Issue**: P9 says the `inputs` array records which sources were composed,
+  "not how many times or in what order". The implementation deduplicates but
+  keeps first-occurrence order, so `μ(A,B)` and `μ(B,A)` emit
+  differently-ordered (set-equal) inventories. That is consistent with the
+  laws — P4 is stated "over provenance as a deduplicated source inventory",
+  i.e. compared as sets — and deterministic per P14 (order is a function of
+  argument order), but a reader could take the phrase as mandating a
+  canonical (sorted) array.
+- **Recommendation**: optional one-clause clarification in P9 ("the emitted
+  array keeps first-occurrence order; inventory equality is set equality").
+  Not blocking — the executable behavior contradicts no stated law.
 
-### [I2] Merged-envelope `schema-version` now differs by producer generation
-Hub merged output is stamped `3.1` while producers keep emitting `3.0`
-(schema.md's stated policy: hub-side minor bump, 3.x additive). Verified
-consistent across schema.md (§ current version, version-history row, merged
-example — the example was updated during this audit's quality pass), the
-executable schema (`^[0-9]+\.[0-9]+$`, both accepted), `cmd_merge`
-(stamps 3.1), `probe project` (3.1 since PR 3a), and `parse_envelope`
-(accepts any 3.x). Recorded because mixed 3.0/3.1 stamps in one pipeline are
-now the *expected* steady state, not drift.
+### [I2] Merged-envelope `schema-version` differs by producer generation
+Carried over unchanged from the PR 3b report: hub merged/projected output is
+stamped `3.1` while producers emit `3.0`; mixed stamps in one pipeline are
+the expected steady state per schema.md's hub-side-minor-bump policy.
+Re-checked against `cmd_merge`/`cmd_project` (both stamp 3.1) and
+`parse_envelope` (accepts any 3.x).
 
 ## Fixed during this audit
 
-- kb/engineering/glossary.md: added the `raw staging primitive` entry — the
-  term is load-bearing in ADR-006 Decision 3, schema.md, and
-  kb/tools/probe-merge.md but was undefined in the glossary (whose own rule is
-  that every domain term is defined there). Definition names the concrete
-  functions and the off-carrier caveat.
-- kb/tools/probe-merge.md Phase 2 lead sentence still said per-input ordering
-  "selects which atom wins a post-normalization collision" — stale against the
-  same page's (and P8's) new rejection rule one paragraph below; rephrased to
-  the alias-collapse-before-cross-input-resolution formulation.
-- `last-updated` stamps bumped (2026-09-28 → 2026-09-29) on properties.md,
-  schema.md, and probe-merge.md, all substantively edited by this branch.
-
-Second pass (2026-09-30, review-fix surfaces):
-
-- kb/tools/probe-merge.md Phase 2 restated P27's rejected-shape list and had
-  already drifted (five items to P27's six — "non-string method" missing).
-  Replaced the restated list with a short characterization plus a pointer to
-  P27 as the normative list, the same delegate-don't-duplicate rule the enum
-  drift guard enforces on the docs surface.
+- kb/engineering/glossary.md: added the `carrier preparation` entry — the
+  term (`prepare = enrich ∘ normalize`) is load-bearing in ADR-006,
+  architecture.md, probe-project.md Step 2, and this release's CHANGELOG,
+  but was undefined in the glossary (whose own rule is that every domain
+  term is defined there; same gap the PR 3b audit closed for "raw staging
+  primitive"). Entry names the boundaries that prepare, the projected-input
+  exemption, and the fail-closed collision rule.
+- kb/tools/probe-project.md Step 1 and the input-restriction bullet named
+  `load_atom_file()` as the loader; `cmd_project` has routed through
+  `load_validated_atom_file()` since PR 3a, and this PR makes the
+  distinction semantic (the validated loader now returns the `projected`
+  flag Step 2 depends on). Corrected both references and noted the flag.
+- kb/tools/probe-project.md `last-updated` bumped 2026-09-28 → 2026-09-30
+  (Step 2 substantively edited by this branch).
+- kb/tools/probe-merge.md stats table: the specs/proofs "Conflicts" cell
+  said only "overrides, incoming kept", but this PR makes the same stat
+  also count intra-input post-normalization collisions (the page's own
+  Phase 2 documents this); the cell now names both feeds. The atoms cell
+  was already accurate ("intra-input distinct-real collisions are errors,
+  not counts").
+- `./scripts/check-kb-links.sh` and the enum drift guard re-run clean after
+  the edits.
 
 ## Verified clean (this delta)
 
-Second pass (2026-09-30, review-fix surfaces):
-
-- **Cross-file agreement on the canonical-form clause**: P27 ("empty `method`
-  ... canonicalized to absent", dedup by identity), schema.md § Correspondence
-  records ("an empty `method` is canonicalized to absent, and no other fields
-  are allowed"), § Mappings file format (validated at load), ADR-006
-  Decision 1 (rationale: two encodings of one identity break set union and
-  P4), glossary `correspondence record`, probe-merge.md Phase 2, and plan §10
-  state the same rule; the executable schema's `minLength: 1` on `method` is
-  the same decision in schema form.
-- **"Every recomputation boundary"** in the new P27/ADR-006/schema.md
-  validation clauses follows P8 ¶2's established construction — enumerated in
-  place as merge (per input) + enrich. `probe project` joining at PR 3c (when
-  it routes through `prepare_atoms`) is already the W3 window; validation
-  rides along automatically because it lives inside `normalize_atoms`.
-- **"canonical form"** is a predicate of P27 defined at first use and reused
-  consistently — below the glossary-entry bar for the same reason as I1's
-  "identical-modulo-records". No action.
-- **Claims vs code**: the six-item rejection list in P27 matches
-  `validate_and_canonicalize_records` arm-for-arm; the confidence vocabulary
-  is pinned code↔schema by `confidence_vocabulary_matches_executable_schema`;
-  `load_mappings`' documented load-boundary validation and `""`→absent
-  canonicalization match the implementation.
-
-- **Glossary consistency**: `merge`, `mapping`, `correspondence record`,
-  `carrier`, `version gate`, `blocker seed`, `trusted (boundary)` — all match
-  the implemented semantics; `correspondence record`'s "unioned through every
-  merge conflict, inert to enrichment and projection" is now code, not intent.
-- **Cross-file agreement** on the new collision rule: properties.md P8 ¶2,
-  P27 bullet 1, schema.md § Normalization, probe-merge.md Phase 2, ADR-006
-  Decision 3, and plan §10 state the same predicate (distinct-real modulo
-  records ⇒ reject; benign ⇒ union) with the same rationale.
+- **P7 (last-wins) × P8 (collision surfaced)**: the new P8 ¶3 and
+  probe-merge.md Phase 2 state warn-and-count with last-wins kept;
+  `normalize_generic` implements exactly that (warning text names P7/P8;
+  collisions feed `stats.conflicts`); pinned at unit level
+  (`test_generic_intra_input_collision_counted`) and over the real binary
+  (roundtrip `specs_intra_input_collision_warned_and_counted`, which also
+  checks the printed "Conflicts: 1").
+- **P8 array list vs code**: P8's "Normalization is applied to" list names
+  the five categorized arrays; `CATEGORIZED_DEPENDENCY_ARRAYS` matches
+  entry-for-entry, and `normalize_atoms` applies it with the documented
+  non-string pass-through.
+- **P8 distinct-real rejection at all three boundaries**: merge (per input,
+  `collision_error` with 1-based input prefix), enrich (`cmd_enrich` on
+  `dropped_atoms`), project (`cmd_project`, same rule and message shape) —
+  matching P8 ¶2's amended three-boundary enumeration; probe-project.md
+  Step 2 and schema.md § Authority validation agree.
+- **P9**: `dedup_provenance` (first occurrence kept; entries differing in
+  flattened `source` extensions stay distinct — pinned by
+  `dedup_provenance_collapses_identical_entries_only`) applied at both
+  merge boundaries; structural composed-detection unchanged; schema.md's
+  "deduplicated source inventory" clause and the executable schema's new
+  `inputs` description + `minItems: 1` state the same rule; envelope
+  idempotence pinned over the real binary (roundtrip).
+- **P14**: dedup is order-deterministic; projection BFS unchanged over
+  BTreeMap/BTreeSet; no new HashMap-iteration serialization.
+- **P15**: preservation clause ("trims the categorized extension arrays
+  with the same filter") is now code (project.rs) with the decomposition
+  regression (`test_categorized_arrays_trimmed_with_dependencies`);
+  probe-project.md Step 5 and the properties bullet agree.
+- **P23**: probe-project.md Step 2, ADR-006 Decision 6, schema.md § 369,
+  and the glossary `projection` entry all state prepare-before-trim +
+  inherited labels for projected inputs; `cmd_project` implements both
+  branches (the `projected` flag), with the Verus-shaped stale-label
+  regression pinned over the real binary
+  (`projection_recomputes_enrichment_before_trimming`).
+- **P27 inertness in projection**: "never traversed by projection BFS" is
+  pinned by `test_selection_is_dependency_only` (the pre-ADR-006
+  fabricated-edge reachability is not reproduced); probe-project.md Step 4
+  states the same.
+- **0.5.0 contract release coherence**: Cargo.toml `0.5.0` =
+  `PROBE_GATE_MIN` = ADR-006 Decision 7 table row = schema.md's merged
+  example = CHANGELOG 0.5.0 header; the round-trip suite proves the hub's
+  real outputs pass its own gate (only true from this release) and that a
+  real projection is rejected on the projection predicate specifically,
+  not the gate.
 - **Enumerated lists vs code**: probe-merge.md stats table matches
-  `print_stats` labels exactly (incl. the new Records attached / Enrichment
-  rows); the confidence vocabulary is identical across schema.md, the
-  executable schema enum, and the mappings-spec table; `status-origin`
-  enforcement rows now name all three rejecting consumers (merge added).
-- **ADR-005 ownership**: nothing single-probe leaked into shared files by this
-  change; probe-aeneas mechanics stay on its page, the hub API contract on the
-  hub's.
-- `./scripts/check-kb-links.sh` and the enum drift guard pass.
+  `print_stats` labels (after the specs-cell fix above); probe-merge.md's
+  "two or more" input arity matches the CLI (`num_args = 2..`).
+- **Glossary consistency**: `projection`, `seed set`, `carrier`,
+  `raw staging primitive`, `version gate`, `correspondence record` all
+  match the implemented semantics; `carrier preparation` added (above).
+- **ADR-005 ownership**: nothing single-probe leaked into shared files;
+  the P15 scope note still correctly scopes the decomposition to
+  subset-carrying producers.
+- Full `cargo test` green (205 tests across unit + integration suites,
+  including the 7 round-trip tests over real binary outputs);
+  `./scripts/check-kb-links.sh` and `scripts/check-enum-drift.py` pass.

@@ -2,91 +2,131 @@
 auditor: test-quality-auditor
 date: 2026-09-30
 repo: probe (hub)
-kb: kb/ (own KB; this branch amends P8 ¶2 and P27 — the coverage rows for those judge the tests against the branch text, which is the semantics this PR implements; the quality report records the merge-order constraint)
-scope: branch la/merge-soundness-pr3b-maps-to-records vs origin/main (merge-soundness PR 3b — correspondence records, merge re-enrichment, raw staging, P8 reconciliation), full property matrix; second pass 2026-09-30 over the PR #81 review-fix delta (P27 canonical form + fail-closed validation, CLI --mappings end-to-end, determinism rework)
-status: 0 critical, 2 warnings, 4 info (I1 closed this round)
+kb: kb/ (own KB; this branch amends P8 — the `probe project` rejection clause and the specs/proofs counted-collision paragraph are unmerged edits, and the coverage rows for P8 judge the tests against the branch text, which is the semantics this PR implements; audit against `main:kb/engineering/properties.md` confirmed no other property text differs — merge-order constraint: PR #82 must land with these KB edits)
+scope: branch la/merge-soundness-pr3c-collision-warnings-projection vs origin/main (merge-soundness PR 3c, issue #82 — counted collision warnings, provenance dedup + envelope idempotence, minItems relaxation, P8/P15 categorized-array completion, projection prepare = enrich ∘ normalize, 0.5.0 contract release, round-trip suite), full property matrix; third run, over the uncommitted delta: the I4 fix to the legacy inherited-labels test, plus two new `cmd_project` behaviors in src/commands/project.rs (status-origin validation on every input, and normalization without enrichment for already-projected inputs) with their tests in tests/roundtrip.rs; fourth run, over `project_rejects_invalid_projected_input` (targets W4) and the `write_real_projection` helper refactor
+status: 0 critical, 1 warning, 3 info
 ---
 
-Test surface: inline `#[cfg(test)]` modules (`src/types.rs`, `src/authority.rs`, `src/commands/{merge,project,propagate,summary}.rs` — 127 unit tests), integration suites `tests/{merge,merge_laws,propagate,authority,schema_validation}.rs` (65 tests, binary-level via `CARGO_BIN_EXE_probe` plus jsonschema validation), and the `probe-extract-check` crate (separate scope: extract-vs-source validation).
+Test surface: inline `#[cfg(test)]` modules (`src/types.rs`, `src/authority.rs`, `src/commands/{merge,project,propagate,summary}.rs` — 133 unit tests), integration suites `tests/{merge,merge_laws,propagate,authority,schema_validation,roundtrip}.rs` (77 tests, binary-level via `CARGO_BIN_EXE_probe` plus jsonschema validation; `roundtrip.rs` is new this branch, 12 tests over real binary outputs), and the `probe-extract-check` crate (separate scope: 30 unit + 27 golden, 8 ignored). `cargo test --workspace`: 267 passed, 0 failed, 8 ignored.
+
+Fourth run. I re-applied the two mutations that left the suite green in the third run. Running the status-origin check only when `!loaded.projected` now fails `project_rejects_invalid_projected_input` in its `bogus_marker` case. Discarding `dropped` in the projected branch fails the same test in its `collision` case (tests/roundtrip.rs:414 in both). No other test fails. Source restored: src/commands/project.rs is byte-identical to the pre-mutation copy, and the `git diff src` hash is unchanged. The `write_real_projection` helper (tests/roundtrip.rs:279-307) runs the same merge, the same `f()`→`probe:Lean.T` mapping and the same project call that `project_inherits_labels_of_legacy_format_projection` and `project_normalizes_keys_of_projected_input` previously did inline. Their assertions are unchanged, so the refactor does not weaken them.
+
+Mutation checks, third run. Each mutation was applied to the working tree (which already contains the intended project.rs change) and then reverted. Both source files were compared byte for byte against copies saved before the first mutation, and `git diff src` shows only the intended src/commands/project.rs change.
+
+| Mutation | Result |
+|---|---|
+| Drop `\|\| meta.has_projection_field` (src/authority.rs:211) | Only `project_inherits_labels_of_legacy_format_projection` fails, at its `labels inherited` stderr assertion (tests/roundtrip.rs:330). That assertion runs first, so this mutation never reaches the label check |
+| Keep the `labels inherited` message but run `prepare_atoms` (enrichment) in the projected branch (src/commands/project.rs:253) | Only the legacy test fails, at the label `assert_eq!` (tests/roundtrip.rs:335). The label assertion now discriminates on its own, which closes I4 |
+| Validate status-origins over an empty map instead of the input (src/commands/project.rs:238) | Only `project_rejects_invalid_status_origin` fails (non-zero-exit assertion, tests/roundtrip.rs:433) |
+| Skip normalization for projected inputs (return `loaded.atoms` unchanged, src/commands/project.rs:253) | Only `project_normalizes_keys_of_projected_input` fails (tests/roundtrip.rs:394) |
+| Run the status-origin check only when `!loaded.projected` | All tests passed in the third run (W4). In the fourth run, `project_rejects_invalid_projected_input` fails (`bogus_marker` case) |
+| Discard `dropped` in the projected branch, so a view's collisions are not rejected | All tests passed in the third run (W4). In the fourth run, `project_rejects_invalid_projected_input` fails (`collision` case) |
+
+The previous runs' mutations (disabling the project collision rejection; dropping the disjunct) remain closed. The collision test still fails when its rejection block is disabled, because that block is now shared by both branches.
 
 ## Coverage matrix
 
 | Property | Tests | Coverage | Notes |
 |----------|-------|----------|-------|
-| P1 | schema_validation.rs (all fixtures incl. the new merged-with-records envelope), authority.rs::project_output_uses_projected_atoms_schema_and_validates; tests/propagate.rs::test_envelope_structure_preserved | Full | |
+| P1 | schema_validation.rs (all fixtures), authority.rs::project_output_uses_projected_atoms_schema_and_validates, tests/propagate.rs::test_envelope_structure_preserved; **new**: roundtrip.rs::specs_merge_same_source_dedups_and_validates (real merged envelope with a deduped single-entry inventory validates against the executable schema — pins the minItems 2→1 relaxation) | Full | |
 | P2 | (BTreeMap keys by construction) | Indirect | Uniqueness is structural; code-name determinism is producer-side |
 | P3 | merge.rs::test_is_stub, project.rs::test_stub_seeds_included | Full | |
-| P4 | merge.rs::test_associativity_with_mappings_across_groupings (both nestings vs flat 3-way, with mappings, over stub replacement + real-vs-real + dangling-then-resolved targets), ::test_commutativity_disjoint_keys, ::test_mapping_compatibility_laws (F_M idempotence + F_M(μ(A,B)) = μ(F_M(A),F_M(B))), ::test_intermediate_enrichment_does_not_change_selected_base_data (the exact associativity argument: label rewrite in an intermediate does not change P6 selection), ::test_tied_identity_records_keep_associativity (review regression: tied identity triples across groupings) | Full (example + generated) | Laws run against `merge_atom_maps` itself, the μ the property defines. Generated-input sweep in tests/merge_laws.rs::laws_hold_over_generated_record_variants (18³ variant triples × enriched/raw = 11,664 associativity cases, plus mapping compatibility and self-merge idempotence per pair) closes the former I1 |
-| P5 | merge.rs::test_identity_exact_on_carrier (both argument positions, records included), ::test_identity_up_to_preparation_on_legacy (compared against the real `prepare_atoms`, not a reimplementation) | Full | |
-| P6 | merge.rs::test_stub_replaced_by_real, ::test_real_vs_real_conflict_keeps_base, ::test_new_atoms_added, tests/merge.rs::test_atoms_* | Full | Unit + binary paths |
-| P7 | merge.rs::test_generic_last_wins_on_conflict, tests/merge.rs::test_specs_*/test_proofs_* | Full | |
-| P8 | merge.rs::test_trailing_dot_normalization, ::test_normalization_collision_classification (distinct-real vs stub vs identical vs identical-modulo-records), ::test_intra_input_distinct_real_collision_rejected (Err on merge — first input, subsequent input, and raw path), ::test_repeated_trailing_dots_normalize_in_one_pass, ::test_record_targets_normalized, ::test_dependencies_with_locations_normalized (new), ::test_load_mappings_normalizes_endpoints, ::test_two_input_dotted_alias_evidence_selection (per-input-before-conflict-resolution ordering — the case single-input tests cannot catch); propagate.rs::test_prepare_normalizes_before_enrichment, ::test_prepare_normalizes_keys, ::test_prepare_reports_collision; tests/propagate.rs::{test_dotted_alias_contamination_end_to_end, test_enrich_rejects_normalization_collision, test_enrich_accepts_identical_duplicate_and_stub_collisions} | Partial | Both boundaries (merge per-input, enrich) covered for the rejection, positive and negative halves. Remaining gap is the PR 3c scope: extended arrays (`requires-dependencies` etc.) and the project boundary are not yet normalized, so not yet testable |
-| P9 | merge.rs::test_recursive_merge_flattens_provenance, ::test_generic_recursive_merge_flattens_provenance, types.rs::parse_envelope_* matrix, authority.rs::aeneas_composed_envelope_inventory_survives_merge | Full (current scope) | Dedup clause is PR 3c and unimplemented |
-| P10 | merge.rs::test_extensions_preserved; enrichment writes only `verification-status` (pinned indirectly by every status-origin test) | Full | Record union is the P27 carve-out, tested there |
-| P13 | merge.rs::test_mappings_attach_records_not_edges (records attached, `dependencies` asserted unchanged on every atom), ::test_dangling_target_still_attaches (the inversion of the retired existence-check guard), ::test_reapplication_is_noop (set-like), ::test_one_to_many_mapping_produces_multiple_records, ::test_distinct_confidence_records_both_kept_sorted; schema_validation.rs::merged_envelope_with_correspondence_records_is_valid (wire shape from real merge output); **binary boundary** (review fix): tests/merge.rs::test_merge_with_mappings_attaches_records_via_cli (loader → merge → envelope write: records both directions, endpoints normalized at load, dangling target attached, `dependencies` byte-equal to input) | Full | The PR-2 audit's W1 (tests pinning superseded edge-injection) is resolved: those tests were replaced wholesale; the review's CLI-coverage gap closed |
-| P14 | merge.rs::test_full_envelope_serialization_deterministic (review fix: now feeds the same evidence in *different* input orders — record arrays reversed, mappings file reordered — and asserts byte-identical envelope JSON, so it exercises canonicalization, not only BTreeMap ordering), ::test_distinct_confidence_records_both_kept_sorted (record sort order pinned exactly); propagate.rs::test_deterministic_output, project.rs::test_determinism | Full | Closes the carried W2 (struct-level-only determinism); the review's near-tautological-double-build critique addressed |
-| P15 | probe-extract-check golden/properties tests (extract side) | Partial | Hub-side projection trim of categorized arrays is PR 3c and untested |
+| P4 | merge.rs::test_associativity_with_mappings_across_groupings, ::test_commutativity_disjoint_keys, ::test_mapping_compatibility_laws, ::test_intermediate_enrichment_does_not_change_selected_base_data, ::test_tied_identity_records_keep_associativity; tests/merge_laws.rs::laws_hold_over_generated_record_variants (generated sweep); **new**: roundtrip.rs::envelope_idempotence_modulo_meta_after_dedup (envelope-level idempotence at the binary boundary: re-merging merged output with one of its inputs changes neither `data` nor the deduped inventory — the "modulo envelope meta / deduplicated inventory" qualifier of the laws, testable only after P9 dedup) | Full (example + generated + binary) | |
+| P5 | merge.rs::test_identity_exact_on_carrier, ::test_identity_up_to_preparation_on_legacy | Full | |
+| P6 | merge.rs::test_stub_replaced_by_real, ::test_real_vs_real_conflict_keeps_base, ::test_new_atoms_added, tests/merge.rs::test_atoms_* | Full | |
+| P7 | merge.rs::test_generic_last_wins_on_conflict, tests/merge.rs::test_specs_*/test_proofs_*; **new**: last-wins explicitly re-asserted under an intra-input collision (merge.rs::test_generic_intra_input_collision_counted, roundtrip.rs::specs_intra_input_collision_warned_and_counted) | Full | |
+| P8 | Carried suite (trailing-dot normalization, collision classification, intra-input distinct-real rejection on merge first/subsequent/raw inputs, record targets, dependencies-with-locations, mapping endpoints, two-input dotted-alias evidence selection; propagate prepare trio; tests/propagate.rs enrich-boundary trio). **New this branch**: merge.rs::test_categorized_dependency_arrays_normalized (the five CATEGORIZED_DEPENDENCY_ARRAYS normalized like `dependencies`, non-string entries untouched — shared `normalize_atoms` helper, so the merge, enrich, and project boundaries all inherit it); merge.rs::test_generic_intra_input_collision_counted + roundtrip.rs::specs_intra_input_collision_warned_and_counted (specs/proofs collision warned + counted in `stats.conflicts`, unit and CLI, stdout `Conflicts: 1` asserted); roundtrip.rs::projection_seeds_match_normalized_keys (project boundary normalizes before seed matching — dotted-key atom found by its normalized mapping seed); roundtrip.rs::project_rejects_distinct_real_normalization_collision (a `probe-verus/atoms` extract with distinct real atoms `g()`/`g().` → `probe project` exits non-zero, stderr says `refusing to project` and names both keys, no output file written); roundtrip.rs::project_normalizes_keys_of_projected_input (a real projection with `f()` re-keyed to `f().` is re-projected; `f()` is selected by its normalized seed, so projected inputs are normalized too); roundtrip.rs::project_rejects_invalid_projected_input `collision` case (a real projection with a distinct real `f().` alias beside `f()` → non-zero exit, `refusing to project`, no output) | Full | Collision rejection is pinned at merge, enrich, and project, and at project for both authoritative and already-projected inputs. This covers the kb/tools/probe-project.md Step 2 clause "with the same collision rejection" (W4 closed, mutation-checked) |
+| P9 | Carried flattening suite (test_recursive_merge_flattens_provenance, generic variant, types.rs parse matrix, authority.rs::aeneas_composed_envelope_inventory_survives_merge). **New — dedup clause now implemented and tested at all three levels**: types.rs::dedup_provenance_collapses_identical_entries_only (exact duplicates collapse first-occurrence-ordered; entries differing only in flattened `source` extensions stay distinct), merge.rs::test_merge_atom_files_dedups_provenance (library file path), roundtrip.rs::envelope_idempotence_modulo_meta_after_dedup + ::specs_merge_same_source_dedups_and_validates (cmd_merge binary path, both categories) | Full | Closes the previous report's "dedup clause is PR 3c and unimplemented" caveat |
+| P10 | merge.rs::test_extensions_preserved; record union tested under P27 | Full | |
+| P13 | Carried attachment suite (records-not-edges, dangling target, re-application no-op, one-to-many, distinct-confidence; schema wire test; CLI end-to-end) | Full | |
+| P14 | merge.rs::test_full_envelope_serialization_deterministic, ::test_distinct_confidence_records_both_kept_sorted; propagate.rs::test_deterministic_output, project.rs::test_determinism | Full | dedup_provenance keeps first-occurrence order — deterministic given the argument order, which P6/P7 already make significant |
+| P15 | **New**: project.rs::test_categorized_arrays_trimmed_with_dependencies (projection trims the categorized arrays with the same filter as `dependencies`; excluded name removed, included kept, non-string entry untouched — would fail if project trimmed `dependencies` alone, the exact break the plan's §6 P15 item names); merge.rs::test_categorized_dependency_arrays_normalized (normalization applies one rule to `dependencies` and the subsets, so the decomposition equality survives merge/enrich/project preparation); probe-extract-check golden/properties tests (extract side) | Full (hub mutation sites) | Both hub-side transformations that touch these arrays are pinned; closes the carried W1. Residual imprecision — no test asserts the union equality itself on a real merged/projected binary output — is I1 |
 | P16 | propagate.rs recomputation suite (see P23 row) | Full (hub scope) | Producer mapping rows are producer-owned |
 | P17 | merge.rs::test_category_detection, ::test_category_mismatch_detected_by_loader, tests/merge.rs::test_category_mismatch_rejected | Full | |
 | P19 | — | Indirect | No path deps; manifest hygiene, review-enforced |
 | P21 | — | None (cross-repo) | Implemented and tested in probe-verus/probe-rust (ADR-005 ownership) |
-| P22 | — | None (consumer script) | `scripts/summarize_extract.py` has no tests (W2, carried) |
-| P23 (authority boundary) | tests/authority.rs suite; src/authority.rs unit matrix; **new**: merge.rs::test_raw_path_rejects_both_projection_formats (raw staging entry point), ::test_file_paths_reject_invalid_status_origin (merge is now a recomputation boundary: both file-level paths fail closed on out-of-enum markers) | Full | |
-| P23 (recomputation/seeds) | propagate.rs plan-§3 letter suite (a–d, g–k) + retained chain/diamond/cycle/idempotence suite; tests/propagate.rs end-to-end trio; **new** "merge re-enriches" clause (plan test e): merge.rs::test_merge_recomputes_enrichment (stale downgrade after stub resolution + clean-leaf promotion, enrichment counts in stats), ::test_raw_path_defers_enrichment (negative half: raw output carries stale statuses) | Full | Library + CLI paths; both halves |
+| P22 | — | None (consumer script) | `scripts/summarize_extract.py` has no tests (W3, carried) |
+| P23 (authority boundary) | Carried tests/authority.rs suite + src/authority.rs unit matrix + raw-path/status-origin rejections. **New — real-binary round trips (the PR 3a review gap)**: roundtrip.rs::merged_output_passes_the_hubs_own_gate (merge → enrich/summary/project on actual output; `tool.version` pinned to `CARGO_PKG_VERSION`, i.e. the 0.5.0 contract release inside the gate interval), ::projection_readable_by_consumers_rejected_by_recomputation (real projection: summary and project read it; merge and enrich reject it with `projected input` in stderr and the test asserts the absence of `pre-contract`, attributing the rejection to the projection predicate, not the version gate); roundtrip.rs::project_rejects_invalid_status_origin (an authoritative extract with `status-origin: "bogus"` → `probe project` exits non-zero with `invalid status-origin` and writes no output); roundtrip.rs::project_rejects_invalid_projected_input `bogus_marker` case (the same check on a real projection) | Full | The `probe project` status-origin check is pinned for authoritative and projected inputs, matching kb/engineering/schema.md (`status-origin` row) and kb/tools/probe-project.md ("every input, projected or not"). W4 closed, mutation-checked |
+| P23 (recomputation/seeds) | Carried plan-§3 letter suite + chain/diamond/cycle/idempotence + merge-re-enriches pair + raw-defers negative | Full | |
+| P23 (projection caveat: enrich-before-trim, inherited labels) | **New**: roundtrip.rs::projection_recomputes_enrichment_before_trimming (the Verus-shaped stale-label regression: stale embedded `transitively-verified` over a `failed`-reaching chain comes out `verified` in a depth-0 view whose trimmed `dependencies` could never justify the recomputation — pins recompute-on-the-full-graph-before-trim); ::projection_readable_by_consumers_rejected_by_recomputation asserts `labels inherited` stderr when projecting a projection (marker preserved through the ReadOnly load, modern format); tests/authority.rs::project_reads_an_already_projected_input; roundtrip.rs::project_inherits_labels_of_legacy_format_projection (a real projection rewritten to the legacy shape, with schema `probe/merged-atoms` and the `projection` field kept, is re-projected; stderr must say `labels inherited` and an injected `verified` label, which recomputation would promote to `transitively-verified`, must be kept) | Full | Both disjuncts of `ValidatedAtomFile.projected` are pinned at the project boundary (the first run's W2). The label assertion now discriminates independently of the stderr line (second run's I4, mutation-checked) |
 | P24 | — | None (producer-side) | Validated in producer repos + probe-extract-check goldens |
 | P25 | — | None (producer-side) | Same ownership as P24 |
-| P27 | merge.rs::test_records_preserved_through_every_equal_key_case (one test walking all five resolutions: stub replacement, real-vs-real, stub-vs-stub, real-vs-stub, benign intra-input collision), ::test_normalization_collision_classification (identical-modulo-records collapse unions), ::test_record_targets_normalized, ::test_distinct_confidence_records_both_kept_sorted (identity triple, absent-method ordering, distinct assertions kept); **canonical form** (review fix): ::test_empty_method_canonicalized_to_absent (input-atom, self-merge-idempotence, and mapping-attachment paths), ::test_records_equal_after_target_normalization_collapse, ::test_tied_identity_records_keep_associativity (the review's P4 counterexample); **fail-closed validation** (review fix): ::test_malformed_record_shapes_rejected (all six rejection arms, input-ordinal asserted), ::test_invalid_mapping_confidence_rejected (in-memory Mapping), ::test_load_mappings_validates_confidence_and_canonicalizes_method (file boundary), tests/merge.rs::test_merge_rejects_invalid_mapping_confidence_via_cli (binary, exit code + no output), propagate.rs::test_prepare_rejects_malformed_correspondence_records (enrich boundary); schema_validation.rs::confidence_vocabulary_matches_executable_schema (code↔schema enum pin), ::malformed_correspondence_records_are_rejected (wire constraints incl. the new empty-method rejection); propagate.rs::test_maps_to_records_do_not_contaminate (inert to enrichment) | Full (current scope) | Enrich-boundary rejection is pinned on one arm (non-array); the other five ride the shared `validate_and_canonicalize_records` inside `normalize_atoms`, exhaustively tested on the merge path. Projection-BFS inertness unpinned; PR 3c (I3) |
+| P27 | Carried suite (union through every equal-key case, collision classification, target normalization, identity/canonical-form/fail-closed matrix, generated laws, enrichment inertness). **New**: project.rs::test_selection_is_dependency_only (projection BFS never traverses `maps-to`/`mapped-from`: an atom reachable only via a record is excluded, with a mixed present/absent mapping-endpoint pair — closes the carried I3, both halves: record inertness and mixed valid+ghost seeds, `seeds_found` asserted) | Full | |
 
-ADR-006 Decision 9 (summary consumer contract): unchanged from the PR 2 audit — summary.rs matrix suite still green.
+ADR-006 Decision 9 (summary consumer contract): unchanged; summary.rs matrix suite still green (the `ValidatedAtomFile` refactor in cmd_summary is mechanical destructuring).
+
+## Plan §9 row 3c obligations
+
+| Obligation | Covered by | Verdict |
+|---|---|---|
+| Counted collision warnings feeding `stats.conflicts` | test_generic_intra_input_collision_counted (unit), specs_intra_input_collision_warned_and_counted (CLI: stderr warning + stdout count + last-wins) | Yes |
+| Provenance dedup | dedup_provenance unit test, test_merge_atom_files_dedups_provenance, both roundtrip dedup tests | Yes |
+| `minItems` relaxation validated | specs_merge_same_source_dedups_and_validates (single-entry inventory vs executable schema; only the generic merged branch changed 2→1 — verified against `main:schemas/atom-envelope.schema.json`) | Yes |
+| Envelope idempotence modulo meta, after dedup | envelope_idempotence_modulo_meta_after_dedup | Yes |
+| P8 extension (categorized arrays) | test_categorized_dependency_arrays_normalized | Yes |
+| P15 trim + decomposition test | test_categorized_arrays_trimmed_with_dependencies (projected output), test_categorized_dependency_arrays_normalized (merge path) | Yes, unit-level (I1: no explicit union-equality assertion on binary output) |
+| Dependency-only projection-selection regression (§8) | test_selection_is_dependency_only | Yes |
+| Verus-shaped stale-label regression | projection_recomputes_enrichment_before_trimming | Yes |
+| Dotted-key projection-seed regression | projection_seeds_match_normalized_keys | Yes |
+| Projection-marker preservation through ReadOnly load | projection_readable_by_consumers_rejected_by_recomputation (modern format), project_inherits_labels_of_legacy_format_projection (legacy format); both assert `labels inherited` | Yes (the legacy test also asserts the inherited label value) |
+| Round trips: merge → enrich/summary/project | merged_output_passes_the_hubs_own_gate | Yes |
+| Round trips: project → summary/project | projection_readable_by_consumers_rejected_by_recomputation | Yes |
+| Round trips: project → merge/enrich fails on the projection predicate specifically | same test — asserts `projected input` present and `pre-contract` absent | Yes |
+
+Not in the row but introduced by this branch's KB edit: `probe project` collision rejection is covered by project_rejects_distinct_real_normalization_collision, which closes the previous W1.
 
 ## Impact analysis (this changeset)
 
-Every behavior change landed with tests:
-
-- Correspondence-record attachment replacing edge injection → the P13 row's five attachment tests plus the envelope-level wire test; the superseded edge-injection tests were replaced, not left pinning dead semantics.
-- Record union on every equal-key case → single walking test + the shared-helper collision cases (P27 row).
-- Merge re-enrichment (μ on the carrier) → test e pair (recompute + raw-defers), the four law tests, and the identity pair.
-- `load_mappings` signature change (full records, normalized endpoints) → loader tests rewritten (`test_duplicate_from_keys_preserved` now also covers `endpoint_lookup_maps`, which `probe project` consumes; `test_load_mappings_normalizes_endpoints` new).
-- P8 reconciliation (merge rejects intra-input distinct-real collisions) → rejection tested in the first input, a subsequent input, and on the raw path; the benign-collapse and zero-conflict negatives retained.
-- Raw staging primitives → projection-rejection and status-origin rejection tests on `merge_atom_files_raw`; enrichment-deferral negative.
-- Merged envelopes stamped 3.1 → tests/merge.rs schema-version assertions updated (they would have caught a silent stamp change; they did — three failed until updated deliberately).
-
-Unpinned interim state, deliberate: the projection-seed regression window (normalized mapping endpoints vs still-exact-key project seed matching) is not tested because it is scheduled to be *fixed* in PR 3c, and a test pinning the wrong interim behavior would have to be deleted there (quality report W2).
-
-Second pass (2026-09-30, review-fix delta) — every behavior change again landed with tests:
-
-- Triple-based dedup + `method: ""` canonicalization → the two review counterexamples became regressions (`test_tied_identity_records_keep_associativity`, self-merge idempotence inside `test_empty_method_canonicalized_to_absent`) — both reproduced as failures against the pre-fix code before the fix was written.
-- Fail-closed record-shape validation → six-arm rejection matrix on the merge path (input ordinal asserted), one-arm pin on the enrich path (shared validator).
-- Mapping-confidence validation → all three boundaries tested (in-memory, file load, CLI exit code) plus the code↔schema enum drift pin.
-- `prepare_atoms` → `Result` → callers updated; rejection path pinned in propagate.
-- Determinism test reworked to vary input order (the review's tautology critique).
-- `records_attached` rename → compile-enforced across tests; stats doc comment states the 0–2-per-mapping semantics.
+- Collision counting in `normalize_generic` → unit + CLI tests, both asserting the count reaches `stats.conflicts` and last-wins is kept.
+- `dedup_provenance` wired into `load_atom_inputs` and `cmd_merge` → three levels (struct, library file path, binary both categories), plus the idempotence and schema-validation consequences.
+- `CATEGORIZED_DEPENDENCY_ARRAYS` normalization (merge.rs) and trim (project.rs) → one test at each mutation site; the shared-helper placement means enrich/project inherit the normalization coverage.
+- `ValidatedAtomFile` (`projected` flag replacing the tuple) → compile-enforced across callers; the flag's *use* (skip preparation, inherit labels) is pinned for both formats (the legacy one by project_inherits_labels_of_legacy_format_projection).
+- Projection carrier preparation (`prepare = enrich ∘ normalize` before seed matching/trimming) → the Verus-shaped and dotted-key roundtrip regressions; the collision-rejection arm is pinned by project_rejects_distinct_real_normalization_collision.
+- `cmd_project` status-origin validation (uncommitted, src/commands/project.rs:238) → project_rejects_invalid_status_origin (authoritative input) and project_rejects_invalid_projected_input (projected input).
+- `cmd_project` normalizes already-projected inputs without enrichment (uncommitted, src/commands/project.rs:251-255) → project_normalizes_keys_of_projected_input pins the normalization, and project_rejects_invalid_projected_input pins the collision rejection on projected inputs.
+- Uncommitted KB and schema edits (a glossary entry for `carrier preparation`, kb/tools/probe-merge.md, kb/tools/probe-project.md Step 2, kb/engineering/schema.md adding `probe project` to the status-origin rejecters, and the schema `inputs` description) document the two behaviors above. The schema change is a description string only.
+- 0.5.0 bump (ADR-006 Decision 7) → merged_output_passes_the_hubs_own_gate pins `tool.version == CARGO_PKG_VERSION` and its acceptance by the hub's own gate — the test that PR 3a's hypothetical-input acceptance tests deferred to the contract release.
 
 ## Critical
 
-None. (P4/P5/P13/P27 — previously the starred no-coverage rows — are now covered; remaining gaps are the PR 3c-scheduled clauses, tracked per-row.)
+None.
 
 ## Warnings
 
-### [W1] P15 hub-side projection trim untested (carried; PR 3c scope)
-- **Location**: src/commands/project.rs (categorized arrays cloned untrimmed)
-- **Issue**: the P15 decomposition break in projection output has no regression test; the fix and test are the plan's 3c row.
+### [W1] ~~`probe project` distinct-real collision rejection untested (new P8 clause)~~ — resolved
+- **Resolved by**: tests/roundtrip.rs::project_rejects_distinct_real_normalization_collision. It asserts a non-zero exit, `refusing to project` in stderr, both colliding keys named, and no output file written.
+- **Mutation check**: replacing the condition at src/commands/project.rs:258 with `false` fails this test and no other. Source restored.
 
-### [W2] `scripts/summarize_extract.py` untested (P22, carried)
+### [W2] ~~Legacy-format projection marker unpinned at the project boundary~~ — resolved
+- **Resolved by**: tests/roundtrip.rs::project_inherits_labels_of_legacy_format_projection. It takes a real projection, rewrites `schema` to `probe/merged-atoms` while keeping the `projection` field, runs `probe project` on it, and asserts `labels inherited` in stderr.
+- **Mutation check**: dropping `|| meta.has_projection_field` at src/authority.rs:211 fails this test at its `labels inherited` assertion (tests/roundtrip.rs:330), and no other test. Source restored.
+- **Residual**: the test's label-value assertion does not discriminate (I4).
+
+### [W3] `scripts/summarize_extract.py` untested (P22, carried)
+- **Location**: scripts/summarize_extract.py
 - **Recommendation**: low priority; smoke test over a fixture extract.
+
+### [W4] ~~`probe project`'s fail-closed checks are untested on already-projected inputs~~ — resolved
+- **Resolved by**: tests/roundtrip.rs::project_rejects_invalid_projected_input. It builds a real projection with `write_real_projection`, then runs two cases: `bogus_marker` sets `status-origin: "bogus"` on `f()`, and `collision` adds a distinct real `f().` alias with status `failed`. Each case asserts a non-zero exit, the expected message (`invalid status-origin` / `refusing to project`), and no output file.
+- **Mutation check**: running the status-origin check only for authoritative inputs fails the `bogus_marker` case. Discarding the projected branch's `dropped` list fails the `collision` case. No other test fails in either case. Both were reverted.
 
 ## Info
 
-### [I1] ~~Property-based testing opportunity~~ — CLOSED (2026-09-30)
-Resolved by tests/merge_laws.rs (adapted from the codex verification pass over 989b7f4): generated-input sweeps for the P4/P5/P27 laws (11,664 associativity cases over stubs/distinct-reals/dotted-alias keys/tied-triple record shapes, both paths), runtime-acceptance ⟺ schema-validity parity at every boundary (734 record-shape cases, ordinals asserted), CLI merge+enrich rejection-before-writing (24 cases), and mapping canonicalization counts through the loader. Retained this round so the closure is on record; drops off next run.
+### [I1] P15 decomposition asserted per-field, not as the union equality, and not on binary output
+test_categorized_arrays_trimmed_with_dependencies and test_categorized_dependency_arrays_normalized assert exact field values whose instances happen to satisfy `dependencies = union(subsets)`; neither computes the union and asserts the equality, and no roundtrip fixture carries categorized arrays through `probe merge`/`probe project` at the binary level. The mutation sites are pinned (hence the matrix's Full), but an equality-form assertion on a roundtrip fixture would make the invariant explicit and catch a future third mutation site for free.
 
 ### [I2] Gate thresholds asserted in one place only (carried from PR 3a)
 Acceptable; unchanged this branch.
 
-### [I3] Projection-side record inertness and mixed valid+ghost seeds untested (carried, projection scope)
-Both belong to PR 3c's projection work (normalize-then-enrich-then-trim, seed matching over normalized keys).
+### [I3] Defensive non-array guards in `push_record`/`union_correspondence_records` unreachable on merge paths (carried, was I4)
+Unchanged this branch; boundary validation still guarantees arrays before any union or attachment. Noted so nobody mistakes the guards for a live path with missing coverage.
 
-### [I4] Defensive non-array guards in `push_record`/`union_correspondence_records` are unreachable on merge paths (new)
-Boundary validation guarantees arrays before any union or attachment, so the two defensive branches (warn-and-skip / silent skip) can only fire for direct library callers that bypass `merge_atom_maps*`. They are untested; acceptable as defense-in-depth, noted so nobody mistakes them for a live code path with missing coverage.
+### [I4] ~~Legacy inherited-labels test: its label-value assertion cannot detect recomputation, and its comment is wrong~~ — resolved
+- **Resolved by**: the test now injects `"verified"` and asserts it is kept (tests/roundtrip.rs:316, 335-339). The comment now correctly says recomputation would promote the label because `f()` reaches no seed.
+- **Mutation check**: keeping the `labels inherited` message but recomputing enrichment in the projected branch fails the test at the label `assert_eq!` (tests/roundtrip.rs:335). Reverted.
 
-Totals: 127 unit tests, 65 binary/integration tests (249 workspace-wide), all green; clippy `-D warnings` clean.
+Closed this round: W4 (fail-closed checks on already-projected inputs), mutation-checked.
+
+Closed in earlier rounds: I4 (legacy test label assertion), from the third run; W1 (`probe project` collision rejection on authoritative inputs) and W2 (legacy-format projection marker), from the second run; the P15 hub-side trim warning (the trim landed with its test), and the projection-side record inertness plus mixed valid/ghost seeds info finding (test_selection_is_dependency_only covers both).
+
+Totals (`cargo test --workspace`, this tree): probe 133 unit + 77 integration; probe-extract-check 30 unit + 27 golden (8 ignored); 267 passed, 0 failed.

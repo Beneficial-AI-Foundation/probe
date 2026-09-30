@@ -74,6 +74,10 @@ The no-recomputation variant of the hub merge (`merge_atom_maps_raw` / `merge_at
 
 The set of normalized, enrichment-consistent atom maps — the domain on which the merge laws hold ([P4](properties.md#p4-merge-associativity-on-the-carrier), [P5](properties.md#p5-merge-identity-exact-on-the-carrier)). A precondition established by normalization + enrichment, not an automatic property of tool outputs (`--skip-enrich` output is off-carrier). Projected artifacts are outside the carrier and outside merge's domain entirely.
 
+## carrier preparation
+
+The operation `prepare = enrich ∘ normalize` (normalize first, [P8](properties.md#p8-code-name-normalization); then enrichment recomputation, [P23](properties.md#p23-transitive-verification)) that brings an authoritative atom map onto the [carrier](#carrier). Merge (μ) applies the two halves separately — normalization per input, enrichment once after all inputs are combined ([P4](properties.md#p4-merge-associativity-on-the-carrier)); the unary recomputation boundaries apply it whole: `probe enrich` (as `prepare_atoms` in `probe/src/commands/propagate.rs`) and `probe project` on authoritative inputs before seed matching and trimming — never on already-projected inputs, whose labels are inherited ([ADR-006](../decisions/006-correspondence-records.md)) and which `probe project` only normalizes. A distinct-real post-normalization collision rejects the input fail-closed at every boundary that normalizes.
+
 ## version gate
 
 The per-producer authority check run by `probe merge`, `probe enrich`, `probe summary`, and `probe project`: an atoms envelope whose `tool.name` is in the gate table with `tool.version` below that producer's contract-release threshold is rejected — pre-contract artifacts can carry unmarked imported or graph-inexpressible evidence. The `probe` entry is an interval (`threshold ≤ version < 1.0.0`) plus a `tool.command: "merge-atoms"` rejection. Thresholds are reserved constants recorded in [ADR-006](../decisions/006-correspondence-records.md).

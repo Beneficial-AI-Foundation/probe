@@ -78,7 +78,7 @@ After merging, the tool prints:
 | Stubs remaining | yes | — |
 | New entries added | yes | yes |
 | Keys normalized | yes | yes |
-| Conflicts | yes (cross-input real-vs-real, base kept; intra-input distinct-real collisions are errors, not counts) | yes (overrides, incoming kept) |
+| Conflicts | yes (cross-input real-vs-real, base kept; intra-input distinct-real collisions are errors, not counts) | yes (cross-input overrides, incoming kept; plus intra-input post-normalization collisions, warned, last kept — Phase 2) |
 | Records attached | yes (if `--mappings`: `maps-to`/`mapped-from` counts, dangling-target warnings) | — |
 | Enrichment | yes (transitively-verified / locally-scoped verified counts from the Phase 5 recomputation) | — |
 
