@@ -4,10 +4,10 @@ date: 2026-09-30
 repo: probe (hub)
 kb: kb/ (own KB; this branch amends P8 ¶2 and P27 — the coverage rows for those judge the tests against the branch text, which is the semantics this PR implements; the quality report records the merge-order constraint)
 scope: branch la/merge-soundness-pr3b-maps-to-records vs origin/main (merge-soundness PR 3b — correspondence records, merge re-enrichment, raw staging, P8 reconciliation), full property matrix; second pass 2026-09-30 over the PR #81 review-fix delta (P27 canonical form + fail-closed validation, CLI --mappings end-to-end, determinism rework)
-status: 0 critical, 2 warnings, 4 info
+status: 0 critical, 2 warnings, 4 info (I1 closed this round)
 ---
 
-Test surface: inline `#[cfg(test)]` modules (`src/types.rs`, `src/authority.rs`, `src/commands/{merge,project,propagate,summary}.rs` — 120 unit tests), integration suites `tests/{merge,propagate,authority,schema_validation}.rs` (58 tests, binary-level via `CARGO_BIN_EXE_probe` plus jsonschema validation), and the `probe-extract-check` crate (separate scope: extract-vs-source validation).
+Test surface: inline `#[cfg(test)]` modules (`src/types.rs`, `src/authority.rs`, `src/commands/{merge,project,propagate,summary}.rs` — 120 unit tests), integration suites `tests/{merge,merge_laws,propagate,authority,schema_validation}.rs` (65 tests, binary-level via `CARGO_BIN_EXE_probe` plus jsonschema validation), and the `probe-extract-check` crate (separate scope: extract-vs-source validation).
 
 ## Coverage matrix
 
@@ -16,7 +16,7 @@ Test surface: inline `#[cfg(test)]` modules (`src/types.rs`, `src/authority.rs`,
 | P1 | schema_validation.rs (all fixtures incl. the new merged-with-records envelope), authority.rs::project_output_uses_projected_atoms_schema_and_validates; tests/propagate.rs::test_envelope_structure_preserved | Full | |
 | P2 | (BTreeMap keys by construction) | Indirect | Uniqueness is structural; code-name determinism is producer-side |
 | P3 | merge.rs::test_is_stub, project.rs::test_stub_seeds_included | Full | |
-| P4 | merge.rs::test_associativity_with_mappings_across_groupings (both nestings vs flat 3-way, with mappings, over stub replacement + real-vs-real + dangling-then-resolved targets), ::test_commutativity_disjoint_keys, ::test_mapping_compatibility_laws (F_M idempotence + F_M(μ(A,B)) = μ(F_M(A),F_M(B))), ::test_intermediate_enrichment_does_not_change_selected_base_data (the exact associativity argument: label rewrite in an intermediate does not change P6 selection), ::test_tied_identity_records_keep_associativity (review regression: tied identity triples across groupings) | Full (example-based) | Laws run against `merge_atom_maps` itself, the μ the property defines. Hand-picked fixtures, not generated inputs (I1) |
+| P4 | merge.rs::test_associativity_with_mappings_across_groupings (both nestings vs flat 3-way, with mappings, over stub replacement + real-vs-real + dangling-then-resolved targets), ::test_commutativity_disjoint_keys, ::test_mapping_compatibility_laws (F_M idempotence + F_M(μ(A,B)) = μ(F_M(A),F_M(B))), ::test_intermediate_enrichment_does_not_change_selected_base_data (the exact associativity argument: label rewrite in an intermediate does not change P6 selection), ::test_tied_identity_records_keep_associativity (review regression: tied identity triples across groupings) | Full (example + generated) | Laws run against `merge_atom_maps` itself, the μ the property defines. Generated-input sweep in tests/merge_laws.rs::laws_hold_over_generated_record_variants (18³ variant triples × enriched/raw = 11,664 associativity cases, plus mapping compatibility and self-merge idempotence per pair) closes the former I1 |
 | P5 | merge.rs::test_identity_exact_on_carrier (both argument positions, records included), ::test_identity_up_to_preparation_on_legacy (compared against the real `prepare_atoms`, not a reimplementation) | Full | |
 | P6 | merge.rs::test_stub_replaced_by_real, ::test_real_vs_real_conflict_keeps_base, ::test_new_atoms_added, tests/merge.rs::test_atoms_* | Full | Unit + binary paths |
 | P7 | merge.rs::test_generic_last_wins_on_conflict, tests/merge.rs::test_specs_*/test_proofs_* | Full | |
@@ -77,8 +77,8 @@ None. (P4/P5/P13/P27 — previously the starred no-coverage rows — are now cov
 
 ## Info
 
-### [I1] Property-based testing opportunity (carried, now concrete)
-The P4/P5 law tests are example-based over one fixture family (`law_fixtures`). A proptest generating random atom maps + mapping sets and asserting the four laws would generalize them; the fixtures already encode the tricky shapes (stub replacement, conflicts, dangling targets), so this is an upgrade, not a gap.
+### [I1] ~~Property-based testing opportunity~~ — CLOSED (2026-09-30)
+Resolved by tests/merge_laws.rs (adapted from the codex verification pass over 989b7f4): generated-input sweeps for the P4/P5/P27 laws (11,664 associativity cases over stubs/distinct-reals/dotted-alias keys/tied-triple record shapes, both paths), runtime-acceptance ⟺ schema-validity parity at every boundary (734 record-shape cases, ordinals asserted), CLI merge+enrich rejection-before-writing (24 cases), and mapping canonicalization counts through the loader. Retained this round so the closure is on record; drops off next run.
 
 ### [I2] Gate thresholds asserted in one place only (carried from PR 3a)
 Acceptable; unchanged this branch.
@@ -89,4 +89,4 @@ Both belong to PR 3c's projection work (normalize-then-enrich-then-trim, seed ma
 ### [I4] Defensive non-array guards in `push_record`/`union_correspondence_records` are unreachable on merge paths (new)
 Boundary validation guarantees arrays before any union or attachment, so the two defensive branches (warn-and-skip / silent skip) can only fire for direct library callers that bypass `merge_atom_maps*`. They are untested; acceptable as defense-in-depth, noted so nobody mistakes them for a live code path with missing coverage.
 
-Totals: 127 unit tests, 61 binary/integration tests (245 workspace-wide), all green; clippy `-D warnings` clean.
+Totals: 127 unit tests, 65 binary/integration tests (249 workspace-wide), all green; clippy `-D warnings` clean.
