@@ -1,6 +1,6 @@
 ---
 title: "ADR-006: Correspondence records and the verification evidence contract"
-last-updated: 2026-09-28
+last-updated: 2026-09-30
 status: accepted
 ---
 
@@ -68,6 +68,19 @@ Consequences:
 - Records are **unioned through every equal-key conflict** and are inert
   to enrichment and projection
   ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
+- Records have **one canonical form** and are **validated fail-closed**
+  (PR 3b review): record identity is the `(target, confidence, method)`
+  triple, dedup is by that same identity, and an empty `method` is
+  canonicalized to absent (`""` names no matching method; the canonical
+  encoding of "none" is omission — two encodings of one identity would
+  let a tied-key record shield exact duplicates from collapsing, growing
+  the "set" union on self-merge and making merge results
+  grouping-dependent). Because merge re-emits these fields into
+  schema-constrained output, every recomputation boundary rejects a
+  malformed record shape, and mapping confidences are validated against
+  the vocabulary at load and at the merge boundary — a warning is not
+  enough: a malformed field silently swallowing a union already lost
+  evidence grouping-dependently (P4).
   This is a narrow carve-out from whole-atom conflict semantics; general
   extension union (review issue 4) remains a separate, undecided question.
 - Wire format and determinism rules:
@@ -141,14 +154,30 @@ validation. Its output is documented as carrying potentially stale derived
 statuses.
 
 **Carrier preparation.** In merge, normalization (P8) runs **per input,
-before conflict resolution** — the ordering selects evidence (which atom
-wins a post-normalization dotted-alias collision) and no later pass can
-repair a mis-selected P6 winner. Unary recomputation boundaries
+before conflict resolution** — the ordering selects evidence (a dotted
+alias collapses onto its normalized key within its own input before
+cross-input P6 resolution) and no later pass can repair a mis-selected P6
+winner. Unary recomputation boundaries
 (`probe enrich`, `probe project`) apply `prepare = enrich ∘ normalize` to
 their single authoritative input before recomputation, seed matching, or
 trimming. Mapping endpoints and atom keys are normalized by the same rule
 on both sides of every lookup. Formally:
 `μ(A, B) = enrich(resolve_conflicts(normalize(A), normalize(B)))`.
+
+**Intra-input collision policy is uniform rejection** (PR 3b
+reconciliation). A post-normalization collision between distinct real
+atoms — distinctness judged ignoring correspondence records — within a
+*single* input is producer error and is rejected at every recomputation
+boundary: `probe merge` errors during per-input normalization exactly as
+`probe enrich` errors on its file. The earlier asymmetry (merge warns and
+counts, enrich rejects) became unsound the moment μ re-enriches: merge's
+silently first-wins-selected evidence would feed enrichment *inside*
+merge, the laundering path P8 condemns at the unary boundary. Benign
+collapses (a stub, or duplicates identical modulo `maps-to`/`mapped-from`)
+proceed, unioning their correspondence records (P27). Cross-input
+equal-key conflicts remain first-wins (P6) — argument order is the user's
+deliberate freshness knob, and two independent producers legitimately
+observe one atom.
 
 **Cost** (measured 2026-09-22, release mode): ~10–12 ms on a real
 1,547-atom/18,617-edge artifact; up to ~1.2 s on a synthetic 100k-atom/

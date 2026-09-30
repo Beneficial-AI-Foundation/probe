@@ -1,34 +1,32 @@
 ---
 auditor: ambiguity-auditor
-date: 2026-09-29
+date: 2026-09-30
 repo: probe (hub)
 kb: kb/ (own KB)
-scope: branch la/merge-soundness-pr2-enrich-recomputation (merge-soundness PR 2,
-  issue #78 — enrichment recomputation, summary consumer contract), delta audit
-  over the PR 3a report; KB surfaces this PR implements re-checked against the
-  code
-status: 1 critical (scheduled, merge-order constraint, carried over), 3 warnings, 2 info
+scope: branch la/merge-soundness-pr3b-maps-to-records (merge-soundness PR 3b —
+  correspondence records, merge re-enrichment, raw staging, P8 reconciliation),
+  delta audit over the PR 2 report; every KB surface this PR touches or
+  implements re-checked against the code. Second pass 2026-09-30 over the
+  PR #81 review-fix surfaces (P27 canonical form + fail-closed validation:
+  P27, schema.md §§ Correspondence records / Mappings file format, ADR-006
+  Decision 1, probe-merge.md Phase 2, glossary).
+status: 0 critical, 3 warnings, 2 info
 ---
 
 ## Critical
 
-### [C1] ~~Enrichment implementation contradicts P23~~ — CLOSED by this branch
-- **Resolution**: `enrich_verification_status` (src/commands/propagate.rs) now
-  implements P23's path-based recomputation: one BFS from the unified seed set
-  (`failed`/`unverified` + every `status-origin`-bearing atom), transparency
-  through missing-status atoms, trusted-boundary precedence
-  (`trusted` AND origin absent), labels set fresh with unconditional demotion
-  of marked `transitively-verified`. The PR 1 counterexample
-  (`v [verified] → helper [no status] → bad [unverified]`) is a regression
-  test (`test_contamination_flows_through_missing_status`). Retained in the
-  report this round so the closure is on record; drops off next run.
+### [C2 of the PR 2 report] ~~`merge --mappings` injects dependency edges, contradicting revised P13~~ — CLOSED by this branch
+- **Resolution**: the edge-injection block is removed; `attach_correspondence_records`
+  (src/commands/merge.rs) implements P13's unconditional/key-local/set-like
+  attachment, with the union rule (P27) on every equal-key resolution and the
+  record definitions in the executable schema. The old tests pinning the
+  superseded semantics were replaced, not amended. Retained this round so the
+  closure is on record; drops off next run.
 
-### [C2] `merge --mappings` injects dependency edges, contradicting revised P13
-- **Location**: src/commands/merge.rs (edge-injection block; tests pinning it)
-- **Issue / Evidence**: unchanged from the PR 1 report.
-- **Recommendation**: PR 3b (next in the plan §9 order). Its merge-order
-  precondition — PR 2's recomputation, which μ's re-enrichment reuses — is
-  satisfied by this branch.
+No new criticals: the P8/P27 text amendments on this branch and the code that
+implements them were written together, and the amendment is the reconciliation
+the plan's §9 row 3b explicitly mandates (recorded in ADR-006 Decision 3 and
+plan §10). The quality report carries the merge-order constraint.
 
 ## Warnings
 
@@ -39,97 +37,111 @@ issue; recorded in ADR-006 Decision 4). Not a hub KB defect.
 ### [W2] Presentation decks still describe edge injection
 Carried over unchanged (local-only decks, updated when next regenerated).
 
-### [W3] Remaining spec-ahead-of-code statements, all scheduled
-- **Location**: kb/engineering/schema.md § Authority validation ("merge
-  **re-enriches** the atoms category", line ~306) and § Correspondence records
-  (union rule); properties.md P4/P5 (law statements), P8 (extended arrays,
-  project boundary), P9 (dedup clause), P13/P27 (record attachment/union),
-  P15 (projection trims categorized arrays), P23 ("merge re-enriches",
-  projection enrich-then-trim); glossary `projection` ("recomputed on the full
-  input before trimming"); kb/tools/probe-project.md `prepare = enrich ∘
-  normalize` step; kb/tools/probe-merge.md phases 2/4/5.
-- **Issue**: these describe PR 3b/3c behavior. After PR 2 the *enrichment*
-  statements — P23's recomputation definition, blocker-seed and
-  trusted-boundary rules, P16's hub enrichment note, ADR-006 Decision 3's
-  unary-boundary preparation for `probe enrich`, Decision 9's summary
-  contract, the glossary's `blocker seed`/`trusted (boundary)`/
-  `transitively-verified` definitions, and kb/tools/probe-summary.md in its
-  entirety — are implemented and verified against the code; they leave the
-  divergence list.
-- **Recommendation**: none beyond executing the plan's remaining PRs; listed
-  so the window stays explicit.
+### [W3] Remaining spec-ahead-of-code statements, all PR 3c
+- **Location**: properties.md P8 (extended arrays `requires-dependencies` etc.;
+  project boundary), P9 (dedup clause), P15 (projection trims categorized
+  arrays), P23 (projection enrich-then-trim); glossary `projection`
+  ("recomputed on the full input before trimming"); kb/tools/probe-project.md
+  steps 3–4 and the `prepare = enrich ∘ normalize` step.
+- **Issue**: these describe PR 3c behavior. After PR 3b the merge-side
+  statements — P4/P5 law statements, P13/P27 attachment and union, P23's
+  "merge re-enriches", schema.md § Correspondence records and the
+  re-enrichment clause, kb/tools/probe-merge.md phases 2/4/5 and its stats
+  table, the glossary's `merge`/`mapping`/`correspondence record`/`carrier`
+  entries, and kb/tools/probe-aeneas.md's hub-API description (records-first
+  `load_mappings`, derived endpoint indexes) — are implemented and verified
+  against the code; they leave the divergence list.
+- **Sharpened within the window**: kb/tools/probe-project.md step 4 ("seeds …
+  normalized, that exist in the (normalized) atom data") now *actively*
+  diverges rather than merely leading the code: this PR's `load_mappings`
+  normalizes endpoints, but `project_atoms` still matches them against raw
+  atom keys, so a dotted-*key* legacy atom selects zero seeds — the interim
+  regression plan §3d predicted and assigns to 3c. Land 3c promptly.
+- **Recommendation**: none beyond executing PR 3c; listed so the window stays
+  explicit.
 
 ## Info
 
-### [I1] ADR-003 body retains superseded application wording
-Carried over (accepted: historical record behind a supersession banner).
+### [I1] "identical-modulo-records" defined inline, used in three files
+P8 defines distinctness as "judged ignoring `maps-to`/`mapped-from`" and P27,
+probe-merge.md Phase 2, and ADR-006 Decision 3 reuse the phrase (probe-merge
+paraphrases as "differ beyond their correspondence records"). Consistent at
+every use site and anchored by P8's definition; below the glossary-entry bar
+since it is a predicate of one property, not a standalone domain term. No
+action.
 
-### [I2] Version-gate producer names duplicated between ADR-006 and code
-Carried over (by design, Decision 10; unit-test matrix is the drift guard).
+### [I2] Merged-envelope `schema-version` now differs by producer generation
+Hub merged output is stamped `3.1` while producers keep emitting `3.0`
+(schema.md's stated policy: hub-side minor bump, 3.x additive). Verified
+consistent across schema.md (§ current version, version-history row, merged
+example — the example was updated during this audit's quality pass), the
+executable schema (`^[0-9]+\.[0-9]+$`, both accepted), `cmd_merge`
+(stamps 3.1), `probe project` (3.1 since PR 3a), and `parse_envelope`
+(accepts any 3.x). Recorded because mixed 3.0/3.1 stamps in one pipeline are
+now the *expected* steady state, not drift.
 
 ## Fixed during this audit
 
-(Doc/spec contradictions found by this round's code-quality pass, recorded
-here because they were KB-adjacent staleness:)
+- kb/engineering/glossary.md: added the `raw staging primitive` entry — the
+  term is load-bearing in ADR-006 Decision 3, schema.md, and
+  kb/tools/probe-merge.md but was undefined in the glossary (whose own rule is
+  that every domain term is defined there). Definition names the concrete
+  functions and the off-carrier caveat.
+- kb/tools/probe-merge.md Phase 2 lead sentence still said per-input ordering
+  "selects which atom wins a post-normalization collision" — stale against the
+  same page's (and P8's) new rejection rule one paragraph below; rephrased to
+  the alias-collapse-before-cross-input-resolution formulation.
+- `last-updated` stamps bumped (2026-09-28 → 2026-09-29) on properties.md,
+  schema.md, and probe-merge.md, all substantively edited by this branch.
 
-- kb/engineering/architecture.md hub module inventory: `src/commands/propagate.rs`
-  was absent and the `summary.rs` line predated even the three-list contract —
-  both rewritten to the implemented behavior.
-- README quick-start, docs/consumer-guide.md, docs/testing-guide.md, CLAUDE.md:
-  upgrade-pass wording and three-list summary descriptions updated to
-  recomputation / four lists.
+Second pass (2026-09-30, review-fix surfaces):
 
-## Verified clean (this PR's KB surfaces)
+- kb/tools/probe-merge.md Phase 2 restated P27's rejected-shape list and had
+  already drifted (five items to P27's six — "non-string method" missing).
+  Replaced the restated list with a short characterization plus a pointer to
+  P27 as the normative list, the same delegate-don't-duplicate rule the enum
+  drift guard enforces on the docs surface.
 
-- **P23 ↔ propagate.rs**: the executable definition, seed quantifier ("any
-  atom carrying `status-origin`" — including status-less marked atoms, now
-  pinned by test), trusted-boundary precedence, whole-atom trust, missing-dep
-  trusted fallback, non-candidate untouchability, determinism and idempotence
-  all match the implementation.
-- **ADR-006 Decision 2** (marker semantics) and **Decision 3** (recomputation
-  + carrier preparation at unary boundaries, enrich side) ↔ code: consistent;
-  `prepare_atoms` implements `enrich ∘ normalize` and `cmd_enrich` applies it
-  after authority validation.
-- **Decision 9 / kb/tools/probe-summary.md ↔ summary.rs**: four-partition
-  contract, membership conjunction, kernel-taint locality, blueprint
-  exclusion (both partitions and `depended_upon`), wire field names, CLI
-  shape, stderr statistics — all verified true, with the KB's documented JSON
-  field names pinned by a new wire-contract test.
-- **schema.md `status-origin` row ↔ schemas/atom-envelope.schema.json**: the
-  executable schema now constrains the marker to exactly the two documented
-  values (positive + negative fixtures).
-- **Glossary**: `blocker seed`, `carrier`, `trusted (boundary)`,
-  `transitively-verified`, `status-origin` — defined, cross-linked, and
-  consistent with the implementation landed here; no new undefined terms were
-  introduced by this PR (its code comments use the glossary vocabulary).
+## Verified clean (this delta)
+
+Second pass (2026-09-30, review-fix surfaces):
+
+- **Cross-file agreement on the canonical-form clause**: P27 ("empty `method`
+  ... canonicalized to absent", dedup by identity), schema.md § Correspondence
+  records ("an empty `method` is canonicalized to absent, and no other fields
+  are allowed"), § Mappings file format (validated at load), ADR-006
+  Decision 1 (rationale: two encodings of one identity break set union and
+  P4), glossary `correspondence record`, probe-merge.md Phase 2, and plan §10
+  state the same rule; the executable schema's `minLength: 1` on `method` is
+  the same decision in schema form.
+- **"Every recomputation boundary"** in the new P27/ADR-006/schema.md
+  validation clauses follows P8 ¶2's established construction — enumerated in
+  place as merge (per input) + enrich. `probe project` joining at PR 3c (when
+  it routes through `prepare_atoms`) is already the W3 window; validation
+  rides along automatically because it lives inside `normalize_atoms`.
+- **"canonical form"** is a predicate of P27 defined at first use and reused
+  consistently — below the glossary-entry bar for the same reason as I1's
+  "identical-modulo-records". No action.
+- **Claims vs code**: the six-item rejection list in P27 matches
+  `validate_and_canonicalize_records` arm-for-arm; the confidence vocabulary
+  is pinned code↔schema by `confidence_vocabulary_matches_executable_schema`;
+  `load_mappings`' documented load-boundary validation and `""`→absent
+  canonicalization match the implementation.
+
+- **Glossary consistency**: `merge`, `mapping`, `correspondence record`,
+  `carrier`, `version gate`, `blocker seed`, `trusted (boundary)` — all match
+  the implemented semantics; `correspondence record`'s "unioned through every
+  merge conflict, inert to enrichment and projection" is now code, not intent.
+- **Cross-file agreement** on the new collision rule: properties.md P8 ¶2,
+  P27 bullet 1, schema.md § Normalization, probe-merge.md Phase 2, ADR-006
+  Decision 3, and plan §10 state the same predicate (distinct-real modulo
+  records ⇒ reject; benign ⇒ union) with the same rationale.
+- **Enumerated lists vs code**: probe-merge.md stats table matches
+  `print_stats` labels exactly (incl. the new Records attached / Enrichment
+  rows); the confidence vocabulary is identical across schema.md, the
+  executable schema enum, and the mappings-spec table; `status-origin`
+  enforcement rows now name all three rejecting consumers (merge added).
+- **ADR-005 ownership**: nothing single-probe leaked into shared files by this
+  change; probe-aeneas mechanics stay on its page, the hub API contract on the
+  hub's.
 - `./scripts/check-kb-links.sh` and the enum drift guard pass.
-
-## Post-audit delta (2026-09-29, review commit e6a376e)
-
-The PR #79 cross-model review (codex-critique) landed fail-closed
-tightenings after this audit's pass — spec and code moved together:
-
-- **P8 gained the collision clause** (post-normalization collision that
-  discards a distinct real atom: merge warns + counts in `conflicts`,
-  the unary `probe enrich` boundary rejects; stub drops and identical
-  duplicates collapse silently). kb/tools/probe-merge.md Phase 2 already
-  specced the warn-and-count half since PR 1; the code now conforms, and
-  the phrase was tightened to "real atoms *and differ*" to match P8's
-  identical-duplicate carve-out. Found during this delta: the first
-  implementation of the review fix warned without counting, contradicting
-  probe-merge.md:45 — fixed in the same commit series.
-- **schema.md `status-origin` row** now records the enforcement contract:
-  presence-based enrichment predicates (matching P23's "any atom
-  *carrying* status-origin" quantifier — a malformed non-string marker
-  seeds instead of silently reading as absent) and load-boundary
-  rejection of out-of-enum values by `probe enrich`/`probe summary`
-  (`validate_status_origins`; the runtime does not schema-validate).
-- **kb/tools/probe-summary.md**: input-authority paragraph gains the
-  marker-rejection sentence; the Entrypoints prose/table now carry the
-  code-atom qualifier their own Scope section mandates, and no longer
-  claim entrypoints are "not called by other *verified* functions"
-  (the implementation checks dependencies of all non-test code atoms,
-  whatever the caller's status).
-- No new glossary terms introduced; docs/schema-validation.md remains
-  consistent (it describes optional external validation, matching the
-  "runtime does not schema-validate" premise of the boundary checks).

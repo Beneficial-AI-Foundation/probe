@@ -192,6 +192,7 @@ pub fn enrich_verification_status(
 }
 
 /// Statistics from carrier preparation (`prepare = enrich ∘ normalize`).
+#[derive(Debug)]
 pub struct PrepareStats {
     pub keys_normalized: usize,
     pub transitive: usize,
@@ -214,15 +215,22 @@ pub struct PrepareStats {
 /// must run first.
 ///
 /// Normalization is not injective, so it can collide keys even within a
-/// single input; a collision that would discard a distinct real atom is
-/// reported in [`PrepareStats::dropped_atoms`] (the CLI boundary rejects it
-/// fail-closed — with one input there is no second source to arbitrate the
-/// evidence).
-pub fn prepare_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, PrepareStats) {
+/// single input; a collision between distinct real atoms is reported in
+/// [`PrepareStats::dropped_atoms`] and the CLI boundary rejects it
+/// fail-closed — the same P8 rule merge applies to each of its inputs
+/// (silently selecting one atom's evidence can launder contamination).
+///
+/// Errors on a malformed correspondence-record shape, the same fail-closed
+/// rule merge applies per input (ADR-006): every recomputation boundary
+/// re-emits `maps-to`/`mapped-from`, so a shape the executable schema rejects
+/// must not pass through.
+pub fn prepare_atoms(
+    atoms: BTreeMap<String, Atom>,
+) -> Result<(BTreeMap<String, Atom>, PrepareStats), String> {
     let (mut atoms, keys_normalized, dropped_atoms) =
-        crate::commands::merge::normalize_atoms(atoms);
+        crate::commands::merge::normalize_atoms(atoms)?;
     let (transitive, local, missing_deps) = enrich_verification_status(&mut atoms);
-    (
+    Ok((
         atoms,
         PrepareStats {
             keys_normalized,
@@ -231,7 +239,7 @@ pub fn prepare_atoms(atoms: BTreeMap<String, Atom>) -> (BTreeMap<String, Atom>, 
             missing_deps,
             dropped_atoms,
         },
-    )
+    ))
 }
 
 /// CLI entry point: load atom file, enrich verification status, write JSON.
@@ -288,7 +296,10 @@ pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
         std::process::exit(1);
     }
 
-    let (atoms, stats) = prepare_atoms(atoms);
+    let (atoms, stats) = prepare_atoms(atoms).unwrap_or_else(|e| {
+        eprintln!("Error: {origin}: {e}");
+        std::process::exit(1);
+    });
 
     // A normalization collision that discarded a distinct real atom is
     // producer error at a unary boundary: silently selecting one atom's
@@ -1134,7 +1145,7 @@ mod tests {
         set_status(&mut g, "failed");
         atoms.insert("g".to_string(), g);
 
-        let (prepared, stats) = prepare_atoms(atoms);
+        let (prepared, stats) = prepare_atoms(atoms).unwrap();
         assert_eq!(get_vs(prepared.get("f").unwrap()), Some("verified"));
         assert_eq!(stats.local, 1);
         assert_eq!(stats.transitive, 0);
@@ -1156,7 +1167,7 @@ mod tests {
         set_status(&mut g, "unverified");
         atoms.insert("g().".to_string(), g);
 
-        let (prepared, stats) = prepare_atoms(atoms);
+        let (prepared, stats) = prepare_atoms(atoms).unwrap();
         assert_eq!(stats.keys_normalized, 1);
         assert!(prepared.contains_key("g()"));
         assert_eq!(get_vs(prepared.get("f").unwrap()), Some("verified"));
@@ -1222,11 +1233,27 @@ mod tests {
         set_status(&mut g_alias, "failed");
         atoms.insert("g().".to_string(), g_alias);
 
-        let (_, stats) = prepare_atoms(atoms);
+        let (_, stats) = prepare_atoms(atoms).unwrap();
         assert_eq!(
             stats.dropped_atoms,
             vec![("g().".to_string(), "g()".to_string())]
         );
+    }
+
+    // ADR-006 fail-closed at the unary boundary too: a malformed
+    // correspondence-record shape rejects the input — every recomputation
+    // boundary re-emits `maps-to`/`mapped-from`, so a shape the executable
+    // schema rejects must not pass through enrich either.
+    #[test]
+    fn test_prepare_rejects_malformed_correspondence_records() {
+        let mut atoms = BTreeMap::new();
+        let mut f = make_atom("f");
+        f.extensions
+            .insert("maps-to".to_string(), serde_json::json!("not-an-array"));
+        atoms.insert("f".to_string(), f);
+
+        let err = prepare_atoms(atoms).unwrap_err();
+        assert!(err.contains("must be an array"), "{err}");
     }
 
     #[test]

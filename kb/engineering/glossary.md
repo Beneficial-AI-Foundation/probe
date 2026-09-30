@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-09-28
+last-updated: 2026-09-30
 status: draft
 ---
 
@@ -56,7 +56,7 @@ Mapping-generation invariants are owned by probe-aeneas — see [properties.md �
 
 ## correspondence record
 
-A `maps-to` or `mapped-from` entry on an [atom](#atom), attached by `probe merge --mappings`: `{target, confidence, method?}`. Records assert "there is a mappings-file entry linking these names, with this confidence" — a different relation from a dependency, with its own verification semantics: the correspondence is a trust boundary, not a call. Unioned through every merge conflict, inert to enrichment and projection ([P13](properties.md#p13-correspondence-records-attach-unconditionally), [P27](properties.md#p27-correspondence-records-are-unioned-and-inert), [schema.md § Correspondence records](schema.md#correspondence-records-maps-to-mapped-from)). The correspondence relation is the union over both fields; cross-language resolution is a derived consumer view.
+A `maps-to` or `mapped-from` entry on an [atom](#atom), attached by `probe merge --mappings`: `{target, confidence, method?}`. Records assert "there is a mappings-file entry linking these names, with this confidence" — a different relation from a dependency, with its own verification semantics: the correspondence is a trust boundary, not a call. Identity is the `(target, confidence, method)` triple in canonical form (empty `method` ≡ absent, canonicalized to omission); shape is validated fail-closed at every recomputation boundary. Unioned through every merge conflict, inert to enrichment and projection ([P13](properties.md#p13-correspondence-records-attach-unconditionally), [P27](properties.md#p27-correspondence-records-are-unioned-and-inert), [schema.md § Correspondence records](schema.md#correspondence-records-maps-to-mapped-from)). The correspondence relation is the union over both fields; cross-language resolution is a derived consumer view.
 
 ## status-origin
 
@@ -65,6 +65,10 @@ An enumerated atom extension marking whose evidence a `verification-status` is: 
 ## blocker seed
 
 A seed of the enrichment BFS ([P23](properties.md#p23-transitive-verification)): an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom. A locally verified atom that reaches a blocker seed along a dependency path with no trusted boundary is labelled `"verified"`, not `"transitively-verified"`; a seed itself is never promoted and keeps its own base status. Not to be confused with a projection's [seed set](#seed-set), which selects atoms for `probe project` and has no verification semantics.
+
+## raw staging primitive
+
+The no-recomputation variant of the hub merge (`merge_atom_maps_raw` / `merge_atom_files_raw` in `probe/src/commands/merge.rs`) for multi-step pipelines that mutate verification statuses between merge steps and enrich exactly once at the end (probe-aeneas). Identical normalization, conflict resolution, and record attachment; only the final enrichment recomputation is deferred, so its output is off-[carrier](#carrier) (potentially stale derived statuses) until enriched. Raw means skip recomputation, never skip validation: the file-level entry point applies the same authority and `status-origin` rejection as the public paths ([ADR-006](../decisions/006-correspondence-records.md)).
 
 ## carrier
 

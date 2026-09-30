@@ -1,6 +1,6 @@
 ---
 title: Schema 3.1 Interchange Specification
-last-updated: 2026-09-28
+last-updated: 2026-09-30
 status: draft
 ---
 
@@ -59,8 +59,8 @@ When `probe merge` produces output, `source` is replaced by `inputs`:
 ```json
 {
   "schema": "probe/merged-atoms",
-  "schema-version": "3.0",
-  "tool": { "name": "probe", "version": "0.1.0", "command": "merge" },
+  "schema-version": "3.1",
+  "tool": { "name": "probe", "version": "0.5.0", "command": "merge" },
   "inputs": [
     { "schema": "probe-verus/atoms", "source": { ... } },
     { "schema": "probe-lean/atoms", "source": { ... } }
@@ -156,7 +156,7 @@ The derivation rule and its rationale are owned by probe-verus:
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification text (verus) or code-name of primary spec theorem (lean) |
 | `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment ([P23](properties.md#p23-transitive-verification)): `"transitively-verified"` = locally verified and no **seed** (explicit `"failed"`/`"unverified"` atom, or any `status-origin`-bearing atom) is reachable along a dependency path that does not pass through a trusted boundary; `"verified"` = locally verified only. Labels assert consistency with the graph they were computed on; they are not proof re-validation. |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
-| `status-origin` | string | probe-aeneas, probe-lean | Evidence marker on `verification-status`: `"translation"` (status copied from a corresponding atom in another language — imported evidence) or `"kernel-taint"` (probe-lean: the kernel-level taint walk found reachable taint the emitted graph cannot express). Enrichment treats every bearing atom as a **blocker seed**: never promoted to `"transitively-verified"`, unconditionally demoted from an imported `"transitively-verified"`, and blocking promotion of atoms that reach it along a non-trusted path. A `"trusted"` atom carrying `status-origin` is **not** a trust boundary. Enforcement is fail-closed: the enrichment predicates are presence-based (any bearing atom seeds, whatever the value), and `probe enrich`/`probe summary` reject out-of-enum or non-string values at their load boundaries — the executable schema constrains the marker, but runtime inputs are not schema-validated. See [ADR-006](../decisions/006-correspondence-records.md). |
+| `status-origin` | string | probe-aeneas, probe-lean | Evidence marker on `verification-status`: `"translation"` (status copied from a corresponding atom in another language — imported evidence) or `"kernel-taint"` (probe-lean: the kernel-level taint walk found reachable taint the emitted graph cannot express). Enrichment treats every bearing atom as a **blocker seed**: never promoted to `"transitively-verified"`, unconditionally demoted from an imported `"transitively-verified"`, and blocking promotion of atoms that reach it along a non-trusted path. A `"trusted"` atom carrying `status-origin` is **not** a trust boundary. Enforcement is fail-closed: the enrichment predicates are presence-based (any bearing atom seeds, whatever the value), and `probe merge`/`probe enrich`/`probe summary` reject out-of-enum or non-string values at their load boundaries — the executable schema constrains the marker, but runtime inputs are not schema-validated. See [ADR-006](../decisions/006-correspondence-records.md). |
 | `maps-to` / `mapped-from` | array of records | probe (merge) | Correspondence records attached by `probe merge --mappings`; see [Correspondence records](#correspondence-records-maps-to-mapped-from). |
 | `untracked` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
 | `specs` | array of strings | probe-lean | Theorem atoms referencing this atom |
@@ -218,9 +218,9 @@ Extension fields are flattened, so the records appear as top-level atom fields. 
 
 On the `to` atom, the mirror field `mapped-from` with `"target"` pointing back.
 
-- **Record fields**: `target` (required), `confidence` (required, the mappings-file vocabulary: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`), `method` (optional; omitted when absent).
+- **Record fields**: `target` (required), `confidence` (required, the mappings-file vocabulary: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`), `method` (optional; omitted when absent — an empty `method` is canonicalized to absent, and no other fields are allowed). Record shape is validated fail-closed at every recomputation boundary ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): merge re-emits these fields and must not violate this schema.
 - **Direction**: the mappings file's `from`/`to` are generic source/target — they assign no implementation/formal roles. `maps-to` goes on the `from` atom, `mapped-from` on the `to` atom, whichever languages the sides are.
-- **Determinism** ([P14](properties.md#p14-deterministic-output)): arrays sorted by `(target, confidence, method)`, absent `method` ordering as the empty string. Record identity is the same triple; duplicates collapse. Records with the same target but different confidence/method are distinct assertions and both kept.
+- **Determinism** ([P14](properties.md#p14-deterministic-output)): arrays sorted by `(target, confidence, method)`, absent `method` ordering as the empty string. Record identity is the same triple; duplicates collapse by that identity. Records with the same target but different confidence/method are distinct assertions and both kept.
 - **Attachment is unconditional and key-local** ([P13](properties.md#p13-correspondence-records-attach-unconditionally)): a record attaches whether or not its target exists in the invocation's key set (dangling target ⇒ warning, not skip).
 - **Union through conflicts** ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): on every equal-key merge resolution the surviving atom carries the set union of both sides' records.
 - **Inert to enrichment**: correspondence records never participate in contamination/promotion BFS ([P23](properties.md#p23-transitive-verification)).
@@ -307,7 +307,7 @@ After combining all inputs, merge **re-enriches** the atoms category via the sha
 
 ### Normalization
 
-Per input, before conflict resolution, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact). Normalization covers code-name-bearing extension arrays and mapping endpoints ([P8](properties.md#p8-code-name-normalization)). The per-input ordering is semantic: it decides which atom wins a post-normalization collision before evidence from other inputs is considered.
+Per input, before conflict resolution, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact). Normalization covers code-name-bearing extension arrays, correspondence-record targets, and mapping endpoints ([P8](properties.md#p8-code-name-normalization)). The per-input ordering is semantic: aliases collapse within their own input before cross-input conflicts are resolved. A post-normalization collision between distinct real atoms (ignoring correspondence records) within one input is a merge **error**, the same fail-closed rule `probe enrich` applies; benign collapses (stub, identical-modulo-records) union their correspondence records ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)).
 
 ## Mappings file format
 
@@ -331,7 +331,7 @@ Schema: `probe/mappings`. Contains bidirectional mappings between code-names acr
 
 The `sources` block describes each side of the mappings (`schema`, `package`, `package-version`). `from`/`to` are generic source/target roles — they assign no implementation/formal roles (a Lean→Rust file is legal). Multiple entries with the same `from` key are allowed (1-to-many): one implementation may correspond to several formal constructs.
 
-Each mapping entry carries a required `confidence` and an optional `method` (a finer description of the matching method, e.g. `"rust-qualified-name"`, `"file+display-name"`):
+Each mapping entry carries a required `confidence` and an optional `method` (a finer description of the matching method, e.g. `"rust-qualified-name"`, `"file+display-name"`). `confidence` is validated against the vocabulary below at load and at the merge boundary, fail-closed — merge writes it into correspondence records, and an unchecked typo would make merge emit output violating the executable schema. An empty `method` is canonicalized to absent at load ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)):
 
 | Confidence | Meaning |
 |------------|---------|

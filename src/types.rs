@@ -65,6 +65,15 @@ pub struct InputProvenance {
     pub source: Source,
 }
 
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
+/// Strip all trailing `.` characters from a code-name (legacy verus-analyzer
+/// artifact). Stripping every trailing dot makes normalization a fixed point,
+/// so one pass suffices and the collision guard cannot be evaded by a
+/// repeated suffix (`"g().."` and `"g()"` collide immediately).
+pub(crate) fn normalize_code_name(name: &str) -> String {
+    name.trim_end_matches('.').to_string()
+}
+
 fn deserialize_code_text<'de, D>(deserializer: D) -> Result<CodeText, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -124,7 +133,8 @@ impl Atom {
 ///
 /// The executable schema constrains the marker, but the runtime load paths do
 /// not schema-validate, so the recomputation and summary boundaries
-/// (`cmd_enrich`, `summarize_atoms`) call this: an out-of-contract marker
+/// (`cmd_merge`/`merge_atom_files`, `cmd_enrich`, `summarize_atoms`) call
+/// this: an out-of-contract marker
 /// fails closed here instead of silently reading as absent (non-string
 /// values) or being presented as local evidence (unknown strings). The error
 /// names the offending atom; callers prefix their input context.
@@ -377,6 +387,19 @@ pub type GenericLoadResult = (
 // ---------------------------------------------------------------------------
 
 // @kb: kb/engineering/schema.md#mappings-file-format
+/// The mappings-file confidence vocabulary (schema.md § Mappings file format;
+/// mirrored by the `correspondenceRecord` enum in the executable schema —
+/// pinned against it by a schema-validation test).
+pub const MAPPING_CONFIDENCE_VALUES: [&str; 6] = [
+    "exact",
+    "exact-disambiguated",
+    "file-and-name",
+    "file-and-lines",
+    "heuristic",
+    "manual",
+];
+
+// @kb: kb/engineering/schema.md#mappings-file-format
 /// A single entry in a cross-language mappings file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mapping {
@@ -385,6 +408,27 @@ pub struct Mapping {
     pub confidence: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub method: Option<String>,
+}
+
+/// Fail closed on an out-of-vocabulary mapping confidence (ADR-006): merge
+/// writes `confidence` into correspondence records, and the executable schema
+/// constrains it to [`MAPPING_CONFIDENCE_VALUES`], so an unchecked typo would
+/// make merge emit output violating its own contract. Called by
+/// [`load_mappings`] (file boundary) and by the merge operation itself, so
+/// in-memory `Mapping` values get the same rule.
+pub fn validate_mappings(mappings: &[Mapping]) -> Result<(), String> {
+    for mapping in mappings {
+        if !MAPPING_CONFIDENCE_VALUES.contains(&mapping.confidence.as_str()) {
+            return Err(format!(
+                "mapping {:?} -> {:?} carries invalid confidence {:?} (expected one of: {})",
+                mapping.from,
+                mapping.to,
+                mapping.confidence,
+                MAPPING_CONFIDENCE_VALUES.join(", ")
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// A cross-language mappings file linking code-names between languages.
@@ -396,14 +440,19 @@ pub struct MappingsFile {
     pub mappings: Vec<Mapping>,
 }
 
-/// Load a mappings file and build bidirectional lookup maps.
+// @kb: kb/engineering/schema.md#mappings-file-format
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
+/// Load a mappings file as full [`Mapping`] records.
 ///
-/// Returns two maps: `from → [to₁, to₂, …]` and `to → [from₁, from₂, …]`.
-/// A single `from` key may map to multiple `to` targets (1-to-many).
-#[allow(clippy::type_complexity)]
-pub fn load_mappings(
-    path: &std::path::Path,
-) -> Result<(HashMap<String, Vec<String>>, HashMap<String, Vec<String>>), String> {
+/// `confidence`/`method` become correspondence-record fields (ADR-006), so
+/// both are put in canonical form at load: `confidence` is validated against
+/// [`MAPPING_CONFIDENCE_VALUES`] (fail-closed — merge must not emit records
+/// the executable schema rejects) and an empty `method` is canonicalized to
+/// absent (`""` names no matching method; the canonical encoding of "none" is
+/// omission). Endpoints are normalized at load (P8: mapping-file endpoints
+/// are normalized before any lookup, by the same rule as atom keys). A single
+/// `from` key may map to multiple `to` targets (1-to-many).
+pub fn load_mappings(path: &std::path::Path) -> Result<Vec<Mapping>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read mappings {}: {e}", path.display()))?;
 
@@ -418,10 +467,33 @@ pub fn load_mappings(
         ));
     }
 
+    let mappings: Vec<Mapping> = file
+        .mappings
+        .into_iter()
+        .map(|m| Mapping {
+            from: normalize_code_name(&m.from),
+            to: normalize_code_name(&m.to),
+            confidence: m.confidence,
+            method: m.method.filter(|m| !m.is_empty()),
+        })
+        .collect();
+
+    validate_mappings(&mappings).map_err(|e| format!("{}: {e}", path.display()))?;
+
+    Ok(mappings)
+}
+
+/// Build bidirectional endpoint lookup maps from mapping records:
+/// `from → [to₁, to₂, …]` and `to → [from₁, from₂, …]` (used by
+/// `probe project` for seed matching).
+#[allow(clippy::type_complexity)]
+pub fn endpoint_lookup_maps(
+    mappings: &[Mapping],
+) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
     let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
     let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
 
-    for mapping in &file.mappings {
+    for mapping in mappings {
         from_to
             .entry(mapping.from.clone())
             .or_default()
@@ -432,7 +504,7 @@ pub fn load_mappings(
             .push(mapping.from.clone());
     }
 
-    Ok((from_to, to_from))
+    (from_to, to_from)
 }
 
 /// Load any Schema 3.0 data file as opaque JSON entries.

@@ -1,7 +1,9 @@
 // @kb: kb/tools/probe-project.md — graph projection from mapping seeds
 
 use crate::authority::{load_validated_atom_file, AuthorityScope};
-use crate::types::{load_mappings, Atom, InputProvenance, Tool, PROJECTED_ATOMS_SCHEMA};
+use crate::types::{
+    endpoint_lookup_maps, load_mappings, Atom, InputProvenance, Tool, PROJECTED_ATOMS_SCHEMA,
+};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
@@ -215,13 +217,14 @@ pub fn cmd_project(
 
     // Load mappings
     eprintln!("  Loading mappings from {}...", mappings_path.display());
-    let (from_to, to_from) = match load_mappings(&mappings_path) {
+    let mappings = match load_mappings(&mappings_path) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("Error: {e}");
             std::process::exit(1);
         }
     };
+    let (from_to, to_from) = endpoint_lookup_maps(&mappings);
     eprintln!(
         "    {} from→to entries, {} to→from entries",
         from_to.len(),

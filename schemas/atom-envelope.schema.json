@@ -255,6 +255,16 @@
           "type": "string",
           "enum": ["translation", "kernel-taint"],
           "description": "Optional evidence marker on verification-status (ADR-006): \"translation\" = imported evidence copied from a corresponding atom in another language (probe-aeneas); \"kernel-taint\" = local evidence reflecting a producer-known negative finding the emitted graph cannot express (probe-lean). Bearing atoms are enrichment blocker seeds."
+        },
+        "maps-to": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/correspondenceRecord" },
+          "description": "Correspondence records attached by probe merge --mappings on the mapping's from atom (ADR-006, P13/P27): sorted by (target, confidence, method), never written into dependencies, inert to enrichment."
+        },
+        "mapped-from": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/correspondenceRecord" },
+          "description": "Mirror correspondence records on the mapping's to atom. Mirrors are best-effort: the correspondence relation is the union over maps-to and mapped-from."
         }
       },
       "required": [
@@ -267,6 +277,29 @@
         "language"
       ],
       "additionalProperties": true
+    },
+
+    "correspondenceRecord": {
+      "type": "object",
+      "description": "One correspondence assertion: a mappings-file entry linked these code-names with this confidence (ADR-006). Record identity is the (target, confidence, method) triple.",
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "Code-name URI of the corresponding atom (normalized, may dangle)."
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["exact", "exact-disambiguated", "file-and-name", "file-and-lines", "heuristic", "manual"],
+          "description": "Mappings-file confidence vocabulary."
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional finer matching-method description (e.g. \"rust-qualified-name\"); omitted when absent. Non-empty: the canonical encoding of \"no method\" is omission (merge canonicalizes an empty method to absent, P27)."
+        }
+      },
+      "required": ["target", "confidence"],
+      "additionalProperties": false
     }
   }
 }
