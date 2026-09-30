@@ -35,7 +35,7 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 
 ### Step 2: Prepare the carrier (authoritative inputs only)
 
-On an authoritative (non-projected) input, apply `prepare = enrich ∘ normalize`: normalize the map (P8), then **recompute enrichment on the full input graph** ([P23](../engineering/properties.md#p23-transitive-verification)) *before* any trimming — otherwise a stale label from a producer's embedded old enrichment would be frozen into a depth-limited view that the projection rejection rule then makes unrepairable. Labels are never recomputed from the trimmed view. An already-projected input skips this step: it stays readable and keeps its labels untouched.
+On an authoritative (non-projected) input, apply `prepare = enrich ∘ normalize`: normalize the map (P8), then **recompute enrichment on the full input graph** ([P23](../engineering/properties.md#p23-transitive-verification)) *before* any trimming — otherwise a stale label from a producer's embedded old enrichment would be frozen into a depth-limited view that the projection rejection rule then makes unrepairable. Labels are never recomputed from the trimmed view. A post-normalization collision between distinct real atoms rejects the input fail-closed, exactly as `probe enrich` does ([P8](../engineering/properties.md#p8-code-name-normalization)) — silently selected evidence would be frozen into the view. An already-projected input skips this step: it stays readable and keeps its labels untouched.
 
 ### Step 3: Build reverse adjacency index
 

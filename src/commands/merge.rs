@@ -1,9 +1,10 @@
 use crate::authority::{load_validated_atom_file, validate_authority, AuthorityScope};
 use crate::commands::propagate::enrich_verification_status;
 use crate::types::{
-    load_envelope, load_mappings, normalize_code_name, validate_mappings, validate_status_origins,
-    Atom, InputProvenance, Mapping, MergedAtomEnvelope, MergedGenericEnvelope, SchemaCategory,
-    Tool, MAPPING_CONFIDENCE_VALUES,
+    dedup_provenance, load_envelope, load_mappings, normalize_code_name, validate_mappings,
+    validate_status_origins, Atom, InputProvenance, Mapping, MergedAtomEnvelope,
+    MergedGenericEnvelope, SchemaCategory, Tool, CATEGORIZED_DEPENDENCY_ARRAYS,
+    MAPPING_CONFIDENCE_VALUES,
 };
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -338,6 +339,27 @@ pub(crate) fn normalize_atoms(
             }
         }
 
+        // P8: the categorized dependency subsets are code-name arrays too —
+        // normalizing them with the same rule as `dependencies` keeps the P15
+        // decomposition equality intact (non-string entries pass through
+        // untouched, like `dependencies-with-locations` above).
+        for field in CATEGORIZED_DEPENDENCY_ARRAYS {
+            if let Some(arr) = atom
+                .extensions
+                .get_mut(field)
+                .and_then(|v| v.as_array_mut())
+            {
+                for entry in arr {
+                    if let Some(name) = entry.as_str() {
+                        let norm = normalize_code_name(name);
+                        if norm != name {
+                            *entry = serde_json::Value::String(norm);
+                        }
+                    }
+                }
+            }
+        }
+
         // P8/P27: validate record shape fail-closed and canonicalize —
         // record targets are code-names too.
         validate_and_canonicalize_records(&key, &mut atom)?;
@@ -525,13 +547,16 @@ fn load_atom_inputs(
     let mut provenance = Vec::new();
 
     for path in paths {
-        let (atoms, prov) = load_validated_atom_file(path, AuthorityScope::Recompute)?;
-        validate_status_origins(&atoms).map_err(|e| format!("{}: {e}", path.display()))?;
-        maps.push(atoms);
-        provenance.extend(prov);
+        let loaded = load_validated_atom_file(path, AuthorityScope::Recompute)?;
+        validate_status_origins(&loaded.atoms).map_err(|e| format!("{}: {e}", path.display()))?;
+        maps.push(loaded.atoms);
+        provenance.extend(loaded.provenance);
     }
 
-    Ok((maps, provenance))
+    // P9: provenance is a deduplicated source inventory — re-merging over an
+    // already-merged input must not multiply its entries (envelope
+    // idempotence up to metadata).
+    Ok((maps, dedup_provenance(provenance)))
 }
 
 /// Load multiple atom files, flatten their provenance, and merge them.
@@ -571,21 +596,32 @@ pub fn merge_atom_files_raw(
 
 /// Normalize keys in a generic data map. Only normalizes the dictionary keys
 /// (trailing-dot stripping); values are passed through untouched.
+///
+/// Returns `(map, keys_changed, collisions)`. A post-normalization key
+/// collision within the input keeps the category's last-wins rule (P7) but is
+/// warned about and counted — it feeds `stats.conflicts`, never resolves
+/// silently (P8).
 fn normalize_generic(
     data: BTreeMap<String, serde_json::Value>,
-) -> (BTreeMap<String, serde_json::Value>, usize) {
+) -> (BTreeMap<String, serde_json::Value>, usize, usize) {
     let mut out: BTreeMap<String, serde_json::Value> = BTreeMap::new();
     let mut changed = 0;
+    let mut collisions = 0;
 
     for (key, value) in data {
         let norm_key = normalize_code_name(&key);
         if norm_key != key {
             changed += 1;
         }
-        out.insert(norm_key, value);
+        if out.insert(norm_key.clone(), value).is_some() {
+            collisions += 1;
+            eprintln!(
+                "  Warning: normalization collision for '{norm_key}' within one input (keeping last, P7/P8)"
+            );
+        }
     }
 
-    (out, changed)
+    (out, changed, collisions)
 }
 
 // @kb: kb/engineering/properties.md#p7-specsproofs-merge-is-last-wins
@@ -601,12 +637,14 @@ pub fn merge_generic_maps(
 
     let mut maps_iter = maps.into_iter();
     let first = maps_iter.next().unwrap_or_default();
-    let (mut base, norm_count) = normalize_generic(first);
+    let (mut base, norm_count, collisions) = normalize_generic(first);
     stats.keys_normalized += norm_count;
+    stats.conflicts += collisions;
 
     for incoming in maps_iter {
-        let (incoming, norm_count) = normalize_generic(incoming);
+        let (incoming, norm_count, collisions) = normalize_generic(incoming);
         stats.keys_normalized += norm_count;
+        stats.conflicts += collisions;
 
         for (key, value) in incoming {
             if base.contains_key(&key) {
@@ -680,6 +718,10 @@ pub fn cmd_merge(inputs: Vec<PathBuf>, output: PathBuf, mappings_path: Option<Pa
     for meta in &envelopes {
         provenance.extend(meta.provenance.clone());
     }
+    // P9: the output inventory records *which* sources were composed, not how
+    // many times — identical entries collapse (envelope idempotence up to
+    // metadata).
+    let provenance = dedup_provenance(provenance);
 
     println!();
     println!("Merging {} {} files...", inputs.len(), category);
@@ -2255,6 +2297,68 @@ mod tests {
         assert!(!normalized.contains_key("probe:a/1.0/mod/f()."));
     }
 
+    // Plan issue 6 (P8): an intra-input post-normalization collision in a
+    // specs/proofs map keeps the category's last-wins rule but is counted in
+    // `stats.conflicts`, never resolved silently. (BTreeMap iteration puts
+    // the dotted key after its normalized form, so the dotted entry wins.)
+    #[test]
+    fn test_generic_intra_input_collision_counted() {
+        let mut input = BTreeMap::new();
+        input.insert(
+            "probe:a/1.0/mod/f()".to_string(),
+            serde_json::json!({"which": "plain"}),
+        );
+        input.insert(
+            "probe:a/1.0/mod/f().".to_string(),
+            serde_json::json!({"which": "dotted"}),
+        );
+
+        let (merged, stats) = merge_generic_maps(vec![input]);
+
+        assert_eq!(stats.conflicts, 1, "intra-input collision counted");
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged["probe:a/1.0/mod/f()"]["which"], "dotted",
+            "last-wins kept (P7)"
+        );
+    }
+
+    // P9: `merge_atom_files` dedups the flattened provenance — merging the
+    // same file twice yields one inventory entry, not two.
+    #[test]
+    fn test_merge_atom_files_dedups_provenance() {
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+        let file_a = dir.path().join("a.json");
+        let mut data = BTreeMap::new();
+        data.insert(
+            "probe:a/1.0/mod/foo()".to_string(),
+            make_real_atom("foo", "src/a.rs", "rust", "exec"),
+        );
+        let envelope = serde_json::json!({
+            "schema": "probe-rust/extract",
+            "schema-version": "3.0",
+            "tool": {"name": "probe-rust", "version": "1.0.0", "command": "extract"},
+            "source": {"repo": "repo-a", "commit": "aaa", "language": "rust", "package": "pkg-a", "package-version": "1.0"},
+            "timestamp": "2025-01-01T00:00:00Z",
+            "data": data
+        });
+        std::fs::File::create(&file_a)
+            .unwrap()
+            .write_all(serde_json::to_string_pretty(&envelope).unwrap().as_bytes())
+            .unwrap();
+
+        let (_, provenance, _) =
+            merge_atom_files(&[file_a.as_path(), file_a.as_path()], None).unwrap();
+        assert_eq!(
+            provenance.len(),
+            1,
+            "identical provenance entries collapse (P9)"
+        );
+        assert_eq!(provenance[0].source.package, "pkg-a");
+    }
+
     #[test]
     fn test_generic_recursive_merge_flattens_provenance() {
         use crate::types::{load_generic_file, MergedGenericEnvelope, SchemaCategory, Tool};
@@ -2564,6 +2668,35 @@ mod tests {
             .get("dependencies-with-locations")
             .unwrap();
         assert_eq!(dwl[0]["code-name"], "probe:a/1.0/g()");
+    }
+
+    // P8: the categorized dependency subsets (P15) are code-name arrays and
+    // are normalized with the same rule as `dependencies`; non-string entries
+    // pass through untouched.
+    #[test]
+    fn test_categorized_dependency_arrays_normalized() {
+        let mut atom = make_real_atom("f", "src/lib.rs", "rust", "exec");
+        atom.dependencies.insert("probe:a/1.0/g().".to_string());
+        for field in CATEGORIZED_DEPENDENCY_ARRAYS {
+            atom.extensions.insert(
+                field.to_string(),
+                serde_json::json!(["probe:a/1.0/g().", 42]),
+            );
+        }
+        let mut atoms = BTreeMap::new();
+        atoms.insert("probe:a/1.0/f()".to_string(), atom);
+
+        let (out, _, _) = normalize_atoms(atoms).unwrap();
+        let f = &out["probe:a/1.0/f()"];
+        assert!(f.dependencies.contains("probe:a/1.0/g()"));
+        for field in CATEGORIZED_DEPENDENCY_ARRAYS {
+            let arr = f.extensions.get(field).unwrap();
+            assert_eq!(
+                arr[0], "probe:a/1.0/g()",
+                "{field} entries normalized like dependencies (P8/P15)"
+            );
+            assert_eq!(arr[1], 42, "{field}: non-string entry untouched");
+        }
     }
 
     // P14 at the envelope level: the same evidence presented in different

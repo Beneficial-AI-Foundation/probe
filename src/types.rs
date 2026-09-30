@@ -42,7 +42,7 @@ pub struct Tool {
 }
 
 /// Source metadata in the envelope.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Source {
     pub repo: String,
     pub commit: String,
@@ -59,11 +59,39 @@ pub struct Source {
 }
 
 /// One entry in the merged envelope's `inputs` array.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InputProvenance {
     pub schema: String,
     pub source: Source,
 }
+
+// @kb: kb/engineering/properties.md#p9-provenance-is-preserved
+/// Deduplicate a provenance inventory, keeping first-occurrence order (P9:
+/// the `inputs` array records *which* sources were composed, not how many
+/// times — dedup is what gives envelope-level merge idempotence up to
+/// metadata).
+pub fn dedup_provenance(entries: Vec<InputProvenance>) -> Vec<InputProvenance> {
+    let mut out: Vec<InputProvenance> = Vec::with_capacity(entries.len());
+    for entry in entries {
+        if !out.contains(&entry) {
+            out.push(entry);
+        }
+    }
+    out
+}
+
+// @kb: kb/engineering/properties.md#p15-dependency-completeness
+/// The categorized dependency subsets whose union `dependencies` must equal
+/// (P15). Every code-name inside them is normalized like `dependencies`
+/// entries (P8), and `probe project` trims them with the same filter as
+/// `dependencies` so the decomposition survives projection.
+pub const CATEGORIZED_DEPENDENCY_ARRAYS: [&str; 5] = [
+    "requires-dependencies",
+    "ensures-dependencies",
+    "body-dependencies",
+    "type-dependencies",
+    "term-dependencies",
+];
 
 // @kb: kb/engineering/properties.md#p8-code-name-normalization
 /// Strip all trailing `.` characters from a code-name (legacy verus-analyzer
@@ -657,6 +685,49 @@ mod tests {
         assert_eq!(meta.provenance.len(), 2, "composed inventory preserved");
         assert_eq!(meta.provenance[0].source.package, "pkg-rust");
         assert_eq!(meta.provenance[1].source.package, "pkg-lean");
+    }
+
+    /// P9: provenance is a deduplicated source inventory — identical entries
+    /// collapse (first occurrence kept, order preserved), while entries
+    /// differing in any field (including flattened `source` extensions)
+    /// remain distinct.
+    #[test]
+    fn dedup_provenance_collapses_identical_entries_only() {
+        let source = |pkg: &str| Source {
+            repo: "r".to_string(),
+            commit: "c".to_string(),
+            language: "rust".to_string(),
+            package: pkg.to_string(),
+            package_version: "1.0".to_string(),
+            extensions: BTreeMap::new(),
+        };
+        let entry = |schema: &str, pkg: &str| InputProvenance {
+            schema: schema.to_string(),
+            source: source(pkg),
+        };
+
+        let mut with_class = entry("probe-lean/extract", "pkg-b");
+        with_class
+            .source
+            .extensions
+            .insert("class".to_string(), serde_json::json!("security-protocol"));
+
+        let deduped = dedup_provenance(vec![
+            entry("probe-rust/extract", "pkg-a"),
+            entry("probe-lean/extract", "pkg-b"),
+            entry("probe-rust/extract", "pkg-a"), // exact duplicate
+            with_class.clone(),                   // differs only in extensions
+        ]);
+
+        assert_eq!(
+            deduped,
+            vec![
+                entry("probe-rust/extract", "pkg-a"),
+                entry("probe-lean/extract", "pkg-b"),
+                with_class,
+            ],
+            "exact duplicates collapse; extension-differing entries stay"
+        );
     }
 
     /// Unknown `source` fields (e.g. `class`) must survive a deserialize →

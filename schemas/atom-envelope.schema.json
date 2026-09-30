@@ -110,7 +110,7 @@
         "tool": { "$ref": "#/$defs/tool" },
         "inputs": {
           "type": "array",
-          "description": "Provenance: one entry per input file that was merged.",
+          "description": "Provenance: a deduplicated source inventory (P9) — one entry per distinct source, so merging two files from the same source can legitimately collapse to one entry.",
           "items": {
             "type": "object",
             "properties": {
@@ -120,7 +120,7 @@
             "required": ["schema", "source"],
             "additionalProperties": false
           },
-          "minItems": 2
+          "minItems": 1
         },
         "timestamp": { "$ref": "#/$defs/timestamp" },
         "data": { "$ref": "#/$defs/genericDictionary" }

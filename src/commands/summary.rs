@@ -155,13 +155,14 @@ fn default_output_name(provenance: &[InputProvenance]) -> String {
 /// readable — views with inherited labels are legitimate to read.
 // @kb: kb/engineering/schema.md#authority-validation-and-re-enrichment
 pub fn cmd_summary(input: &Path, output: Option<&Path>) {
-    let (atoms, provenance) = match load_validated_atom_file(input, AuthorityScope::ReadOnly) {
+    let loaded = match load_validated_atom_file(input, AuthorityScope::ReadOnly) {
         Ok(result) => result,
         Err(e) => {
             eprintln!("Error: {e}");
             std::process::exit(1);
         }
     };
+    let (atoms, provenance) = (loaded.atoms, loaded.provenance);
 
     // summarize_atoms fails closed on out-of-enum status-origin markers
     // (ADR-006 Decision 2): an unknown origin proves neither local nor

@@ -27,7 +27,7 @@
 //! envelope boundary.
 
 use crate::types::{
-    load_envelope, Atom, EnvelopeMeta, LoadResult, SchemaCategory, PROJECTED_ATOMS_SCHEMA,
+    load_envelope, Atom, EnvelopeMeta, InputProvenance, SchemaCategory, PROJECTED_ATOMS_SCHEMA,
 };
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -175,13 +175,30 @@ pub fn validate_authority(
     Ok(())
 }
 
+/// Result of a validated atoms load ([`load_validated_atom_file`]).
+pub struct ValidatedAtomFile {
+    pub atoms: BTreeMap<String, Atom>,
+    pub provenance: Vec<InputProvenance>,
+    /// Whether the input is a projection, in either format (the
+    /// `probe/projected-atoms` schema or a legacy `projection` field). Only
+    /// meaningful under [`AuthorityScope::ReadOnly`] — the `Recompute` scope
+    /// rejects projections outright. `probe project` needs it: a projection's
+    /// labels are inherited, never recomputed over the trimmed view
+    /// (ADR-006), so enrich-before-trim must know the shape the loader
+    /// otherwise discards.
+    pub projected: bool,
+}
+
 /// Load an atoms file through the authority validator.
 ///
 /// `load_envelope` + [`validate_authority`] + atoms-category check +
 /// deserialization. Recomputation boundaries pass
 /// [`AuthorityScope::Recompute`]; read-only consumers pass
 /// [`AuthorityScope::ReadOnly`].
-pub fn load_validated_atom_file(path: &Path, scope: AuthorityScope) -> Result<LoadResult, String> {
+pub fn load_validated_atom_file(
+    path: &Path,
+    scope: AuthorityScope,
+) -> Result<ValidatedAtomFile, String> {
     let meta = load_envelope(path)?;
     let origin = path.display().to_string();
     validate_authority(&meta, &origin, scope)?;
@@ -191,9 +208,14 @@ pub fn load_validated_atom_file(path: &Path, scope: AuthorityScope) -> Result<Lo
             meta.category, meta.schema
         ));
     }
-    let data: BTreeMap<String, Atom> = serde_json::from_value(meta.data_value)
+    let projected = meta.schema == PROJECTED_ATOMS_SCHEMA || meta.has_projection_field;
+    let atoms: BTreeMap<String, Atom> = serde_json::from_value(meta.data_value)
         .map_err(|e| format!("{origin}: failed to deserialize atoms: {e}"))?;
-    Ok((data, meta.provenance))
+    Ok(ValidatedAtomFile {
+        atoms,
+        provenance: meta.provenance,
+        projected,
+    })
 }
 
 #[cfg(test)]

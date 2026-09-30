@@ -46,6 +46,8 @@ Correspondence-record fields on input atoms are validated fail-closed and put in
 
 If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules) and identical-modulo-records duplicates collapse; if both are real atoms and differ beyond their correspondence records, the merge **errors** — a single input offering two distinct atoms for one code-name is producer error, and merge re-enriches (Phase 5), so silently selecting one atom's evidence would launder contamination; the same rule the unary `probe enrich` boundary applies ([P8](../engineering/properties.md#p8-code-name-normalization)). Correspondence records are unioned across benign collisions ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)). Per-input rejections are prefixed with the 1-based input position (`input #2 of 3: …`) so the offending producer file is identifiable from the argument order.
 
+On the specs/proofs path an intra-input collision keeps last-wins ([P7](../engineering/properties.md#p7-specsproofs-merge-is-last-wins)) — no verification evidence is at stake — but is warned about and counted in `stats.conflicts` ([P8](../engineering/properties.md#p8-code-name-normalization)).
+
 ### Phase 3: Merge
 
 - **Atoms**: `merge_atom_maps()` — first-wins with [stub](../engineering/glossary.md#stub) replacement. See [P6](../engineering/properties.md#p6-atom-merge-is-first-wins-with-stub-replacement). On every equal-key resolution, `maps-to`/`mapped-from` records are unioned ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).

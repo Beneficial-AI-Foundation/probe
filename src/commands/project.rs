@@ -127,6 +127,22 @@ pub fn project_atoms(
             let original_dep_count = projected_atom.dependencies.len();
             projected_atom.dependencies.retain(|d| included.contains(d));
             deps_trimmed += original_dep_count - projected_atom.dependencies.len();
+            // P15: the categorized dependency subsets are trimmed with the
+            // same filter as `dependencies`, so the decomposition equality
+            // (`dependencies` = union of the subsets) survives projection.
+            // Non-string entries pass through untouched.
+            for field in crate::types::CATEGORIZED_DEPENDENCY_ARRAYS {
+                if let Some(arr) = projected_atom
+                    .extensions
+                    .get_mut(field)
+                    .and_then(|v| v.as_array_mut())
+                {
+                    arr.retain(|entry| match entry.as_str() {
+                        Some(name) => included.contains(name),
+                        None => true,
+                    });
+                }
+            }
             result.insert(key.clone(), projected_atom);
         }
     }
@@ -202,18 +218,67 @@ pub fn cmd_project(
     // rejection).
     // @kb: kb/engineering/schema.md#authority-validation-and-re-enrichment
     eprintln!("  Loading {}...", input.display());
-    let (atoms, provenance) = match load_validated_atom_file(&input, AuthorityScope::ReadOnly) {
+    let loaded = match load_validated_atom_file(&input, AuthorityScope::ReadOnly) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error: {e}");
             std::process::exit(1);
         }
     };
+    let provenance = loaded.provenance;
     eprintln!(
         "    {} atoms, {} provenance entries",
-        atoms.len(),
+        loaded.atoms.len(),
         provenance.len()
     );
+
+    // Carrier preparation (ADR-006, P23): on an authoritative input, apply
+    // `prepare = enrich ∘ normalize` — labels are recomputed on the *full*
+    // input graph before any trimming, otherwise a stale producer label would
+    // be frozen into a depth-limited view that the projection rejection rule
+    // makes unrepairable. Seed matching then runs over normalized keys (P8),
+    // the same rule `load_mappings` applies to endpoints. An already-projected
+    // input skips preparation entirely: it is a view — its labels are
+    // inherited, never recomputed over the trimmed graph.
+    let atoms = if loaded.projected {
+        eprintln!("  Input is a projection: labels inherited, no recomputation");
+        loaded.atoms
+    } else {
+        let (atoms, stats) = match crate::commands::propagate::prepare_atoms(loaded.atoms) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Error: {}: {e}", input.display());
+                std::process::exit(1);
+            }
+        };
+        // P8: a normalization collision that would discard a distinct real
+        // atom is producer error at every recomputation boundary — silently
+        // selecting one atom's evidence could freeze laundered labels into
+        // the view. Reject, exactly as `probe enrich` does.
+        if !stats.dropped_atoms.is_empty() {
+            for (discarded, kept) in &stats.dropped_atoms {
+                eprintln!(
+                    "Error: normalization collision: atom {discarded:?} would be discarded \
+                     (a distinct atom already occupies {kept:?})"
+                );
+            }
+            eprintln!(
+                "Error: {}: refusing to project — normalization collided {} distinct \
+                 atom(s); fix the producer aliases and regenerate (P8)",
+                input.display(),
+                stats.dropped_atoms.len()
+            );
+            std::process::exit(1);
+        }
+        if stats.keys_normalized > 0 {
+            eprintln!("    Keys normalized: {}", stats.keys_normalized);
+        }
+        eprintln!(
+            "    Enrichment recomputed on the full graph: {} transitively-verified, {} locally-scoped verified",
+            stats.transitive, stats.local
+        );
+        atoms
+    };
 
     // Load mappings
     eprintln!("  Loading mappings from {}...", mappings_path.display());
@@ -743,6 +808,98 @@ mod tests {
             result.contains_key("probe:stub"),
             "stubs in seed set must be included"
         );
+    }
+
+    // P15: projection trims the categorized dependency subsets with the same
+    // filter as `dependencies`, so the decomposition equality survives; a
+    // non-string entry passes through untouched.
+    #[test]
+    fn test_categorized_arrays_trimmed_with_dependencies() {
+        let mut atoms = BTreeMap::new();
+        let mut f = make_atom("f", "rust", "exec", &["probe:g", "probe:outside"]);
+        f.extensions.insert(
+            "requires-dependencies".to_string(),
+            serde_json::json!(["probe:outside"]),
+        );
+        f.extensions.insert(
+            "body-dependencies".to_string(),
+            serde_json::json!(["probe:g", "probe:outside", 42]),
+        );
+        atoms.insert("probe:f".to_string(), f);
+        atoms.insert("probe:g".to_string(), make_atom("g", "rust", "exec", &[]));
+        atoms.insert(
+            "probe:outside".to_string(),
+            make_atom("outside", "rust", "exec", &[]),
+        );
+
+        // Seeds f and g only; depth 0 excludes probe:outside.
+        let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+        let to_from: HashMap<String, Vec<String>> = HashMap::new();
+        from_to
+            .entry("probe:f".to_string())
+            .or_default()
+            .push("probe:g".to_string());
+        from_to
+            .entry("probe:g".to_string())
+            .or_default()
+            .push("probe:f".to_string());
+
+        let (result, _) = project_atoms(&atoms, &from_to, &to_from, 0, 0);
+        let f = &result["probe:f"];
+        assert!(f.dependencies.contains("probe:g"));
+        assert!(!f.dependencies.contains("probe:outside"));
+        assert_eq!(
+            f.extensions.get("requires-dependencies").unwrap(),
+            &serde_json::json!([]),
+            "excluded name trimmed from the categorized array (P15)"
+        );
+        assert_eq!(
+            f.extensions.get("body-dependencies").unwrap(),
+            &serde_json::json!(["probe:g", 42]),
+            "included name kept, excluded trimmed, non-string untouched"
+        );
+    }
+
+    // Plan §8: projection selection is dependency-only — correspondence
+    // records are never traversed. With f → g where g is absent (dangling
+    // dep), ga present, mapping g ↔ ga, reverse-depth 1: the old fabricated
+    // f → ga edge used to select {f, ga}; without it the selection is {ga}.
+    #[test]
+    fn test_selection_is_dependency_only() {
+        let mut atoms = BTreeMap::new();
+        let mut f = make_atom("f", "rust", "exec", &["probe:g"]);
+        f.extensions.insert(
+            "maps-to".to_string(),
+            serde_json::json!([{ "target": "probe:ga", "confidence": "exact" }]),
+        );
+        atoms.insert("probe:f".to_string(), f);
+        let mut ga = make_atom("ga", "lean", "def", &[]);
+        ga.extensions.insert(
+            "mapped-from".to_string(),
+            serde_json::json!([{ "target": "probe:g", "confidence": "exact" }]),
+        );
+        atoms.insert("probe:ga".to_string(), ga);
+
+        let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+        let mut to_from: HashMap<String, Vec<String>> = HashMap::new();
+        from_to
+            .entry("probe:g".to_string())
+            .or_default()
+            .push("probe:ga".to_string());
+        to_from
+            .entry("probe:ga".to_string())
+            .or_default()
+            .push("probe:g".to_string());
+
+        let (result, stats) = project_atoms(&atoms, &from_to, &to_from, 0, 1);
+
+        assert_eq!(stats.seeds_found, 1, "only ga exists among the endpoints");
+        assert!(result.contains_key("probe:ga"));
+        assert!(
+            !result.contains_key("probe:f"),
+            "f is reachable only via records; records are never traversed"
+        );
+        assert_eq!(result.len(), 1);
     }
 
     #[test]
