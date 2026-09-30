@@ -59,7 +59,7 @@ When `--mappings <file>` is provided, each mapping entry attaches a `maps-to` re
 
 ### Phase 5: Re-enrich
 
-After all inputs are combined, the atoms category runs enrichment recomputation ([P23](../engineering/properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged labels are recomputed, never inherited. The raw staging primitives (`merge_atom_maps_raw`/`merge_atom_files_raw`) for multi-step pipelines (probe-aeneas) defer this single enrichment pass but still validate authority; their output carries potentially stale derived statuses.
+After all inputs are combined, the atoms category runs enrichment recomputation ([P23](../engineering/properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged labels are recomputed, never inherited. The raw staging primitives (`merge_atom_maps_raw`/`merge_atom_files_raw`) for multi-step pipelines (probe-aeneas) defer this single enrichment pass; the file-level `merge_atom_files_raw` still validates authority, while the bare-map `merge_atom_maps_raw` — like `merge_atom_maps` — cannot (callers own the envelope boundary). Their output carries potentially stale derived statuses.
 
 ### Phase 6: Write output
 
