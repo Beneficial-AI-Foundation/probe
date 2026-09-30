@@ -32,6 +32,27 @@ fn run_probe_merge(file_a: &str, file_b: &str, output_path: &std::path::Path) {
     );
 }
 
+fn run_probe_merge_with_mappings(
+    file_a: &str,
+    file_b: &str,
+    mappings_path: &std::path::Path,
+    output_path: &std::path::Path,
+) -> std::process::ExitStatus {
+    let binary = env!("CARGO_BIN_EXE_probe");
+    Command::new(binary)
+        .args([
+            "merge",
+            &format!("{FIXTURES}/{file_a}"),
+            &format!("{FIXTURES}/{file_b}"),
+            "-o",
+            output_path.to_str().unwrap(),
+            "--mappings",
+            mappings_path.to_str().unwrap(),
+        ])
+        .status()
+        .expect("Failed to run probe")
+}
+
 fn load_merged_atom_envelope(path: &str) -> MergedAtomEnvelope {
     let content =
         std::fs::read_to_string(path).unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
@@ -179,6 +200,95 @@ fn test_atoms_provenance_recorded() {
     assert_eq!(envelope.inputs[0].source.package, "crate-a");
     assert_eq!(envelope.inputs[1].schema, "probe-verus/atoms");
     assert_eq!(envelope.inputs[1].source.package, "crate-b");
+}
+
+/// End-to-end through the binary (loader → merge → envelope write):
+/// `--mappings` attaches correspondence records — `maps-to` on the `from`
+/// atom, `mapped-from` on the `to` atom, endpoints normalized at load (P8),
+/// dangling targets attached anyway (P13) — and never touches `dependencies`
+/// (ADR-006).
+#[test]
+fn test_merge_with_mappings_attaches_records_via_cli() {
+    let tmp = TempDir::new().unwrap();
+    let mappings_path = tmp.path().join("mappings.json");
+    // Note the trailing dot on the first `from` endpoint: normalized at load.
+    let mappings = serde_json::json!({
+        "schema": "probe/mappings",
+        "schema-version": "3.0",
+        "mappings": [
+            {"from": "probe:crate-a/1.0/lib/main().",
+             "to": "probe:crate-b/1.0/helpers/internal()",
+             "confidence": "manual", "method": "hand-written"},
+            {"from": "probe:crate-a/1.0/lib/process()", "to": "probe:Ghost.process",
+             "confidence": "heuristic"}
+        ]
+    });
+    std::fs::write(
+        &mappings_path,
+        serde_json::to_string_pretty(&mappings).unwrap(),
+    )
+    .unwrap();
+
+    let output_path = tmp.path().join("merged.json");
+    let status =
+        run_probe_merge_with_mappings("atoms_a.json", "atoms_b.json", &mappings_path, &output_path);
+    assert!(status.success(), "merge with mappings failed");
+
+    let envelope = load_merged_atom_envelope(output_path.to_str().unwrap());
+    let main_atom = &envelope.data["probe:crate-a/1.0/lib/main()"];
+    assert_eq!(
+        main_atom.extensions["maps-to"],
+        serde_json::json!([{"target": "probe:crate-b/1.0/helpers/internal()",
+                            "confidence": "manual", "method": "hand-written"}])
+    );
+    let internal = &envelope.data["probe:crate-b/1.0/helpers/internal()"];
+    assert_eq!(
+        internal.extensions["mapped-from"],
+        serde_json::json!([{"target": "probe:crate-a/1.0/lib/main()",
+                            "confidence": "manual", "method": "hand-written"}])
+    );
+
+    // Dangling target: record attached on the from atom, target absent.
+    let process = &envelope.data["probe:crate-a/1.0/lib/process()"];
+    assert_eq!(
+        process.extensions["maps-to"],
+        serde_json::json!([{"target": "probe:Ghost.process", "confidence": "heuristic"}])
+    );
+    assert!(!envelope.data.contains_key("probe:Ghost.process"));
+
+    // Dependencies are never modified by mappings: identical to the input's.
+    let input_main =
+        &load_input_atoms(&format!("{FIXTURES}/atoms_a.json"))["probe:crate-a/1.0/lib/main()"];
+    assert_eq!(main_atom.dependencies, input_main.dependencies);
+}
+
+/// Fail-closed through the binary: an out-of-vocabulary mapping confidence
+/// exits non-zero — merge must not emit records the executable schema
+/// rejects.
+#[test]
+fn test_merge_rejects_invalid_mapping_confidence_via_cli() {
+    let tmp = TempDir::new().unwrap();
+    let mappings_path = tmp.path().join("mappings.json");
+    let mappings = serde_json::json!({
+        "schema": "probe/mappings",
+        "schema-version": "3.0",
+        "mappings": [
+            {"from": "probe:crate-a/1.0/lib/main()",
+             "to": "probe:crate-b/1.0/helpers/internal()",
+             "confidence": "high"}
+        ]
+    });
+    std::fs::write(
+        &mappings_path,
+        serde_json::to_string_pretty(&mappings).unwrap(),
+    )
+    .unwrap();
+
+    let output_path = tmp.path().join("merged.json");
+    let status =
+        run_probe_merge_with_mappings("atoms_a.json", "atoms_b.json", &mappings_path, &output_path);
+    assert!(!status.success(), "invalid confidence must be rejected");
+    assert!(!output_path.exists(), "no output on rejection");
 }
 
 // ===========================================================================

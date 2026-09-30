@@ -294,7 +294,8 @@
         },
         "method": {
           "type": "string",
-          "description": "Optional finer matching-method description (e.g. \"rust-qualified-name\"); omitted when absent."
+          "minLength": 1,
+          "description": "Optional finer matching-method description (e.g. \"rust-qualified-name\"); omitted when absent. Non-empty: the canonical encoding of \"no method\" is omission (merge canonicalizes an empty method to absent, P27)."
         }
       },
       "required": ["target", "confidence"],

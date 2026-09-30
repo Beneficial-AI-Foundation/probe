@@ -1,6 +1,6 @@
 ---
 title: Schema 3.1 Interchange Specification
-last-updated: 2026-09-29
+last-updated: 2026-09-30
 status: draft
 ---
 
@@ -218,9 +218,9 @@ Extension fields are flattened, so the records appear as top-level atom fields. 
 
 On the `to` atom, the mirror field `mapped-from` with `"target"` pointing back.
 
-- **Record fields**: `target` (required), `confidence` (required, the mappings-file vocabulary: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`), `method` (optional; omitted when absent).
+- **Record fields**: `target` (required), `confidence` (required, the mappings-file vocabulary: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`), `method` (optional; omitted when absent — an empty `method` is canonicalized to absent, and no other fields are allowed). Record shape is validated fail-closed at every recomputation boundary ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): merge re-emits these fields and must not violate this schema.
 - **Direction**: the mappings file's `from`/`to` are generic source/target — they assign no implementation/formal roles. `maps-to` goes on the `from` atom, `mapped-from` on the `to` atom, whichever languages the sides are.
-- **Determinism** ([P14](properties.md#p14-deterministic-output)): arrays sorted by `(target, confidence, method)`, absent `method` ordering as the empty string. Record identity is the same triple; duplicates collapse. Records with the same target but different confidence/method are distinct assertions and both kept.
+- **Determinism** ([P14](properties.md#p14-deterministic-output)): arrays sorted by `(target, confidence, method)`, absent `method` ordering as the empty string. Record identity is the same triple; duplicates collapse by that identity. Records with the same target but different confidence/method are distinct assertions and both kept.
 - **Attachment is unconditional and key-local** ([P13](properties.md#p13-correspondence-records-attach-unconditionally)): a record attaches whether or not its target exists in the invocation's key set (dangling target ⇒ warning, not skip).
 - **Union through conflicts** ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): on every equal-key merge resolution the surviving atom carries the set union of both sides' records.
 - **Inert to enrichment**: correspondence records never participate in contamination/promotion BFS ([P23](properties.md#p23-transitive-verification)).
@@ -331,7 +331,7 @@ Schema: `probe/mappings`. Contains bidirectional mappings between code-names acr
 
 The `sources` block describes each side of the mappings (`schema`, `package`, `package-version`). `from`/`to` are generic source/target roles — they assign no implementation/formal roles (a Lean→Rust file is legal). Multiple entries with the same `from` key are allowed (1-to-many): one implementation may correspond to several formal constructs.
 
-Each mapping entry carries a required `confidence` and an optional `method` (a finer description of the matching method, e.g. `"rust-qualified-name"`, `"file+display-name"`):
+Each mapping entry carries a required `confidence` and an optional `method` (a finer description of the matching method, e.g. `"rust-qualified-name"`, `"file+display-name"`). `confidence` is validated against the vocabulary below at load and at the merge boundary, fail-closed — merge writes it into correspondence records, and an unchecked typo would make merge emit output violating the executable schema. An empty `method` is canonicalized to absent at load ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)):
 
 | Confidence | Meaning |
 |------------|---------|

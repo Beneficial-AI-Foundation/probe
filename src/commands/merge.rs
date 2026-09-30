@@ -1,8 +1,9 @@
 use crate::authority::{load_validated_atom_file, validate_authority, AuthorityScope};
 use crate::commands::propagate::enrich_verification_status;
 use crate::types::{
-    load_envelope, load_mappings, normalize_code_name, validate_status_origins, Atom,
-    InputProvenance, Mapping, MergedAtomEnvelope, MergedGenericEnvelope, SchemaCategory, Tool,
+    load_envelope, load_mappings, normalize_code_name, validate_mappings, validate_status_origins,
+    Atom, InputProvenance, Mapping, MergedAtomEnvelope, MergedGenericEnvelope, SchemaCategory,
+    Tool, MAPPING_CONFIDENCE_VALUES,
 };
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -16,7 +17,9 @@ pub struct MergeStats {
     pub entries_added: usize,
     pub keys_normalized: usize,
     pub conflicts: usize,
-    pub mappings_applied: usize,
+    /// Correspondence records newly attached by `--mappings` (0–2 per
+    /// mapping: `maps-to` + `mapped-from`; re-application counts zero).
+    pub records_attached: usize,
     /// Enrichment recomputation counts (atoms category; zero on the raw
     /// staging path and for specs/proofs).
     pub enriched_transitive: usize,
@@ -32,7 +35,7 @@ impl MergeStats {
             entries_added: 0,
             keys_normalized: 0,
             conflicts: 0,
-            mappings_applied: 0,
+            records_attached: 0,
             enriched_transitive: 0,
             enriched_local: 0,
         }
@@ -48,9 +51,10 @@ const MAPPED_FROM: &str = "mapped-from";
 const RECORD_FIELDS: [&str; 2] = [MAPS_TO, MAPPED_FROM];
 
 /// Record identity/sort key: the `(target, confidence, method)` triple, with
-/// absent `method` ordering as the empty string (P27). Non-string or missing
-/// fields key as empty strings — foreign malformed entries still sort
-/// deterministically (P14).
+/// absent `method` keying as the empty string (P27). Boundary validation
+/// ([`validate_and_canonicalize_records`]) guarantees every record reaching
+/// this key is a canonical `{target, confidence, method?}` object, so the
+/// triple determines the record.
 fn record_key(record: &serde_json::Value) -> (String, String, String) {
     let field = |name: &str| {
         record
@@ -63,19 +67,101 @@ fn record_key(record: &serde_json::Value) -> (String, String, String) {
 }
 
 /// Sort a record array by the identity triple and collapse duplicates (P27,
-/// P14). Duplicates are exact JSON-value duplicates; records sharing a triple
-/// key but differing structurally are both kept (fail-open on foreign data —
-/// dropping either would lose evidence).
+/// P14). Dedup is by the identity triple — the same relation the sort orders
+/// by — so equal-identity records always collapse regardless of where they
+/// sit in the array (a tied record between two duplicates must not shield
+/// them). The first occurrence wins; after boundary validation and
+/// canonicalization, equal triples are byte-identical records anyway.
 fn sort_dedup_records(records: &mut Vec<serde_json::Value>) {
     records.sort_by_key(record_key);
-    records.dedup();
+    records.dedup_by(|a, b| record_key(a) == record_key(b));
+}
+
+// @kb: kb/engineering/schema.md#correspondence-records-maps-to-mapped-from
+/// Validate and canonicalize one atom's `maps-to`/`mapped-from` fields,
+/// fail-closed (ADR-006). Merge owns these reserved fields and re-emits them,
+/// so a shape the executable schema rejects must not pass through — and the
+/// union machinery is only lossless on canonical records (a malformed field
+/// swallowing a valid union would make the result grouping-dependent,
+/// breaking P4).
+///
+/// Validation: the field is an array; every entry is an object with a string
+/// `target`, an in-vocabulary `confidence`, optionally a string `method`, and
+/// nothing else (the executable schema's `correspondenceRecord` shape).
+/// Canonicalization: `target` is normalized (P8), an empty `method` becomes
+/// absent (`""` names no matching method — the canonical encoding of "none"
+/// is omission, P27), and the array is sorted and deduped by the identity
+/// triple.
+fn validate_and_canonicalize_records(code_name: &str, atom: &mut Atom) -> Result<(), String> {
+    for field in RECORD_FIELDS {
+        let Some(value) = atom.extensions.get_mut(field) else {
+            continue;
+        };
+        let Some(arr) = value.as_array_mut() else {
+            return Err(format!(
+                "atom {code_name:?}: {field} must be an array of correspondence records (ADR-006)"
+            ));
+        };
+        for entry in arr.iter_mut() {
+            let Some(obj) = entry.as_object_mut() else {
+                return Err(format!(
+                    "atom {code_name:?}: {field} entry {entry} is not a correspondence-record object (ADR-006)"
+                ));
+            };
+            if let Some(unexpected) = obj
+                .keys()
+                .find(|k| !matches!(k.as_str(), "target" | "confidence" | "method"))
+            {
+                return Err(format!(
+                    "atom {code_name:?}: {field} record carries unexpected field {unexpected:?} \
+                     (expected only target/confidence/method, ADR-006)"
+                ));
+            }
+            let target = match obj.get("target").and_then(|v| v.as_str()) {
+                Some(t) => normalize_code_name(t),
+                None => {
+                    return Err(format!(
+                        "atom {code_name:?}: {field} record is missing a string \"target\" (ADR-006)"
+                    ));
+                }
+            };
+            obj.insert("target".to_string(), serde_json::Value::String(target));
+            match obj.get("confidence").and_then(|v| v.as_str()) {
+                Some(c) if MAPPING_CONFIDENCE_VALUES.contains(&c) => {}
+                _ => {
+                    return Err(format!(
+                        "atom {code_name:?}: {field} record carries invalid confidence {} (expected one of: {})",
+                        obj.get("confidence").unwrap_or(&serde_json::Value::Null),
+                        MAPPING_CONFIDENCE_VALUES.join(", ")
+                    ));
+                }
+            }
+            match obj.get("method") {
+                None => {}
+                Some(serde_json::Value::String(m)) if m.is_empty() => {
+                    obj.remove("method");
+                }
+                Some(serde_json::Value::String(_)) => {}
+                Some(other) => {
+                    return Err(format!(
+                        "atom {code_name:?}: {field} record carries non-string method {other} (ADR-006)"
+                    ));
+                }
+            }
+        }
+        sort_dedup_records(arr);
+    }
+    Ok(())
 }
 
 // @kb: kb/engineering/properties.md#p27-correspondence-records-are-unioned-and-inert
 /// Union `other`'s `maps-to`/`mapped-from` arrays into `survivor`'s (P27):
 /// applied on every equal-key merge resolution, so the surviving atom carries
 /// the set union of both sides' correspondence records — they cannot be
-/// re-derived without the mappings file.
+/// re-derived without the mappings file. Both sides have passed
+/// [`validate_and_canonicalize_records`] (every atom is validated during
+/// per-input normalization before any resolution), so the non-array guards
+/// below are defensive only.
 fn union_correspondence_records(survivor: &mut Atom, other: &Atom) {
     for field in RECORD_FIELDS {
         let Some(incoming) = other.extensions.get(field).and_then(|v| v.as_array()) else {
@@ -89,8 +175,6 @@ fn union_correspondence_records(survivor: &mut Atom, other: &Atom) {
             existing.extend(incoming.iter().cloned());
             sort_dedup_records(existing);
         }
-        // A non-array survivor value is foreign malformed data; leave it
-        // untouched rather than silently replacing it.
     }
 }
 
@@ -110,6 +194,8 @@ fn atoms_equal_modulo_records(a: &Atom, b: &Atom) -> bool {
 
 /// Insert one correspondence record into `atom.<field>` (set-like, P13/P27):
 /// returns `true` when the record was new, `false` on a no-op re-application.
+/// The record is constructed in canonical form: an empty `method` is treated
+/// as absent (P27 canonicalization).
 fn push_record(
     atom: &mut Atom,
     field: &str,
@@ -118,7 +204,7 @@ fn push_record(
     method: Option<&str>,
 ) -> bool {
     let mut record = serde_json::json!({ "target": target, "confidence": confidence });
-    if let Some(m) = method {
+    if let Some(m) = method.filter(|m| !m.is_empty()) {
         record["method"] = serde_json::Value::String(m.to_string());
     }
     let entry = atom
@@ -126,7 +212,8 @@ fn push_record(
         .entry(field.to_string())
         .or_insert_with(|| serde_json::Value::Array(Vec::new()));
     let Some(records) = entry.as_array_mut() else {
-        // Foreign malformed field (non-array): do not destroy it.
+        // Defensive: unreachable on merge paths (per-input validation
+        // guarantees an array), kept for direct library callers.
         eprintln!(
             "Warning: atom field {field:?} is not an array; skipping record attachment for target {target:?}"
         );
@@ -207,15 +294,21 @@ fn attach_correspondence_records(base: &mut BTreeMap<String, Atom>, mappings: &[
 /// is judged modulo correspondence records ([P27]: records union through
 /// benign collapses instead of making atoms "distinct"). Collapsing a stub or
 /// an identical-modulo-records duplicate is benign and not reported (P8);
-/// correspondence records are unioned across every collision.
+/// correspondence records are unioned across every benign collision.
+///
+/// Correspondence-record fields are validated fail-closed and put in
+/// canonical form here ([`validate_and_canonicalize_records`]): a malformed
+/// record shape errors the whole input — merge re-emits these fields, and
+/// the record union is only lossless on canonical arrays.
 ///
 /// Shared by every recomputation boundary (ADR-006 carrier preparation):
 /// a distinct-real intra-input collision is producer error, and both `probe
 /// merge` (per input) and the unary `probe enrich` boundary reject it —
 /// silently selecting one atom's evidence can launder contamination (P8).
+#[allow(clippy::type_complexity)]
 pub(crate) fn normalize_atoms(
     atoms: BTreeMap<String, Atom>,
-) -> (BTreeMap<String, Atom>, usize, Vec<(String, String)>) {
+) -> Result<(BTreeMap<String, Atom>, usize, Vec<(String, String)>), String> {
     let mut out: BTreeMap<String, Atom> = BTreeMap::new();
     let mut changed = 0;
     let mut dropped: Vec<(String, String)> = Vec::new();
@@ -245,24 +338,9 @@ pub(crate) fn normalize_atoms(
             }
         }
 
-        // P8/P27: correspondence-record targets are code-names too.
-        for field in RECORD_FIELDS {
-            if let Some(arr) = atom
-                .extensions
-                .get_mut(field)
-                .and_then(|v| v.as_array_mut())
-            {
-                for entry in arr.iter_mut() {
-                    if let Some(target) = entry.get("target").and_then(|v| v.as_str()) {
-                        let norm = normalize_code_name(target);
-                        if let Some(obj) = entry.as_object_mut() {
-                            obj.insert("target".to_string(), serde_json::Value::String(norm));
-                        }
-                    }
-                }
-                sort_dedup_records(arr);
-            }
-        }
+        // P8/P27: validate record shape fail-closed and canonicalize —
+        // record targets are code-names too.
+        validate_and_canonicalize_records(&key, &mut atom)?;
 
         match out.get(&norm_key) {
             Some(existing) if existing.is_stub() && !atom.is_stub() => {
@@ -285,7 +363,7 @@ pub(crate) fn normalize_atoms(
         }
     }
 
-    (out, changed, dropped)
+    Ok((out, changed, dropped))
 }
 
 /// Format a distinct-real intra-input collision rejection (P8): the error
@@ -315,33 +393,51 @@ fn collision_error(dropped: &[(String, String)]) -> String {
 /// This exists for multi-step pipelines (probe-aeneas) that mutate
 /// verification statuses between merge steps and enrich exactly once at the
 /// end; everyone else should use [`merge_atom_maps`]. Raw means *skip
-/// recomputation*, never *skip validation*: the file-level counterpart
-/// [`merge_atom_files_raw`] applies the same authority rejection as the
-/// public entry points.
+/// recomputation*, never *skip validation*: mapping confidences and
+/// correspondence-record shapes are validated fail-closed here (merge emits
+/// those fields and must not violate the executable schema), and the
+/// file-level counterpart [`merge_atom_files_raw`] applies the same authority
+/// rejection as the public entry points. Per-input rejections are prefixed
+/// with the 1-based input position.
 pub fn merge_atom_maps_raw(
     maps: Vec<BTreeMap<String, Atom>>,
     mappings: Option<&[Mapping]>,
 ) -> Result<(BTreeMap<String, Atom>, MergeStats), String> {
     let mut stats = MergeStats::new();
 
-    let mut maps_iter = maps.into_iter();
-    let first = maps_iter.next().unwrap_or_default();
+    // Fail closed on an out-of-vocabulary mapping confidence before touching
+    // any atom: merge writes `confidence` into the records it emits, and the
+    // executable schema constrains it. `load_mappings` already validates file
+    // inputs; this covers in-memory `Mapping` construction by library callers.
+    if let Some(mappings) = mappings {
+        validate_mappings(mappings)?;
+    }
+
+    let total = maps.len();
+    // The 1-based input position, prefixed onto per-input rejections so the
+    // offending producer file is identifiable from the argument order.
+    let input_context = move |i: usize, e: String| format!("input #{} of {total}: {e}", i + 1);
+
+    let mut maps_iter = maps.into_iter().enumerate();
+    let (_, first) = maps_iter.next().unwrap_or_default();
     // P8: normalization runs per input, before conflict resolution — aliases
     // collapse within their own input before evidence from other inputs is
     // considered. A distinct-real intra-input collision is producer error and
     // rejects the merge (same rule as the unary enrich boundary; silently
     // selecting one atom's evidence would feed enrichment inside merge).
-    let (mut base, norm_count, dropped) = normalize_atoms(first);
+    let (mut base, norm_count, dropped) =
+        normalize_atoms(first).map_err(|e| input_context(0, e))?;
     stats.keys_normalized += norm_count;
     if !dropped.is_empty() {
-        return Err(collision_error(&dropped));
+        return Err(input_context(0, collision_error(&dropped)));
     }
 
-    for incoming in maps_iter {
-        let (incoming, norm_count, dropped) = normalize_atoms(incoming);
+    for (i, incoming) in maps_iter {
+        let (incoming, norm_count, dropped) =
+            normalize_atoms(incoming).map_err(|e| input_context(i, e))?;
         stats.keys_normalized += norm_count;
         if !dropped.is_empty() {
-            return Err(collision_error(&dropped));
+            return Err(input_context(i, collision_error(&dropped)));
         }
 
         for (key, incoming_atom) in incoming {
@@ -374,7 +470,7 @@ pub fn merge_atom_maps_raw(
 
     // F_M: attach correspondence records for the fixed mapping set (P13).
     if let Some(mappings) = mappings {
-        stats.mappings_applied = attach_correspondence_records(&mut base, mappings);
+        stats.records_attached = attach_correspondence_records(&mut base, mappings);
     }
 
     stats.stubs_remaining = base.values().filter(|a| a.is_stub()).count();
@@ -388,8 +484,10 @@ pub fn merge_atom_maps_raw(
 /// Merge multiple atom maps into one (μ, optionally `F_M ∘ μ` with mappings).
 ///
 /// The first map is the base. Each input is normalized (P8) before conflict
-/// resolution; a distinct-real intra-input collision is an error. For each
-/// subsequent map:
+/// resolution; a distinct-real intra-input collision is an error, as is a
+/// malformed correspondence-record shape or an out-of-vocabulary mapping
+/// confidence (fail-closed: merge emits those fields and must not violate the
+/// executable schema). For each subsequent map:
 /// - Stubs in the base are replaced by real atoms from the incoming map.
 /// - New atoms (not in base) are added.
 /// - Real-vs-real conflicts keep the base version (first wins, P6).
@@ -733,8 +831,8 @@ fn print_stats(output: &std::path::Path, stats: &MergeStats) {
     if stats.conflicts > 0 {
         println!("  Conflicts:        {}", stats.conflicts);
     }
-    if stats.mappings_applied > 0 {
-        println!("  Records attached: {}", stats.mappings_applied);
+    if stats.records_attached > 0 {
+        println!("  Records attached: {}", stats.records_attached);
     }
     if stats.enriched_transitive > 0 || stats.enriched_local > 0 {
         println!(
@@ -923,7 +1021,7 @@ mod tests {
             "probe:a/1.0/g().".to_string(),
             make_real_atom("g", "src/other.rs", "rust", "exec"),
         );
-        let (out, changed, dropped) = normalize_atoms(atoms);
+        let (out, changed, dropped) = normalize_atoms(atoms).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(changed, 1);
         assert_eq!(
@@ -941,7 +1039,7 @@ mod tests {
             make_real_atom("g", "src/lib.rs", "rust", "exec"),
         );
         atoms.insert("probe:a/1.0/g().".to_string(), make_stub("g", "rust"));
-        let (_, _, dropped) = normalize_atoms(atoms);
+        let (_, _, dropped) = normalize_atoms(atoms).unwrap();
         assert!(dropped.is_empty());
 
         // Identical duplicates collapse silently (dedup, no evidence lost).
@@ -954,7 +1052,7 @@ mod tests {
             "probe:a/1.0/g().".to_string(),
             make_real_atom("g", "src/lib.rs", "rust", "exec"),
         );
-        let (_, _, dropped) = normalize_atoms(atoms);
+        let (_, _, dropped) = normalize_atoms(atoms).unwrap();
         assert!(dropped.is_empty());
 
         // Duplicates differing only in correspondence records are the same
@@ -973,7 +1071,7 @@ mod tests {
             make_real_atom("g", "src/lib.rs", "rust", "exec"),
         );
         atoms.insert("probe:a/1.0/g().".to_string(), with_record);
-        let (out, _, dropped) = normalize_atoms(atoms);
+        let (out, _, dropped) = normalize_atoms(atoms).unwrap();
         assert!(dropped.is_empty());
         assert_eq!(get_records(&out["probe:a/1.0/g()"], MAPS_TO).len(), 1);
     }
@@ -1044,7 +1142,7 @@ mod tests {
             "probe:a/1.0/g()..".to_string(),
             make_real_atom("g", "src/other.rs", "rust", "exec"),
         );
-        let (out, _, dropped) = normalize_atoms(atoms);
+        let (out, _, dropped) = normalize_atoms(atoms).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(
             dropped,
@@ -1136,7 +1234,7 @@ mod tests {
         let (merged, stats) = merge_mapped(vec![rust_atoms, lean_atoms], &mappings);
 
         // One maps-to record on the from atom, one mapped-from on the to atom.
-        assert_eq!(stats.mappings_applied, 2);
+        assert_eq!(stats.records_attached, 2);
         let from_atom = &merged["probe:mycrate/1.0/reduce()"];
         assert_eq!(
             get_records(from_atom, MAPS_TO),
@@ -1181,7 +1279,7 @@ mod tests {
 
         let (merged, stats) = merge_mapped(vec![rust_atoms], &mappings);
 
-        assert_eq!(stats.mappings_applied, 1);
+        assert_eq!(stats.records_attached, 1);
         let from_atom = &merged["probe:a/1.0/encrypt()"];
         assert_eq!(
             get_records(from_atom, MAPS_TO),
@@ -1209,10 +1307,10 @@ mod tests {
         let mappings = vec![mapping("probe:a/1.0/f()", "probe:Pkg.f", "exact")];
 
         let (first, stats) = merge_mapped(vec![atoms], &mappings);
-        assert_eq!(stats.mappings_applied, 2);
+        assert_eq!(stats.records_attached, 2);
 
         let (second, stats) = merge_mapped(vec![first.clone()], &mappings);
-        assert_eq!(stats.mappings_applied, 0, "re-application is a no-op");
+        assert_eq!(stats.records_attached, 0, "re-application is a no-op");
         assert_eq!(second, first);
     }
 
@@ -1235,7 +1333,7 @@ mod tests {
         ];
 
         let (merged, stats) = merge_mapped(vec![atoms], &mappings);
-        assert_eq!(stats.mappings_applied, 3);
+        assert_eq!(stats.records_attached, 3);
 
         let records = get_records(&merged["probe:a/1.0/f()"], MAPS_TO);
         assert_eq!(
@@ -1284,7 +1382,7 @@ mod tests {
 
         let (merged, stats) = merge_mapped(vec![rust_atoms, lean_atoms], &mappings);
 
-        assert_eq!(stats.mappings_applied, 4, "2 maps-to + 2 mapped-from");
+        assert_eq!(stats.records_attached, 4, "2 maps-to + 2 mapped-from");
         let records = get_records(&merged["probe:mycrate/1.0/encrypt()"], MAPS_TO);
         assert_eq!(records.len(), 2);
         assert_eq!(
@@ -1307,12 +1405,202 @@ mod tests {
         let mut atoms = BTreeMap::new();
         atoms.insert("probe:a/1.0/f()".to_string(), atom);
 
-        let (out, _, dropped) = normalize_atoms(atoms);
+        let (out, _, dropped) = normalize_atoms(atoms).unwrap();
         assert!(dropped.is_empty());
         assert_eq!(
             get_records(&out["probe:a/1.0/f()"], MAPS_TO),
             &vec![serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"})]
         );
+    }
+
+    // P8/P27: records that become equal only after target normalization are
+    // one assertion — they collapse to a single canonical record.
+    #[test]
+    fn test_records_equal_after_target_normalization_collapse() {
+        let mut atom = make_real_atom("f", "src/lib.rs", "rust", "exec");
+        atom.extensions.insert(
+            MAPS_TO.to_string(),
+            serde_json::json!([
+                {"target": "probe:Pkg.f.", "confidence": "exact"},
+                {"target": "probe:Pkg.f", "confidence": "exact"}
+            ]),
+        );
+        let mut atoms = BTreeMap::new();
+        atoms.insert("probe:a/1.0/f()".to_string(), atom);
+
+        let (out, _, _) = normalize_atoms(atoms).unwrap();
+        assert_eq!(
+            get_records(&out["probe:a/1.0/f()"], MAPS_TO),
+            &vec![serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"})]
+        );
+    }
+
+    // P27 canonical form: `method: ""` names no matching method — it is
+    // canonicalized to absent, so a record with and without the empty method
+    // is one identity and collapses. Without this, identity (the triple) and
+    // dedup disagree: a tied-key twin shields exact duplicates from
+    // collapsing, and the set union grows on self-merge.
+    #[test]
+    fn test_empty_method_canonicalized_to_absent() {
+        let r = serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"});
+        let s = serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact", "method": ""});
+
+        // Input-atom path: both encodings collapse to the canonical record.
+        let mut atom = make_real_atom("f", "src/lib.rs", "rust", "exec");
+        atom.extensions
+            .insert(MAPS_TO.to_string(), serde_json::json!([r, s]));
+        let mut atoms = BTreeMap::new();
+        atoms.insert("probe:a/1.0/f()".to_string(), atom.clone());
+        let (out, _, _) = normalize_atoms(atoms).unwrap();
+        assert_eq!(
+            get_records(&out["probe:a/1.0/f()"], MAPS_TO),
+            &vec![serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"})]
+        );
+
+        // Self-merge is idempotent on the record set (no duplicate growth).
+        let mut atoms = BTreeMap::new();
+        atoms.insert("probe:a/1.0/f()".to_string(), atom);
+        let (merged, _) = merge(vec![atoms.clone(), atoms]);
+        assert_eq!(get_records(&merged["probe:a/1.0/f()"], MAPS_TO).len(), 1);
+
+        // Mapping path: an empty method attaches the same record as no method.
+        let mut base = BTreeMap::new();
+        base.insert(
+            "probe:a/1.0/g()".to_string(),
+            make_real_atom("g", "src/lib.rs", "rust", "exec"),
+        );
+        let mut with_empty = mapping("probe:a/1.0/g()", "probe:Pkg.g", "exact");
+        with_empty.method = Some(String::new());
+        let (first, stats) = merge_mapped(vec![base], &[with_empty]);
+        assert_eq!(stats.records_attached, 1);
+        assert_eq!(
+            get_records(&first["probe:a/1.0/g()"], MAPS_TO),
+            &vec![serde_json::json!({"target": "probe:Pkg.g", "confidence": "exact"})]
+        );
+        let (_, stats) = merge_mapped(
+            vec![first],
+            &[mapping("probe:a/1.0/g()", "probe:Pkg.g", "exact")],
+        );
+        assert_eq!(stats.records_attached, 0, "same identity, no re-attachment");
+    }
+
+    // P4 regression: records tying on the identity triple must not make the
+    // merge result grouping-dependent. With the empty-method twin encoding,
+    // stub replacement used to reverse which record sequence was appended
+    // first, and the stable tie sort preserved that order.
+    #[test]
+    fn test_tied_identity_records_keep_associativity() {
+        let key = "probe:a/1.0/f()".to_string();
+        let with_records = |mut atom: Atom, records: serde_json::Value| {
+            atom.extensions.insert(MAPS_TO.to_string(), records);
+            atom
+        };
+
+        let mut a = BTreeMap::new();
+        a.insert(
+            key.clone(),
+            with_records(
+                make_stub("f", "rust"),
+                serde_json::json!([{"target": "probe:Pkg.f", "confidence": "exact"}]),
+            ),
+        );
+        let mut b = BTreeMap::new();
+        b.insert(
+            key.clone(),
+            with_records(
+                make_stub("f", "rust"),
+                serde_json::json!([{"target": "probe:Pkg.f", "confidence": "exact", "method": ""}]),
+            ),
+        );
+        let mut c = BTreeMap::new();
+        c.insert(
+            key.clone(),
+            make_real_atom("f", "src/lib.rs", "rust", "exec"),
+        );
+
+        let (flat, _) = merge(vec![a.clone(), b.clone(), c.clone()]);
+        let (ab, _) = merge(vec![a.clone(), b.clone()]);
+        let (left, _) = merge(vec![ab, c.clone()]);
+        let (bc, _) = merge(vec![b, c]);
+        let (right, _) = merge(vec![a, bc]);
+
+        assert_eq!(left, flat);
+        assert_eq!(right, flat);
+        assert_eq!(
+            get_records(&flat[&key], MAPS_TO),
+            &vec![serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"})]
+        );
+    }
+
+    // ADR-006 fail-closed: a malformed correspondence-record shape rejects
+    // the offending input — merge re-emits these fields (the executable
+    // schema constrains them), and the union machinery is only lossless on
+    // canonical records (a non-array field silently swallowing a union would
+    // make the result grouping-dependent, breaking P4). The error names the
+    // input position.
+    #[test]
+    fn test_malformed_record_shapes_rejected() {
+        let with_field = |value: serde_json::Value| {
+            let mut atom = make_real_atom("f", "src/lib.rs", "rust", "exec");
+            atom.extensions.insert(MAPS_TO.to_string(), value);
+            let mut atoms = BTreeMap::new();
+            atoms.insert("probe:a/1.0/f()".to_string(), atom);
+            atoms
+        };
+        let ok = || {
+            let mut atoms = BTreeMap::new();
+            atoms.insert(
+                "probe:a/1.0/g()".to_string(),
+                make_real_atom("g", "src/lib.rs", "rust", "exec"),
+            );
+            atoms
+        };
+
+        for (bad, why) in [
+            (serde_json::json!("not-an-array"), "must be an array"),
+            (
+                serde_json::json!([42]),
+                "not a correspondence-record object",
+            ),
+            (
+                serde_json::json!([{"target": "probe:Pkg.f", "confidence": "exact", "note": "x"}]),
+                "unexpected field",
+            ),
+            (
+                serde_json::json!([{"target": "probe:Pkg.f", "confidence": "high"}]),
+                "invalid confidence",
+            ),
+            (
+                serde_json::json!([{"confidence": "exact"}]),
+                "missing a string \"target\"",
+            ),
+            (
+                serde_json::json!([{"target": "probe:Pkg.f", "confidence": "exact", "method": 3}]),
+                "non-string method",
+            ),
+        ] {
+            let err = merge_atom_maps(vec![ok(), with_field(bad.clone())], None).unwrap_err();
+            assert!(err.contains(why), "{bad}: {err}");
+            assert!(err.contains("input #2 of 2"), "{err}");
+        }
+    }
+
+    // Fail-closed mapping validation: an out-of-vocabulary confidence rejects
+    // the merge (merge writes `confidence` into the records it emits; the
+    // executable schema constrains it).
+    #[test]
+    fn test_invalid_mapping_confidence_rejected() {
+        let mut atoms = BTreeMap::new();
+        atoms.insert(
+            "probe:a/1.0/f()".to_string(),
+            make_real_atom("f", "src/lib.rs", "rust", "exec"),
+        );
+        let err = merge_atom_maps(
+            vec![atoms],
+            Some(&[mapping("probe:a/1.0/f()", "probe:Pkg.f", "high")]),
+        )
+        .unwrap_err();
+        assert!(err.contains("invalid confidence"), "{err}");
     }
 
     // -----------------------------------------------------------------------
@@ -1542,7 +1830,7 @@ mod tests {
         legacy.insert("probe:a/1.0/g().".to_string(), g);
 
         let (merged, _) = merge(vec![legacy.clone(), BTreeMap::new()]);
-        let (prepared, _) = prepare_atoms(legacy);
+        let (prepared, _) = prepare_atoms(legacy).unwrap();
         assert_eq!(merged, prepared, "μ(A, ∅) = enrich(normalize(A)) on legacy");
         assert_eq!(get_status(&merged["probe:a/1.0/f()"]), Some("verified"));
         assert!(merged.contains_key("probe:a/1.0/g()"));
@@ -1566,7 +1854,7 @@ mod tests {
         let (mapped, _) = merge_mapped(vec![a.clone(), b.clone()], &m);
         let (remapped, stats) = merge_mapped(vec![mapped.clone()], &m);
         assert_eq!(remapped, mapped, "F_M(F_M(A)) = F_M(A)");
-        assert_eq!(stats.mappings_applied, 0);
+        assert_eq!(stats.records_attached, 0);
 
         // Compatibility: F_M(μ(A, B)) = μ(F_M(A), F_M(B)). Records attached
         // per input (dangling targets included, P13) union through the plain
@@ -2220,6 +2508,44 @@ mod tests {
         assert_eq!(mappings[0].method.as_deref(), Some("hand-written"));
     }
 
+    /// Fail-closed at the file boundary: an out-of-vocabulary confidence is
+    /// rejected at load (merge would otherwise emit records the executable
+    /// schema rejects), and an empty method is canonicalized to absent (P27).
+    #[test]
+    fn test_load_mappings_validates_confidence_and_canonicalizes_method() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let bad = dir.path().join("bad.json");
+        let content = serde_json::json!({
+            "schema": "probe/mappings",
+            "schema-version": "3.0",
+            "mappings": [
+                {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "high"}
+            ]
+        });
+        std::fs::write(&bad, serde_json::to_string_pretty(&content).unwrap()).unwrap();
+        let err = load_mappings(&bad).unwrap_err();
+        assert!(err.contains("invalid confidence"), "{err}");
+        assert!(err.contains("bad.json"), "{err}");
+
+        let empty_method = dir.path().join("empty-method.json");
+        let content = serde_json::json!({
+            "schema": "probe/mappings",
+            "schema-version": "3.0",
+            "mappings": [
+                {"from": "probe:a/1.0/f()", "to": "probe:a.lean.f", "confidence": "exact",
+                 "method": ""}
+            ]
+        });
+        std::fs::write(
+            &empty_method,
+            serde_json::to_string_pretty(&content).unwrap(),
+        )
+        .unwrap();
+        let mappings = load_mappings(&empty_method).unwrap();
+        assert_eq!(mappings[0].method, None, "empty method canonicalized");
+    }
+
     // P8: `dependencies-with-locations` code-names are normalized alongside
     // keys and the dependencies set.
     #[test]
@@ -2232,7 +2558,7 @@ mod tests {
         let mut atoms = BTreeMap::new();
         atoms.insert("probe:a/1.0/f()".to_string(), atom);
 
-        let (out, _, _) = normalize_atoms(atoms);
+        let (out, _, _) = normalize_atoms(atoms).unwrap();
         let dwl = out["probe:a/1.0/f()"]
             .extensions
             .get("dependencies-with-locations")
@@ -2240,12 +2566,29 @@ mod tests {
         assert_eq!(dwl[0]["code-name"], "probe:a/1.0/g()");
     }
 
-    // P14 at the envelope level: two identical merges serialize to
-    // byte-identical full envelope JSON (fixed meta), records included.
+    // P14 at the envelope level: the same evidence presented in different
+    // input orders — pre-attached record arrays reversed, mappings file
+    // reordered — serializes to byte-identical full envelope JSON (fixed
+    // meta). This exercises the canonicalization (record sort + triple dedup),
+    // not just BTreeMap ordering.
     #[test]
     fn test_full_envelope_serialization_deterministic() {
-        let build = || {
-            let (a, b, _, m) = law_fixtures();
+        let build = |reverse: bool| {
+            let (mut a, b, _, mut m) = law_fixtures();
+            // Pre-attach two records on one atom, in order-dependent form.
+            let mut records = vec![
+                serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"}),
+                serde_json::json!({"target": "probe:Other.f", "confidence": "manual"}),
+            ];
+            if reverse {
+                records.reverse();
+                m.reverse();
+            }
+            a.get_mut("probe:a/1.0/f()")
+                .unwrap()
+                .extensions
+                .insert(MAPS_TO.to_string(), serde_json::Value::Array(records));
+
             let (merged, _) = merge_mapped(vec![a, b], &m);
             let envelope = MergedAtomEnvelope {
                 schema: "probe/merged-atoms".to_string(),
@@ -2271,7 +2614,7 @@ mod tests {
             };
             serde_json::to_string_pretty(&envelope).unwrap()
         };
-        assert_eq!(build(), build());
+        assert_eq!(build(false), build(true));
     }
 
     #[test]

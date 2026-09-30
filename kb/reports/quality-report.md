@@ -1,9 +1,9 @@
 ---
 auditor: code-quality-auditor
-date: 2026-09-29
+date: 2026-09-30
 repo: probe (hub)
-kb: kb/ (own KB; branch amends P8/P27 wording — those two audited against BOTH the branch text and origin/main's, see W1; all other property text is identical to origin/main)
-scope: branch la/merge-soundness-pr3b-maps-to-records vs origin/main (merge-soundness PR 3b — correspondence records, merge re-enrichment, raw staging primitives, P8 intra-input collision reconciliation)
+kb: kb/ (own KB; branch amends P8/P27 wording — those audited against BOTH the branch text and origin/main's, see W1; all other property text is identical to origin/main)
+scope: branch la/merge-soundness-pr3b-maps-to-records vs origin/main (merge-soundness PR 3b — correspondence records, merge re-enrichment, raw staging primitives, P8 intra-input collision reconciliation), plus the working-tree review-fix delta (record canonical form + triple dedup, fail-closed record/mapping validation, prepare_atoms Result, records_attached rename — cross-model review of PR #81)
 status: 0 critical, 2 warnings, 1 info
 ---
 
@@ -13,11 +13,11 @@ None.
 
 ## Warnings
 
-### [W1] P8/P27 amendment is a merge-order constraint (deliberate, plan-authorized)
-- **Location**: kb/engineering/properties.md P8 ¶2 and P27 bullet 1 (this branch) vs `git show origin/main:kb/engineering/properties.md`
-- **Issue**: against origin/main's P8, merge on a distinct-real intra-input collision "warns and keeps first-wins"; this branch's code **rejects** it (src/commands/merge.rs `merge_atom_maps_raw`, `collision_error`) and amends P8/P27 to match. Code conforms only to the unmerged amendment.
-- **Evidence**: the amendment is the reconciliation the plan's §9 row 3b explicitly mandates ("extend rejection to merge's per-input normalization or record the asymmetry in §10") — commit 4d1dbb3 recorded the obligation; the branch records the decision in ADR-006 Decision 3, plan §10, and P8. Rationale: once μ re-enriches internally, warn-and-count lets first-wins-selected evidence feed enrichment inside merge — the laundering path main's own P8 clause condemns at the unary boundary.
-- **Recommendation**: none beyond merging this PR as one unit (spec amendment + implementation + tests land together). Reviewers should confirm the rejection choice over the recorded-asymmetry alternative.
+### [W1] P8/P27 amendments are a merge-order constraint (deliberate, plan-authorized)
+- **Location**: kb/engineering/properties.md P8 ¶2 and P27 bullets 1–4 (this branch) vs `git show origin/main:kb/engineering/properties.md`
+- **Issue**: against origin/main's P8, merge on a distinct-real intra-input collision "warns and keeps first-wins"; this branch's code **rejects** it (src/commands/merge.rs `merge_atom_maps_raw`, `collision_error`) and amends P8/P27 to match. The review-fix delta adds two further P27 amendments the code conforms to only on this branch: the canonical-form clause (`method: ""` ≡ absent; dedup by the identity triple) and the fail-closed record-shape/mapping-confidence validation clause. Code conforms only to the unmerged amendments.
+- **Evidence**: the P8 amendment is the reconciliation the plan's §9 row 3b explicitly mandates ("extend rejection to merge's per-input normalization or record the asymmetry in §10") — commit 4d1dbb3 recorded the obligation; the branch records the decision in ADR-006 Decision 3, plan §10, and P8. Rationale: once μ re-enriches internally, warn-and-count lets first-wins-selected evidence feed enrichment inside merge — the laundering path main's own P8 clause condemns at the unary boundary. The P27 canonical-form/validation amendments resolve the PR #81 cross-model review's two P1 findings (both reproduced as failing tests before the fix: tied-identity records broke associativity and set-dedup; a malformed non-array record field lost valid records grouping-dependently) — human-authorized, recorded in ADR-006 Decision 1 and plan §10.
+- **Recommendation**: none beyond merging this PR as one unit (spec amendments + implementation + tests land together). Reviewers should confirm the rejection choice over the recorded-asymmetry alternative and the canonical-form decision (`""` ≡ absent).
 
 ### [W2] Staged KB clauses scheduled for PR 3c (carried from the PR 2 audit, narrowed)
 - **Location**: kb/engineering/properties.md P8/P9/P15 vs src/commands/{merge,project}.rs
@@ -38,6 +38,59 @@ None.
 ## Fixed during this audit
 
 - kb/engineering/schema.md merged-envelope example: `schema-version` 3.0 → 3.1 and `tool.version` 0.1.0 → 0.5.0 (the hub now stamps 3.1 on merged output; a 0.1.0 tool example would be rejected by the gate the same page specifies).
+
+## Review-fix delta (2026-09-30, PR #81 cross-model review)
+
+Checked in addition to the base changeset below; spec (P27, schema.md, ADR-006
+Decision 1, probe-merge.md Phase 2, glossary) and code moved together under
+explicit human authorization (see W1):
+
+- **P27 canonical form** — `record_key`/`sort_dedup_records` dedup by the
+  identity triple (`dedup_by`, first occurrence wins in sorted order);
+  `method: ""` canonicalized to absent in `validate_and_canonicalize_records`
+  (input atoms), `push_record` (attachment), and `load_mappings` (file load);
+  the executable schema's `correspondenceRecord.method` gained `minLength: 1`.
+  Regressions: `test_empty_method_canonicalized_to_absent` (all three paths +
+  self-merge idempotence), `test_tied_identity_records_keep_associativity`
+  (the review's P4 counterexample, now associative),
+  `test_records_equal_after_target_normalization_collapse`.
+- **P27 fail-closed validation** — `validate_and_canonicalize_records` runs
+  inside `normalize_atoms`, so every recomputation boundary gets it: merge per
+  input (`merge_atom_maps_raw`, both first and subsequent inputs), enrich via
+  `prepare_atoms` (now `Result`-returning; `cmd_enrich` rejects). Rejected
+  shapes: non-array field, non-object entry, unexpected extra field, missing/
+  non-string `target`, out-of-vocabulary `confidence`, non-string `method`
+  (`test_malformed_record_shapes_rejected` — one case per arm — and
+  propagate's `test_prepare_rejects_malformed_correspondence_records`). This
+  closes the review's grouping-dependent evidence-loss counterexample (a
+  malformed non-array field can no longer swallow a union).
+- **Mapping confidence validation** — `MAPPING_CONFIDENCE_VALUES`
+  (src/types.rs) validated in `load_mappings` (file boundary, error names the
+  file) and `merge_atom_maps_raw` (in-memory `Mapping` values,
+  `validate_mappings`); pinned against the executable schema enum by
+  `confidence_vocabulary_matches_executable_schema`. CLI rejection covered
+  end-to-end (`test_merge_rejects_invalid_mapping_confidence_via_cli`, exits
+  non-zero, no output written).
+- **CLI `--mappings` end-to-end** — new binary-level test
+  (`test_merge_with_mappings_attaches_records_via_cli`): records attached both
+  directions, endpoints normalized at load, dangling target attached anyway,
+  `dependencies` byte-equal to the input's.
+- **P14** — the envelope-determinism test now varies record-array and
+  mappings-file input order (`test_full_envelope_serialization_deterministic`),
+  exercising canonicalization rather than only BTreeMap ordering.
+- **Per-input error context** — merge rejections are prefixed `input #N of M`
+  (`merge_atom_maps_raw::input_context`; asserted in
+  `test_malformed_record_shapes_rejected` and the collision tests), matching
+  probe-merge.md Phase 2.
+- **Rename** — `MergeStats.mappings_applied` → `records_attached` (doc comment
+  states the 0–2-per-mapping semantics); no KB or docs surface named the old
+  field (checked by grep; the stats-table label "Records attached" was already
+  the printed form).
+- **Docs accuracy** — schema.md § Correspondence records (canonical form, "no
+  other fields"), § Mappings file format (load-boundary validation), P27,
+  probe-merge.md Phase 2, glossary `correspondence record`, ADR-006 Decision 1
+  consequences, and CHANGELOG all state the implemented behavior; KB link check
+  and enum drift guard pass.
 
 ## Verified clean
 
@@ -60,4 +113,4 @@ Checked on the changeset (commit 90c50cc), at these locations:
 - **Docs/architecture** — architecture.md:31 (post-merge enrichment recomputation, record attachment) now describes implemented behavior; kb/tools/probe-merge.md phases 2/4/5, stats table, and key-files row updated; schema.md normalization and status-origin enforcement rows updated; CLI help (src/main.rs) already stated record semantics; `./scripts/check-kb-links.sh` and the enum drift guard pass.
 - **P1, P2, P15, P16, P19, P21, P22, P24, P25** — not touched by this changeset; spot-checked that no changed file affects them (P15's known project-side gap is W2).
 
-Suite: 206 tests green (`cargo test --workspace`), clippy clean with `-D warnings`, `cargo fmt --check` clean.
+Suite: 245 tests green (`cargo test --workspace`, review-fix delta included), clippy clean with `-D warnings`, `cargo fmt --check` clean.

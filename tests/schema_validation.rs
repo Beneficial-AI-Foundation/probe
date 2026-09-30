@@ -585,7 +585,7 @@ fn merged_envelope_with_correspondence_records_is_valid() {
 
     let (merged, stats) =
         merge_atom_maps(vec![rust_atoms, lean_atoms], Some(&mappings)).expect("merge succeeds");
-    assert_eq!(stats.mappings_applied, 2);
+    assert_eq!(stats.records_attached, 2);
 
     let source = |language: &str, package: &str| Source {
         repo: "https://github.com/org/project".to_string(),
@@ -680,6 +680,9 @@ fn malformed_correspondence_records_are_rejected() {
         json!({"target": "probe:Pkg.f", "confidence": "high"}),
         json!({"confidence": "exact"}),
         json!({"target": "probe:Pkg.f", "confidence": "exact", "extra": 1}),
+        // Empty method: the canonical encoding of "no method" is omission
+        // (P27); merge canonicalizes, the schema forbids.
+        json!({"target": "probe:Pkg.f", "confidence": "exact", "method": ""}),
     ] {
         let doc = envelope_with_record(bad.clone());
         assert!(
@@ -687,4 +690,21 @@ fn malformed_correspondence_records_are_rejected() {
             "record {bad} should be rejected"
         );
     }
+}
+
+/// Drift guard: the confidence vocabulary the code validates against
+/// (`MAPPING_CONFIDENCE_VALUES`, used by `load_mappings` and the merge
+/// boundaries) is exactly the executable schema's `correspondenceRecord`
+/// confidence enum.
+#[test]
+fn confidence_vocabulary_matches_executable_schema() {
+    let schema = load_schema();
+    let enum_values: Vec<&str> = schema["$defs"]["correspondenceRecord"]["properties"]
+        ["confidence"]["enum"]
+        .as_array()
+        .expect("confidence enum present")
+        .iter()
+        .map(|v| v.as_str().expect("enum values are strings"))
+        .collect();
+    assert_eq!(enum_values, probe::types::MAPPING_CONFIDENCE_VALUES);
 }

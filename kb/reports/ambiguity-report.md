@@ -1,12 +1,15 @@
 ---
 auditor: ambiguity-auditor
-date: 2026-09-29
+date: 2026-09-30
 repo: probe (hub)
 kb: kb/ (own KB)
 scope: branch la/merge-soundness-pr3b-maps-to-records (merge-soundness PR 3b —
   correspondence records, merge re-enrichment, raw staging, P8 reconciliation),
   delta audit over the PR 2 report; every KB surface this PR touches or
-  implements re-checked against the code
+  implements re-checked against the code. Second pass 2026-09-30 over the
+  PR #81 review-fix surfaces (P27 canonical form + fail-closed validation:
+  P27, schema.md §§ Correspondence records / Mappings file format, ADR-006
+  Decision 1, probe-merge.md Phase 2, glossary).
 status: 0 critical, 3 warnings, 2 info
 ---
 
@@ -91,7 +94,39 @@ now the *expected* steady state, not drift.
 - `last-updated` stamps bumped (2026-09-28 → 2026-09-29) on properties.md,
   schema.md, and probe-merge.md, all substantively edited by this branch.
 
+Second pass (2026-09-30, review-fix surfaces):
+
+- kb/tools/probe-merge.md Phase 2 restated P27's rejected-shape list and had
+  already drifted (five items to P27's six — "non-string method" missing).
+  Replaced the restated list with a short characterization plus a pointer to
+  P27 as the normative list, the same delegate-don't-duplicate rule the enum
+  drift guard enforces on the docs surface.
+
 ## Verified clean (this delta)
+
+Second pass (2026-09-30, review-fix surfaces):
+
+- **Cross-file agreement on the canonical-form clause**: P27 ("empty `method`
+  ... canonicalized to absent", dedup by identity), schema.md § Correspondence
+  records ("an empty `method` is canonicalized to absent, and no other fields
+  are allowed"), § Mappings file format (validated at load), ADR-006
+  Decision 1 (rationale: two encodings of one identity break set union and
+  P4), glossary `correspondence record`, probe-merge.md Phase 2, and plan §10
+  state the same rule; the executable schema's `minLength: 1` on `method` is
+  the same decision in schema form.
+- **"Every recomputation boundary"** in the new P27/ADR-006/schema.md
+  validation clauses follows P8 ¶2's established construction — enumerated in
+  place as merge (per input) + enrich. `probe project` joining at PR 3c (when
+  it routes through `prepare_atoms`) is already the W3 window; validation
+  rides along automatically because it lives inside `normalize_atoms`.
+- **"canonical form"** is a predicate of P27 defined at first use and reused
+  consistently — below the glossary-entry bar for the same reason as I1's
+  "identical-modulo-records". No action.
+- **Claims vs code**: the six-item rejection list in P27 matches
+  `validate_and_canonicalize_records` arm-for-arm; the confidence vocabulary
+  is pinned code↔schema by `confidence_vocabulary_matches_executable_schema`;
+  `load_mappings`' documented load-boundary validation and `""`→absent
+  canonicalization match the implementation.
 
 - **Glossary consistency**: `merge`, `mapping`, `correspondence record`,
   `carrier`, `version gate`, `blocker seed`, `trusted (boundary)` — all match

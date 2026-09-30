@@ -1,6 +1,6 @@
 ---
 title: "ADR-006: Correspondence records and the verification evidence contract"
-last-updated: 2026-09-28
+last-updated: 2026-09-30
 status: accepted
 ---
 
@@ -68,6 +68,19 @@ Consequences:
 - Records are **unioned through every equal-key conflict** and are inert
   to enrichment and projection
   ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
+- Records have **one canonical form** and are **validated fail-closed**
+  (PR 3b review): record identity is the `(target, confidence, method)`
+  triple, dedup is by that same identity, and an empty `method` is
+  canonicalized to absent (`""` names no matching method; the canonical
+  encoding of "none" is omission — two encodings of one identity would
+  let a tied-key record shield exact duplicates from collapsing, growing
+  the "set" union on self-merge and making merge results
+  grouping-dependent). Because merge re-emits these fields into
+  schema-constrained output, every recomputation boundary rejects a
+  malformed record shape, and mapping confidences are validated against
+  the vocabulary at load and at the merge boundary — a warning is not
+  enough: a malformed field silently swallowing a union already lost
+  evidence grouping-dependently (P4).
   This is a narrow carve-out from whole-atom conflict semantics; general
   extension union (review issue 4) remains a separate, undecided question.
 - Wire format and determinism rules:

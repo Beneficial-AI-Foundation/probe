@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe (merge operator)"
-last-updated: 2026-09-29
+last-updated: 2026-09-30
 status: draft
 ---
 
@@ -42,7 +42,9 @@ Authority validation (steps 3–4) is one shared validator invoked at every enve
 
 Strip trailing `.` from all code-name keys, dependency references, code-name-bearing extension arrays, and mapping endpoints ([P8](../engineering/properties.md#p8-code-name-normalization)). Per-input ordering is semantic: aliases collapse within their own input before cross-input conflicts are resolved, so Phase 3 pairs already-normalized atoms.
 
-If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules) and identical-modulo-records duplicates collapse; if both are real atoms and differ beyond their correspondence records, the merge **errors** — a single input offering two distinct atoms for one code-name is producer error, and merge re-enriches (Phase 5), so silently selecting one atom's evidence would launder contamination; the same rule the unary `probe enrich` boundary applies ([P8](../engineering/properties.md#p8-code-name-normalization)). Correspondence records are unioned across benign collisions ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)).
+Correspondence-record fields on input atoms are validated fail-closed and put in canonical form in the same pass: a malformed `maps-to`/`mapped-from` shape (anything other than an array of well-typed `{target, confidence, method?}` objects — the normative list is [P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)'s) **errors** the offending input — merge re-emits these fields into schema-constrained output, and a malformed field silently swallowing a record union would make the result grouping-dependent (P4). An empty `method` is canonicalized to absent, and record arrays are sorted and deduped by the identity triple. Mapping-file confidences are validated against the same vocabulary (at load, and again at the merge boundary for in-memory `Mapping` values).
+
+If normalization makes two keys within the same file collide, stub-vs-real resolution applies (Phase 3 rules) and identical-modulo-records duplicates collapse; if both are real atoms and differ beyond their correspondence records, the merge **errors** — a single input offering two distinct atoms for one code-name is producer error, and merge re-enriches (Phase 5), so silently selecting one atom's evidence would launder contamination; the same rule the unary `probe enrich` boundary applies ([P8](../engineering/properties.md#p8-code-name-normalization)). Correspondence records are unioned across benign collisions ([P27](../engineering/properties.md#p27-correspondence-records-are-unioned-and-inert)). Per-input rejections are prefixed with the 1-based input position (`input #2 of 3: …`) so the offending producer file is identifiable from the argument order.
 
 ### Phase 3: Merge
 

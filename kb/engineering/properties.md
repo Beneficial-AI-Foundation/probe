@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-09-29
+last-updated: 2026-09-30
 status: draft
 ---
 
@@ -307,7 +307,9 @@ Causes (1) and (2) are about whether rustc compiles the item at all; (3) is abou
 `maps-to`/`mapped-from` records ([schema.md § Correspondence records](schema.md#correspondence-records-maps-to-mapped-from)):
 
 - **Union through every equal-key resolution**: on stub replacement, real-vs-real first-wins, stub-vs-stub, and post-normalization collisions within a single input (the benign collapses — stub or identical-modulo-records — that survive [P8](#p8-code-name-normalization)'s distinct-real rejection), the surviving atom's `maps-to`/`mapped-from` arrays are the set union of both sides'. This is a narrow, decidable carve-out from whole-atom conflict semantics ([P6](#p6-atom-merge-is-first-wins-with-stub-replacement), [P10](#p10-extensions-are-preserved-through-merge)), specific to correspondence records — they cannot be re-derived without the mappings file. General extension union remains undecided.
-- **Identity and order**: record identity is `(target, confidence, method)` with absent `method` ordering as the empty string; arrays are sorted by the same triple ([P14](#p14-deterministic-output)); duplicates collapse. Same target with different confidence/method = distinct assertions, both kept.
+- **Identity and order**: record identity is `(target, confidence, method)` with absent `method` ordering as the empty string; arrays are sorted by the same triple ([P14](#p14-deterministic-output)); duplicates collapse **by that identity** — dedup and identity are the same relation, so a tied-key record can never shield duplicates from collapsing. Same target with different confidence/method = distinct assertions, both kept.
+- **Canonical form**: an empty `method` names no matching method and is canonicalized to absent at every boundary that constructs or normalizes records (`""` and omission are one identity; the canonical encoding of "none" is omission — the executable schema requires a non-empty `method`). Without this, identity and value-equality disagree and the union stops being a set.
+- **Validated fail-closed**: `maps-to`/`mapped-from` are merge-owned reserved fields, re-emitted into schema-constrained output, so every recomputation boundary (`probe merge` per input, `probe enrich`) rejects a malformed shape — non-array field, non-object entry, missing/non-string `target`, out-of-vocabulary `confidence`, non-string `method`, unexpected extra field — rather than passing it through: a malformed field silently swallowing a union would make the result grouping-dependent, breaking [P4](#p4-merge-associativity-on-the-carrier). Mapping-file `confidence` is validated against the same vocabulary at load and at the merge boundary (in-memory `Mapping` values included).
 - **Normalized**: record targets are covered by [P8](#p8-code-name-normalization).
 - **Inert**: records never participate in the contamination/promotion BFS ([P23](#p23-transitive-verification)) and are never traversed by projection BFS.
 - **Mirrors are best-effort**: the correspondence relation is the union over both fields; consumers index both and derive reverse lookups. A missing mirror (target absent at attachment time) loses no information; regeneration restores it. Mapping corrections and withdrawals take effect only by regenerating from extracts + the corrected mappings file — attachment never removes a record.

@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-09-28
+last-updated: 2026-09-30
 status: draft
 ---
 
@@ -56,7 +56,7 @@ Mapping-generation invariants are owned by probe-aeneas — see [properties.md �
 
 ## correspondence record
 
-A `maps-to` or `mapped-from` entry on an [atom](#atom), attached by `probe merge --mappings`: `{target, confidence, method?}`. Records assert "there is a mappings-file entry linking these names, with this confidence" — a different relation from a dependency, with its own verification semantics: the correspondence is a trust boundary, not a call. Unioned through every merge conflict, inert to enrichment and projection ([P13](properties.md#p13-correspondence-records-attach-unconditionally), [P27](properties.md#p27-correspondence-records-are-unioned-and-inert), [schema.md § Correspondence records](schema.md#correspondence-records-maps-to-mapped-from)). The correspondence relation is the union over both fields; cross-language resolution is a derived consumer view.
+A `maps-to` or `mapped-from` entry on an [atom](#atom), attached by `probe merge --mappings`: `{target, confidence, method?}`. Records assert "there is a mappings-file entry linking these names, with this confidence" — a different relation from a dependency, with its own verification semantics: the correspondence is a trust boundary, not a call. Identity is the `(target, confidence, method)` triple in canonical form (empty `method` ≡ absent, canonicalized to omission); shape is validated fail-closed at every recomputation boundary. Unioned through every merge conflict, inert to enrichment and projection ([P13](properties.md#p13-correspondence-records-attach-unconditionally), [P27](properties.md#p27-correspondence-records-are-unioned-and-inert), [schema.md § Correspondence records](schema.md#correspondence-records-maps-to-mapped-from)). The correspondence relation is the union over both fields; cross-language resolution is a derived consumer view.
 
 ## status-origin
 

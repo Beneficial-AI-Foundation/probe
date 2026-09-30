@@ -1473,6 +1473,20 @@ recorded rationale, not by restating the concern.
   was not a defensible halfway point. Cross-input first-wins is
   untouched (argument order stays the freshness knob). Recorded in
   ADR-006 Decision 3 and P8.
+- Correspondence-record canonical form (PR 3b cross-model review,
+  resolved): an empty `method` is **canonicalized to absent** — `""`
+  names no matching method, so the two encodings are one identity — and
+  record dedup is by the identity triple (`(target, confidence, method)`)
+  rather than exact JSON value. Rationale: with two encodings of one
+  identity, a tied-key record shields exact duplicates from collapsing
+  (the union grows on self-merge) and stub replacement reverses tied
+  append order, breaking P4 associativity on carrier inputs — both
+  confirmed by failing tests before the fix. Record shape and mapping
+  confidence are validated fail-closed at every recomputation boundary
+  (merge per input, enrich): merge re-emits these fields into
+  schema-constrained output, and a malformed field silently swallowing a
+  union loses evidence grouping-dependently — a warning cannot restore
+  P4/P27. Recorded in ADR-006 Decision 1 and P27.
 - `verified-by-translation` derived status — future ADR, which is also
   where staleness anchors on correspondence records (mapping-artifact
   revision) belong if ever needed. The interim `status-origin` rules
