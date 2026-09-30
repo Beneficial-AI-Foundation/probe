@@ -3,85 +3,69 @@ auditor: ambiguity-auditor
 date: 2026-09-30
 repo: probe (hub)
 kb: kb/ (own KB, resolved via common §1.1)
-scope: uncommitted working-tree changeset on branch
-  la/merge-soundness-pr3c-collision-warnings-projection (PR #83), addressing
-  PR #83 review comments — P7 "last" = input-file order, P8 project rejects
-  distinct-real collisions on any input, P8 categorized dependency arrays are
-  sets (sort + dedup after normalization), P8 specs/proofs intra-input
-  collision warning + key-order tie-break; kb/tools/probe-merge.md Phase 2 and
-  statistics table; strict `normalize_atoms`, `prepare_atoms` strict,
-  `PrepareStats::dropped_atoms` removed. Per §2b: branch is not on the default
-  branch; P7/P8 were compared against `origin/main` (Cargo 0.4.0), where P7 has
-  no input-order clarification and P8 has no project clause, no set-semantics
-  paragraph and no specs/proofs collision paragraph. All three P8 additions and
-  the P7 sentence are amendments carried by PR #83 itself (committed 5623ae9,
-  b33d9d0 + this working tree).
-status: 0 critical, 5 warnings, 4 info
+scope: branch la/merge-soundness-pr3c-collision-warnings-projection (PR #83)
+  at 903c1b8 (commits 5623ae9, b33d9d0, 903c1b8 over origin/main), plus two
+  uncommitted working-tree edits — tests/roundtrip.rs
+  `p15_decomposition_survives_merge_then_project` and the CHANGELOG 0.5.0
+  correspondence-record entry reworded to "Every boundary that normalizes".
+  Per §2b the branch is not the default branch; property text was compared
+  against `origin/main` (Cargo 0.4.0; `git log HEAD..origin/main` is empty).
+  On main, P7 has no input-order sentence, P8 has no `probe project` clause,
+  no set-semantics paragraph and no specs/proofs collision paragraph, P10 has
+  no normalization carve-out, P15 has no set sentence, and P27 names only
+  merge and enrich as validating boundaries. All of these are amendments
+  carried by PR #83 itself.
+status: 0 critical, 2 warnings, 2 info
 ---
 
 ## Critical
 
-None. No KB file states a rule that the amended P7/P8 or the code contradicts;
-the drift found is omission and terminology, listed under Warnings.
+None. No KB file states a rule that the amended properties or the code
+contradict. The cross-repo wording conflict in W2 is classed as a warning;
+the reasoning is in the finding.
 
 ## Warnings
 
-### [W1] Merge-order constraint: the code conforms only to P7/P8 amendments unmerged on main
-- **Location**: kb/engineering/properties.md:74 (P7), :82, :84, :86 (P8); src/commands/merge.rs:301-309, 381-385, 625-652; src/commands/project.rs:251-269
-- **Issue**: Against `origin/main`'s properties.md, three behaviours of this changeset have no spec: `probe project` rejecting distinct-real collisions on *projected* inputs (main's P8 names only merge and enrich), sorting/deduplicating the categorized dependency arrays (main's P8 says nothing about order), and the specs/proofs intra-input collision warning with a key-order tie-break (main's P8 has no specs/proofs paragraph; main's P7 says only "last one wins"). The code is conformant only to the branch text.
-- **Evidence**: `git diff origin/main -- kb/engineering/properties.md` shows all four passages as additions; `git log origin/main..HEAD` = 5623ae9, b33d9d0 (both PR #83).
-- **Recommendation**: Both sides are in the same pull request (PR #83), so the constraint is satisfied if the working-tree KB edits are committed together with the code changes. Do not split them. The set-semantics paragraph is a new hub-level statement about producer-owned fields (see W5) and needs explicit human sign-off as a spec refinement, per CLAUDE.md.
+### [W1] Merge-order constraint: the code conforms only to property amendments unmerged on main
+- **Location**: kb/engineering/properties.md:74 (P7), :82, :84, :86 (P8), :107 (P10), :143 (P15), :320 (P27); src/commands/merge.rs:301-309, 367-385, 651-655; src/commands/project.rs:134-144
+- **Issue**: Against `origin/main`'s properties.md, these behaviours of the branch have no spec: `probe project` rejecting distinct-real collisions and malformed records on any input, projected or not (main's P8 and P27 name only merge and enrich); sorting and deduplicating the categorized dependency arrays (main's P8, P10 and P15 say nothing about their order, and main's P10 has no normalization carve-out); and the specs/proofs intra-input collision warning with a key-order tie-break (main's P7 says only "last one wins"). The code conforms only to the branch text.
+- **Evidence**: `git diff origin/main -- kb/engineering/properties.md` shows every cited passage as an addition or rewrite. `git log origin/main..HEAD` lists 5623ae9, b33d9d0 and 903c1b8, all on PR #83.
+- **Recommendation**: The spec and the code change are in the same pull request ([PR #83](https://github.com/Beneficial-AI-Foundation/probe/pull/83)), so the constraint holds as long as they merge together. Do not split the KB commits from the code. The set semantics for the categorized arrays (P8 :84, P15 :143) are a new hub-level statement about producer-emitted fields and need explicit human sign-off as a spec refinement, per CLAUDE.md. W2 is relevant to that sign-off.
 
-### [W2] schema.md § Normalization and § Specs and proofs are stale against amended P8
-- **Location**: kb/engineering/schema.md:310 (Normalization), :283-288 (Specs and proofs: last-wins)
-- **Issue**: The normalization paragraph still gives a narrower rule than P8. It describes the distinct-real collision as "a merge **error**, the same fail-closed rule `probe enrich` applies" but leaves out `probe project` (both input kinds). It doesn't say that the categorized dependency arrays are sorted and deduplicated after normalization. It also has nothing on specs/proofs intra-input collisions, which are warned about, counted in `conflicts`, and resolved by key order. The specs/proofs table (base/incoming → incoming wins) is correct for cross-input merges but gives no hint that intra-input aliases follow a different tie-break.
-- **Evidence**: schema.md:310 text; P8 at properties.md:82-86; probe-merge.md:49-51 already carries all three.
-- **Recommendation**: Extend schema.md:310 with the project clause, the sort/dedup sentence, and one sentence on the specs/proofs intra-input case that links to P8. Alternatively, trim it to a pointer to P8 so the two can't drift again. Add a note under the specs/proofs table that intra-input aliases are resolved by key order ([P8](../engineering/properties.md#p8-code-name-normalization)).
-
-### [W3] ADR-006 Decision 3 does not mention project's collision rejection (decision record; recommend, don't assume an edit)
-- **Location**: kb/decisions/006-correspondence-records.md:160-163 ("Carrier preparation"), :167-180 ("Intra-input collision policy is uniform rejection")
-- **Issue**: The intra-input policy paragraph lists the rejecting boundaries as "`probe merge` errors during per-input normalization exactly as `probe enrich` errors on its file". It leaves out `probe project`, which P8 now says rejects any input, authoritative or projected. The carrier-preparation paragraph speaks only of "their single authoritative input". It doesn't record that already-projected inputs are normalized too, with the same rejection, without enrichment. The glossary (`carrier preparation`, glossary.md:79) and probe-project.md Step 2 (:38) do state this.
-- **Evidence**: ADR text at the cited lines vs properties.md:82 and glossary.md:79.
-- **Recommendation**: The ADR is a decision record. The user should decide whether to append a dated amendment note ("PR 3c: `probe project` applies the same rejection on authoritative and projected inputs; on views a collision would silently pick one atom's inherited label") or leave the ADR as a historical snapshot and rely on P8. Do not rewrite the decision text in place.
-
-### [W4] "Every recomputation boundary" no longer matches the boundaries that reject or validate
-- **Location**: kb/engineering/properties.md:82 (P8), :318 (P27 "Validated fail-closed"); kb/engineering/glossary.md:59; kb/engineering/schema.md:221; kb/decisions/006-correspondence-records.md:79
-- **Issue**: (a) P8 says distinct-real collisions are "rejected fail-closed at every recomputation boundary", then lists `probe project` on *projected* inputs, which the glossary (glossary.md:79) explicitly says is **not** a recomputation: projected inputs are only normalized. The glossary's own wording, "every boundary that normalizes", is the accurate one. The enumerated list keeps the intended behaviour clear, so this is a terminology inconsistency, not a behavioural contradiction. (b) P27's enumeration of record-shape validation, "every recomputation boundary (`probe merge` per input, `probe enrich`)", leaves out `probe project`. `validate_and_canonicalize_records` runs inside `normalize_atoms_reporting_collisions` (merge.rs:391), which both project branches reach (project.rs:255 directly, :258 via `prepare_atoms`).
-- **Evidence**: cited lines; `rg normalize_atoms|prepare_atoms src/` shows the only normalizing call sites are merge (merge.rs:476/480), enrich (propagate.rs:224/291) and project (project.rs:255/258). `probe summary` does not normalize, so "every boundary that normalizes" is exactly these three.
-- **Recommendation**: Use "every boundary that normalizes (`probe merge` per input, `probe enrich`, `probe project`)" in P8 and P27. Align glossary.md:59, schema.md:221 and ADR-006:79 the same way (ADR: recommend only, as in W3).
-
-### [W5] The rule that categorized dependency arrays are sets appears only in P8; P15, schema.md, probe-lean.md and P10 don't say it
-- **Location**: kb/engineering/properties.md:84 (P8), :105-107 (P10), :132-143 (P15); kb/engineering/schema.md:168-177; kb/tools/probe-lean.md:40; src/commands/merge.rs:381-385
-- **Issue**: P8 says the categorized arrays "are sets, like their union `dependencies` ([P15])", but P15 only defines `dependencies` as the union of the subsets. Neither P15 nor the extension-field list in schema.md says the subsets themselves are order-insignificant. The claim is attributed to a property that doesn't make it. Normalization now reorders and deduplicates these producer-owned extension values on **every** atom at every normalizing boundary, not only on colliding aliases. P10 ("Tool-specific extension fields … MUST be preserved through merge") has no normalization carve-out. That was already a latent gap for P8's renaming, and sorting widens it.
-- **Evidence**: P15 text at :134-141; schema.md:170-177 ("functions called in `requires` clauses", "(`dependencies` = union of all three)"); merge.rs:381-385 (`sort_by_cached_key` + `dedup` inside the per-atom loop). Producer side: probe-verus emits `BTreeSet<String>` (probe-verus/src/lib.rs:327, 339), so sorting is a no-op there. probe-lean builds plain arrays (e.g. probe-lean/Tools/GenFixture.lean:74). Its order significance is not stated anywhere in the KB, and I did not verify whether its output is already sorted.
-- **Recommendation**: Put the set semantics where they are defined: add a sentence to P15 ("each categorized subset is a set; order and duplicates carry no meaning") and to the probe-verus/probe-lean extension lists in schema.md. Add "modulo P8 normalization (renaming, and set canonicalization of the categorized arrays)" to P10. P8 can then cite P15 accurately. Confirm with the probe-lean owner that array order carries no meaning, per ADR-005 producer ownership.
+### [W2] probe-lean's schema says `dependencies` can repeat a name; hub P15 says it is a deduplicated union whose duplicates carry no meaning
+- **Location**: kb/engineering/properties.md:139 (P15, "deduplicated union"), :143 (P15, new: "their order and duplicates carry no meaning"); ../probe-lean/docs/SCHEMA.md:153 (last changed 2026-09-18, 97908be)
+- **Issue**: probe-lean documents that `dependencies` deduplicates "by declaration identity before private mangling is stripped, so two distinct private declarations that print to the same name can appear twice; this is permitted and silent". So a string duplicate in probe-lean's output can stand for two different declarations. The hub says the opposite about the same field: `dependencies` is a "deduplicated union", and P15's new sentence says duplicates in the categorized subsets carry no meaning. P8 normalization now drops them from `type-`/`term-dependencies` too. The "deduplicated union" wording predates this PR. The "duplicates carry no meaning" sentence is new in it.
+- **Evidence**: The quoted lines. On the hub side, `Atom.dependencies` is a `BTreeSet<String>` (src/types.rs:131), so the hub already collapsed `dependencies` duplicates at load before this PR. merge.rs:385 now does the same for the categorized arrays. probe-lean's SCHEMA.md says nothing about array order, so the "sorted" half of P15 does not conflict.
+- **Why not critical**: The hub code, P15 and P8 agree with each other. No hub implementer would build anything different after reading them. The disagreement is between the hub contract and one producer's description of its own output, and the colliding declarations already share one code-name, which is a P2 identity question that predates this PR. I am not certain this is only wording. If probe-lean consumers rely on the duplicate as a signal (SCHEMA.md says `tools/audit/compare-extract.py` reports it as a diagnostic), the hub's dedup silently removes that signal.
+- **Recommendation**: Get the probe-lean owner's confirmation before PR #83's set sentence merges. Following ADR-005, either probe-lean's SCHEMA.md:153 points out that the hub treats all dependency arrays as sets (so the duplicate does not survive composition), or P15 names this probe-lean case as an accepted loss.
 
 ## Info
 
-### [I1] P8 "sorted" is underspecified for non-string entries
-properties.md:84 says each array is "sorted and deduplicated". The code sorts strings first, then non-strings by their JSON text (merge.rs:381-384). This rule appears only in a code comment.
+### [I1] P8's first paragraph and ADR-006 still call `probe project` a "unary recomputation boundary" without qualification
+properties.md:80 says "Unary recomputation boundaries (`probe enrich`, `probe project`) apply the same normalization". ADR-006:160-163 says the same and adds "their single authoritative input". For already-projected inputs, `probe project` normalizes but does not recompute (glossary.md:79; probe-project.md:38), and the rest of the KB now uses "boundary that normalizes" for the enumeration (properties.md:82, :320; glossary.md:59, :79; schema.md:221). The P8 sentence is not wrong about which operations run, since normalization does run everywhere it says, but it uses one term for two different sets of boundaries. ADR-006:79 ("every recomputation boundary rejects a malformed record shape") and :170-172 ("rejected at every recomputation boundary: `probe merge` … exactly as `probe enrich`") also leave out `probe project`. ADR-006 is a decision record, so the user should decide whether to append a dated amendment note (e.g. "PR 3c: `probe project` normalizes and rejects on both authoritative and projected inputs; see P8/P27") or leave it as a historical snapshot and rely on P8 and P27. Do not rewrite the decision text in place.
 
-### [I2] probe-merge.md Phase 2 names only enrich as the matching unary boundary
-probe-merge.md:47 says "the same rule the unary `probe enrich` boundary applies". This is accurate but leaves out `probe project`. Optionally add it or link to probe-project.md Step 2.
+### [I2] Normalization terms used in P7/P8 have no glossary entries
+P7 and P8 (properties.md:74, :82-86) use "alias", "distinct real atom", "normalization collision", "key order" and "boundary that normalizes", but the glossary has no heading for any of them (`rg '^## ' kb/engineering/glossary.md`). Each is defined inline in P8, and the first three predate PR #83.
 
-### [I3] probe-project.md Step 2 doesn't say that normalizing a view also puts its categorized arrays in canonical order
-probe-project.md:38 says projected inputs are "still normalized". Re-projecting a view therefore also sorts and deduplicates its categorized arrays. This is harmless given W5's set semantics, but it isn't stated.
+## Dropped from the previous report (resolved)
 
-### [I4] Normalization terms used in P7/P8 have no glossary entries
-"alias", "distinct real atom", "normalization collision" and the new "key order" are defined inline in P8 but have no glossary.md entries. The first three predate this changeset.
+- **Old W2** (schema.md § Normalization and § Specs and proofs stale against P8): schema.md:312 now covers the categorized-array sort and dedup (citing P15) and `probe project` "(on any input)". schema.md:290 now documents the intra-input specs/proofs warning, the conflict count and the key-order tie-break.
+- **Old W4** ("every recomputation boundary" wording): properties.md:82 (P8) and :320 (P27, which now lists `probe project` on any input), glossary.md:59 and schema.md:221 now say "every boundary that normalizes". The working-tree CHANGELOG.md:20 edit brings the 0.5.0 entry in line. The remaining ADR-006 part is folded into I1.
+- **Old W5** (set semantics stated only in P8): P15 now states them itself (properties.md:143), P10 has the normalization carve-out (:107), and schema.md:312 points to P15. The unverified probe-lean question is now checked and reported as W2.
+- **Old W3** (ADR-006 omits project's rejection): kept, but downgraded and merged into I1. The normative texts (P8, P27, glossary, probe-project.md) all state the rule, so the ADR gap no longer affects what gets implemented.
+- **Old I1** (non-string sort order unspecified): P8 (properties.md:84) now says "string entries first in string order, then any non-string entries ordered by their JSON text", which matches merge.rs:381-384.
+- **Old I2** (probe-merge.md named only enrich): probe-merge.md:47 now says "the unary `probe enrich` and `probe project` boundaries".
+- **Old I3** (probe-project.md didn't say re-projection canonicalizes arrays): P8 (properties.md:84) now defines canonical ordering as part of normalization, so probe-project.md:38's "still normalized" covers it.
 
 ## Verified clean
 
-- **P7 (amended)**: "last" = input-file order. `merge_generic_maps` iterates inputs in argument order, and incoming replaces base (merge.rs:661-690). The intra-input carve-out matches `normalize_generic`.
-- **P8 specs/proofs paragraph**: the key-order tie-break is real. Specs/proofs `data` is deserialized into `BTreeMap<String, Value>` (types.rs:544), so file member order is lost, and among `f()`, `f().`, `f()..` the most-dotted alias sorts last and is kept. The warning names the input position, both original keys and the kept key (merge.rs:642-643). The example string in probe-merge.md:51 matches the format exactly, and tests/roundtrip.rs pins it. Collisions feed `stats.conflicts` (merge.rs:670, 675).
-- **P8 rejection enumeration vs code**: merge rejects per input with position prefix (merge.rs:476, 480). enrich rejects via strict `prepare_atoms` (propagate.rs:224). project rejects on both branches (project.rs:255, 258). The lossy map is no longer reachable outside the module, since `normalize_atoms_reporting_collisions` is private.
-- **P8 set paragraph vs code**: aliases differing only in order or duplicates collapse, and a real difference still rejects (test `test_categorized_arrays_compared_as_sets`).
-- **Glossary `carrier preparation`** (glossary.md:79): consistent with the amended P8 and the code, including "every boundary that normalizes" and `prepare_atoms` still in propagate.rs.
-- **probe-project.md Step 2** (:38): consistent. Projected inputs are normalized with the same collision rejection, and authoritative inputs are prepared before trimming.
-- **probe-merge.md Phase 2 + statistics table**: consistent with P7/P8 and the code. The `normalize_atoms()` entry in the key-source-files table still exists.
-- **P15**: sorting/dedup preserves the union equality, and project trimming (Step 5) filters without reordering.
-- **P14**: canonical ordering of the arrays only makes output more deterministic.
-- **P6**: cross-input first-wins is unchanged.
-- **P27**: records still union through benign collisions (the record-shape enumeration drift is in W4).
-- **architecture.md**:31, 33: still accurate.
-- **Staleness stamps**: all touched and cross-checked KB files carry `last-updated: 2026-09-30`, matching their git history. No stale-stamp findings.
+- **P7 (amended, :74)**: "last" means input-file order, and the intra-input carve-out points to P8. probe-merge.md:51 and schema.md:290 say the same.
+- **P8 (all four paragraphs)**: The rejection list (merge per input, enrich, project on any input) matches the code: `normalize_atoms` (merge.rs:301) is the strict entry point, `prepare_atoms` (propagate.rs:221) calls it, and project reaches it on both branches. The canonical-form rule matches merge.rs:367-385. The specs/proofs warning format in probe-merge.md:51 matches merge.rs:651-655 ("kept … (key order, P8)").
+- **P10 (:107)**: the carve-out lists exactly the two changes normalization makes to extension values (renaming, and canonical order for the categorized arrays).
+- **P15 (:141-147)**: Project trims every categorized array with the `dependencies` filter and leaves non-string entries alone (project.rs:130-144), as probe-project.md:55 and :89 say. The working-tree test `p15_decomposition_survives_merge_then_project` checks the union equality after merge and after the trim, on Verus-shaped and Lean-shaped atoms that include dotted aliases, duplicates and unsorted entries. It also checks that `body-dependencies` comes out sorted and deduplicated. This matches the property text.
+- **P27 (:320)**: the validating-boundary list now includes project, and the glossary (:59) and schema.md (:221) use the same wording.
+- **P4/P5**: P8's statement that a map with unsorted categorized arrays is off the carrier fits P4's definition of the carrier as normalized, enrichment-consistent maps.
+- **P6, P14**: cross-input first-wins is unchanged, and canonical array ordering only makes output more deterministic.
+- **Glossary `carrier preparation` (:79)** and **probe-project.md Step 2 (:38)**: consistent with P8 and the code.
+- **CHANGELOG**: the [Unreleased] section is empty. The 0.5.0 entries (:17, :20, :24, :26-28) match P8, P15 and P27 as amended.
+- **Staleness stamps**: properties.md, schema.md, glossary.md, probe-merge.md, probe-project.md and ADR-006 carry `last-updated: 2026-09-30`, which matches their git history. probe-lean.md (2026-09-28) and index.md (2026-09-28) also match their history. Neither was affected by this change, since probe-lean.md:40-41 already points to P15.

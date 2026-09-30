@@ -380,8 +380,9 @@ fn project_normalizes_keys_of_projected_input() {
 }
 
 /// The fail-closed checks apply to already-projected inputs too: a view
-/// carrying an out-of-enum `status-origin`, or a dotted alias colliding with
-/// a distinct real atom, is rejected before any output is written.
+/// carrying an out-of-enum `status-origin`, a malformed correspondence
+/// record, or a dotted alias colliding with a distinct real atom, is rejected
+/// before any output is written.
 #[test]
 fn project_rejects_invalid_projected_input() {
     let dir = tempfile::tempdir().unwrap();
@@ -390,6 +391,10 @@ fn project_rejects_invalid_projected_input() {
     let mut bogus_marker = read_json(&projected);
     bogus_marker["data"]["probe:app/1.0/f()"]["status-origin"] = serde_json::json!("bogus");
 
+    let mut malformed_record = read_json(&projected);
+    malformed_record["data"]["probe:app/1.0/f()"]["maps-to"] =
+        serde_json::json!([{"target": "probe:Lean.f", "confidence": "bad"}]);
+
     let mut collision = read_json(&projected);
     let mut alias = collision["data"]["probe:app/1.0/f()"].clone();
     alias["verification-status"] = serde_json::json!("failed");
@@ -397,6 +402,7 @@ fn project_rejects_invalid_projected_input() {
 
     for (name, view, expected) in [
         ("bogus_marker", bogus_marker, "invalid status-origin"),
+        ("malformed_record", malformed_record, "maps-to"),
         ("collision", collision, "distinct real atom"),
     ] {
         let input = dir.path().join(format!("{name}.json"));
@@ -786,5 +792,168 @@ fn projection_seeds_match_normalized_keys() {
     assert!(
         data.get("probe:app/1.0/f()").is_some(),
         "dotted-key atom selected by its normalized seed (P8): {data}"
+    );
+}
+
+fn string_set(value: &serde_json::Value) -> std::collections::BTreeSet<String> {
+    value
+        .as_array()
+        .unwrap_or_else(|| panic!("expected an array, got {value}"))
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Asserts `dependencies == ⋃ categorized subsets` for the given atom.
+fn assert_p15_decomposition(data: &serde_json::Value, key: &str, subsets: &[&str], stage: &str) {
+    let atom = &data[key];
+    let union: std::collections::BTreeSet<String> = subsets
+        .iter()
+        .flat_map(|field| string_set(&atom[*field]))
+        .collect();
+    assert_eq!(
+        string_set(&atom["dependencies"]),
+        union,
+        "{stage}: {key} dependencies equal the union of {subsets:?} (P15): {atom}"
+    );
+}
+
+/// P15 decomposition on real binary output (plan §9 row 3c): a Verus-shaped
+/// and a Lean-shaped extract, with dotted aliases, duplicates and unsorted
+/// entries in their categorized arrays, go through `probe merge` then
+/// `probe project`. The equality holds after merge normalization and after
+/// the projection trim, which drops an excluded callee on each side.
+#[test]
+fn p15_decomposition_survives_merge_then_project() {
+    const VERUS: &[&str] = &[
+        "requires-dependencies",
+        "ensures-dependencies",
+        "body-dependencies",
+    ];
+    const LEAN: &[&str] = &["type-dependencies", "term-dependencies"];
+
+    let dir = tempfile::tempdir().unwrap();
+    let with_subsets = |deps: &[&str], subsets: &[(&str, &[&str])]| {
+        let mut a = atom(deps, Some("verified"));
+        for (field, entries) in subsets {
+            a[*field] = serde_json::json!(entries);
+        }
+        a
+    };
+
+    let verus = dir.path().join("verus.json");
+    write_json(
+        &verus,
+        &single_tool_envelope(
+            "probe-verus/atoms",
+            "probe-verus",
+            "2.0.0",
+            "pkg-v",
+            serde_json::json!({
+                "probe:app/1.0/f()": with_subsets(
+                    &["probe:app/1.0/g().", "probe:app/1.0/h()"],
+                    &[
+                        ("requires-dependencies", &["probe:app/1.0/g()."]),
+                        ("ensures-dependencies", &[]),
+                        ("body-dependencies", &[
+                            "probe:app/1.0/h()", "probe:app/1.0/g()", "probe:app/1.0/h()",
+                        ]),
+                    ],
+                ),
+                "probe:app/1.0/g()": with_subsets(
+                    &["probe:app/1.0/k()"],
+                    &[
+                        ("requires-dependencies", &[]),
+                        ("ensures-dependencies", &["probe:app/1.0/k()."]),
+                        ("body-dependencies", &["probe:app/1.0/k()"]),
+                    ],
+                ),
+                "probe:app/1.0/h()": with_subsets(&[], &[]),
+                "probe:app/1.0/k()": with_subsets(&[], &[]),
+            }),
+        ),
+    );
+    let lean = dir.path().join("lean.json");
+    write_json(
+        &lean,
+        &single_tool_envelope(
+            "probe-lean/extract",
+            "probe-lean",
+            "0.16.0",
+            "pkg-l",
+            serde_json::json!({
+                "probe:Lean.f": with_subsets(
+                    &["probe:Lean.A", "probe:Lean.B"],
+                    &[
+                        ("type-dependencies", &["probe:Lean.A"]),
+                        ("term-dependencies", &["probe:Lean.B", "probe:Lean.A", "probe:Lean.B"]),
+                    ],
+                ),
+                "probe:Lean.A": with_subsets(&[], &[]),
+                "probe:Lean.B": with_subsets(
+                    &["probe:Lean.C"],
+                    &[("type-dependencies", &[]), ("term-dependencies", &["probe:Lean.C"])],
+                ),
+                "probe:Lean.C": with_subsets(&[], &[]),
+            }),
+        ),
+    );
+
+    let merged = dir.path().join("merged.json");
+    let out = run_probe(&[
+        "merge",
+        verus.to_str().unwrap(),
+        lean.to_str().unwrap(),
+        "-o",
+        merged.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "merge failed: {}", stderr_of(&out));
+    let merged_data = &read_json(&merged)["data"];
+    for key in ["probe:app/1.0/f()", "probe:app/1.0/g()"] {
+        assert_p15_decomposition(merged_data, key, VERUS, "merged");
+    }
+    for key in ["probe:Lean.f", "probe:Lean.B"] {
+        assert_p15_decomposition(merged_data, key, LEAN, "merged");
+    }
+    assert_eq!(
+        merged_data["probe:app/1.0/f()"]["body-dependencies"],
+        serde_json::json!(["probe:app/1.0/g()", "probe:app/1.0/h()"]),
+        "categorized arrays are written sorted and deduplicated (P8)"
+    );
+
+    let mappings = dir.path().join("m.json");
+    write_json(
+        &mappings,
+        &mappings_file(&[("probe:app/1.0/f()", "probe:Lean.f")]),
+    );
+    let projected = dir.path().join("projected.json");
+    let out = run_probe(&[
+        "project",
+        merged.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "--forward-depth",
+        "1",
+        "-o",
+        projected.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "project failed: {}", stderr_of(&out));
+    let view = &read_json(&projected)["data"];
+    for excluded in ["probe:app/1.0/k()", "probe:Lean.C"] {
+        assert!(
+            view.get(excluded).is_none(),
+            "{excluded} lies beyond forward depth 1: {view}"
+        );
+    }
+    for key in ["probe:app/1.0/f()", "probe:app/1.0/g()"] {
+        assert_p15_decomposition(view, key, VERUS, "projected");
+    }
+    for key in ["probe:Lean.f", "probe:Lean.B"] {
+        assert_p15_decomposition(view, key, LEAN, "projected");
+    }
+    assert_eq!(
+        view["probe:app/1.0/g()"]["dependencies"],
+        serde_json::json!([]),
+        "the excluded callee is trimmed from dependencies and every subset"
     );
 }
