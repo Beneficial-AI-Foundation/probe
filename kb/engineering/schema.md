@@ -218,7 +218,7 @@ Extension fields are flattened, so the records appear as top-level atom fields. 
 
 On the `to` atom, the mirror field `mapped-from` with `"target"` pointing back.
 
-- **Record fields**: `target` (required), `confidence` (required, the mappings-file vocabulary: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`), `method` (optional; omitted when absent — an empty `method` is canonicalized to absent, and no other fields are allowed). Record shape is validated fail-closed at every recomputation boundary ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): merge re-emits these fields and must not violate this schema.
+- **Record fields**: `target` (required), `confidence` (required, the mappings-file vocabulary: `exact`, `exact-disambiguated`, `file-and-name`, `file-and-lines`, `heuristic`, `manual`), `method` (optional; omitted when absent — an empty `method` is canonicalized to absent, and no other fields are allowed). Record shape is validated fail-closed at every boundary that normalizes ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): merge re-emits these fields and must not violate this schema.
 - **Direction**: the mappings file's `from`/`to` are generic source/target — they assign no implementation/formal roles. `maps-to` goes on the `from` atom, `mapped-from` on the `to` atom, whichever languages the sides are.
 - **Determinism** ([P14](properties.md#p14-deterministic-output)): arrays sorted by `(target, confidence, method)`, absent `method` ordering as the empty string. Record identity is the same triple; duplicates collapse by that identity. Records with the same target but different confidence/method are distinct assertions and both kept.
 - **Attachment is unconditional and key-local** ([P13](properties.md#p13-correspondence-records-attach-unconditionally)): a record attaches whether or not its target exists in the invocation's key set (dangling target ⇒ warning, not skip).
@@ -287,6 +287,8 @@ See [properties.md](properties.md) for the invariants merge must satisfy.
 | any | any (same key) | **Replace**: incoming wins |
 | (absent) | any | **Add** |
 
+Within one input, keys that collide after normalization are warned about and counted as conflicts; the key sorting last wins ([P8](properties.md#p8-code-name-normalization)).
+
 ### Cross-language mappings
 
 When `--mappings <file>` is provided to `probe merge`, mappings attach [correspondence records](#correspondence-records-maps-to-mapped-from) — they never modify `dependencies`:
@@ -307,7 +309,7 @@ After combining all inputs, merge **re-enriches** the atoms category via the sha
 
 ### Normalization
 
-Per input, before conflict resolution, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact). Normalization covers code-name-bearing extension arrays, correspondence-record targets, and mapping endpoints ([P8](properties.md#p8-code-name-normalization)). The per-input ordering is semantic: aliases collapse within their own input before cross-input conflicts are resolved. A post-normalization collision between distinct real atoms (ignoring correspondence records) within one input is a merge **error**, the same fail-closed rule `probe enrich` applies; benign collapses (stub, identical-modulo-records) union their correspondence records ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)).
+Per input, before conflict resolution, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact). Normalization covers code-name-bearing extension arrays, correspondence-record targets, and mapping endpoints ([P8](properties.md#p8-code-name-normalization)); the categorized dependency arrays are also sorted and deduplicated, since they are sets ([P15](properties.md#p15-dependency-completeness)). The per-input ordering is semantic: aliases collapse within their own input before cross-input conflicts are resolved. A post-normalization collision between distinct real atoms (ignoring correspondence records) within one input is a merge **error**, the same fail-closed rule `probe enrich` and `probe project` (on any input) apply; benign collapses (stub, identical-modulo-records) union their correspondence records ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)).
 
 ## Mappings file format
 

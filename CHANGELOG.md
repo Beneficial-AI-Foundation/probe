@@ -21,7 +21,9 @@ pass its own version gate.
 
 ### Changed
 - Provenance is deduplicated at the merge boundaries (P9, merge-soundness PR 3c): `merge_atom_files` and `cmd_merge` collapse identical `inputs` entries (first occurrence kept), making the inventory record *which* sources were composed rather than how many times, and giving envelope idempotence up to metadata. The executable schema's merged specs/proofs `inputs` `minItems` is relaxed 2 → 1, since dedup can legitimately collapse two same-source inputs to one entry.
-- A post-normalization key collision within a single specs/proofs input is now warned about and counted in `stats.conflicts` instead of resolving silently (plan §6 issue 6; last-wins kept per P7 — the atoms-side analogue is already fail-closed rejection per P8).
+- A post-normalization key collision within a single specs/proofs input is now warned about and counted in `stats.conflicts` instead of resolving silently (plan §6 issue 6; the atoms-side analogue is already fail-closed rejection per P8). The warning names the input position, both original keys, and the kept key. The tie-break is key order (the alias sorting last, e.g. `f().` over `f()`), not P7's input order; P7/P8 now say so.
+- Distinct-real collision rejection moved into the normalization helper itself (PR 3c review): `prepare_atoms` and the projected-input branch of `probe project` now return the P8 collision error instead of handing back a lossy graph, so a library caller of `prepare_atoms(atoms)?` can no longer get it silently. The copied rejection blocks in `cmd_enrich`/`cmd_project` are gone (enrich/project collision errors now use merge's wording).
+- The categorized dependency arrays are sorted and deduplicated after normalization (they are sets, P15), so two aliases whose arrays differ only in order or duplicates collapse benignly instead of being rejected as distinct real atoms.
 - P8 normalization now covers the categorized dependency subsets (`requires-dependencies`, `ensures-dependencies`, `body-dependencies`, `type-dependencies`, `term-dependencies` — exposed as `CATEGORIZED_DEPENDENCY_ARRAYS`), so the P15 decomposition equality survives normalization; non-string entries pass through untouched.
 - `probe project` trims the categorized dependency subsets with the same filter as `dependencies` (P15 preservation): a projection no longer carries spec-position references to atoms it excluded.
 - Projection selection is pinned dependency-only (plan §8): correspondence records are never traversed, and the regression test documents that the pre-ADR-006 reachability through fabricated edges is not reproduced.
@@ -54,6 +56,9 @@ pass its own version gate.
 - `docs/ui-views.md` no longer contradicts the schema contract (#66, docs-report C1): cross-language linkage is described as derived from `maps-to`/`mapped-from` correspondence records (ADR-006), never dependency edges; the status colour mapping covers all five `verification-status` values per the VeriLib two-channel convention (dropping the non-existent `unknown`); the language/kind/status enums are KB links instead of restatements; the Rust/Lean views group `verus` and `blueprint` atoms explicitly; the stub predicate links P3's structural three-condition test; envelope dispatch prefers structural `inputs`-vs-`source` detection over schema-string matching.
 - `docs/SCHEMA.md`: "full field reference" now points at `kb/engineering/schema.md#envelope-fields` (envelope-rationale keeps rationale only); "probe-verus = Rust" qualified with the kind→language rule (#66, docs-report I5).
 - Dangling `@kb:` anchor in `src/commands/propagate.rs` (`#verification-status-values` → `#common-optional-fields`) (#66, docs-report I4).
+
+### Removed
+- `PrepareStats::dropped_atoms` (public since 0.4.0): `prepare_atoms` now returns the P8 collision error instead of reporting collisions alongside a lossy graph (PR 3c review).
 
 ## [0.4.0] - 2026-08-04
 

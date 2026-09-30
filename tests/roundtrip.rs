@@ -397,7 +397,7 @@ fn project_rejects_invalid_projected_input() {
 
     for (name, view, expected) in [
         ("bogus_marker", bogus_marker, "invalid status-origin"),
-        ("collision", collision, "refusing to project"),
+        ("collision", collision, "distinct real atom"),
     ] {
         let input = dir.path().join(format!("{name}.json"));
         write_json(&input, &view);
@@ -493,7 +493,7 @@ fn project_rejects_distinct_real_normalization_collision() {
     ]);
     assert!(!out.status.success(), "project must reject the collision");
     let stderr = stderr_of(&out);
-    assert!(stderr.contains("refusing to project"), "{stderr}");
+    assert!(stderr.contains("distinct real atom"), "{stderr}");
     assert!(
         stderr.contains("probe:app/1.0/g().") && stderr.contains("probe:app/1.0/g()"),
         "collision message names both keys: {stderr}"
@@ -598,8 +598,9 @@ fn specs_merge_same_source_dedups_and_validates() {
 }
 
 /// Plan issue 6: an intra-input post-normalization collision in a specs file
-/// is warned about and counted in the reported conflicts, while last-wins is
-/// kept.
+/// is warned about and counted in the reported conflicts. The warning names
+/// the input position, both original keys, and the kept one; the tie-break is
+/// key order (P8), not P7's input order.
 #[test]
 fn specs_intra_input_collision_warned_and_counted() {
     let dir = tempfile::tempdir().unwrap();
@@ -629,7 +630,10 @@ fn specs_intra_input_collision_warned_and_counted() {
             "source": {"repo": "https://example.org/r2", "commit": "c1", "language": "lean",
                        "package": "pkg-b", "package-version": "1.0"},
             "timestamp": "2026-01-01T00:00:00Z",
-            "data": {"probe:Lean.spec": {"which": "lean"}}
+            "data": {
+                "probe:Lean.spec": {"which": "lean"},
+                "probe:Lean.spec.": {"which": "lean-dotted"}
+            }
         }),
     );
 
@@ -642,27 +646,37 @@ fn specs_intra_input_collision_warned_and_counted() {
         merged.to_str().unwrap(),
     ]);
     assert!(out.status.success(), "{}", stderr_of(&out));
+    let stderr = stderr_of(&out);
     assert!(
-        stderr_of(&out).contains("normalization collision"),
-        "collision warned: {}",
-        stderr_of(&out)
+        stderr.contains(
+            "input #1 of 2: normalization collision: 'probe:a/1.0/s()' and \
+             'probe:a/1.0/s().' both normalize to 'probe:a/1.0/s()'; \
+             kept 'probe:a/1.0/s().' (key order, P8)"
+        ),
+        "collision warning names input, both keys, and the kept one: {stderr}"
+    );
+    assert!(
+        stderr.contains("input #2 of 2: normalization collision: 'probe:Lean.spec' and"),
+        "a collision in a later input names that input's position: {stderr}"
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     assert!(
-        stdout.contains("Conflicts:        1"),
-        "collision counted in stats.conflicts: {stdout}"
+        stdout.contains("Conflicts:        2"),
+        "each input's collision counted in stats.conflicts: {stdout}"
     );
     assert_eq!(
         read_json(&merged)["data"]["probe:a/1.0/s()"]["which"],
         "dotted",
-        "last-wins kept (P7)"
+        "the alias sorting last is kept (key order, P8)"
     );
 }
 
 /// The Verus-shaped stale-label regression (plan §3d/§8): projecting an
 /// authoritative extract carrying a stale embedded enrichment recomputes
 /// labels on the full graph *before* trimming — f comes out `verified`, not
-/// the frozen `transitively-verified`.
+/// the frozen `transitively-verified`. Re-projecting that view inherits the
+/// label: f stays `verified` although its blocker is no longer in the view,
+/// where a recomputation would promote it back.
 #[test]
 fn projection_recomputes_enrichment_before_trimming() {
     let dir = tempfile::tempdir().unwrap();
@@ -709,6 +723,26 @@ fn projection_recomputes_enrichment_before_trimming() {
         f["dependencies"],
         serde_json::json!([]),
         "depth-0 view has the dependency trimmed"
+    );
+
+    let reprojected = dir.path().join("reprojected.json");
+    let out = run_probe(&[
+        "project",
+        projected.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "-o",
+        reprojected.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", stderr_of(&out));
+    let view = read_json(&reprojected);
+    assert!(
+        view["data"].get("probe:app/1.0/bad()").is_none(),
+        "the blocker is absent from the re-projected view"
+    );
+    assert_eq!(
+        view["data"]["probe:app/1.0/f()"]["verification-status"], "verified",
+        "a projected input's labels are inherited, not recomputed over the view"
     );
 }
 

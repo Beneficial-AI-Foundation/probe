@@ -288,26 +288,45 @@ fn attach_correspondence_records(base: &mut BTreeMap<String, Atom>, mappings: &[
 // Atom-specific merge (stub replacement, first-wins)
 // ---------------------------------------------------------------------------
 
-/// Normalize all keys and dependency references in an atom map.
-/// Returns the normalized map, a count of keys that changed, and the
-/// post-normalization collisions between *distinct real* atoms, as
-/// `(colliding original key, occupied normalized key)` pairs — distinctness
-/// is judged modulo correspondence records ([P27]: records union through
-/// benign collapses instead of making atoms "distinct"). Collapsing a stub or
-/// an identical-modulo-records duplicate is benign and not reported (P8);
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
+/// Normalize all keys and dependency references in an atom map, rejecting
+/// any post-normalization collision between *distinct real* atoms (P8).
+/// Returns the normalized map and a count of keys that changed.
+///
+/// Shared by every boundary that normalizes — `probe merge` (per input),
+/// `probe enrich`, and `probe project` on authoritative and projected inputs
+/// alike: a distinct-real intra-input collision is producer error, and
+/// silently selecting one atom's evidence can launder contamination. The
+/// error is returned before any caller can see the lossy map.
+pub(crate) fn normalize_atoms(
+    atoms: BTreeMap<String, Atom>,
+) -> Result<(BTreeMap<String, Atom>, usize), String> {
+    let (out, changed, dropped) = normalize_atoms_reporting_collisions(atoms)?;
+    if !dropped.is_empty() {
+        return Err(collision_error(&dropped));
+    }
+    Ok((out, changed))
+}
+
+/// Non-rejecting core of [`normalize_atoms`]: on a distinct-real collision
+/// the first atom keeps the key and the colliding one is **discarded** — the
+/// returned map is lossy. The collisions are returned as `(colliding
+/// original key, occupied normalized key)` pairs; distinctness is judged
+/// modulo correspondence records ([P27]: records union through benign
+/// collapses instead of making atoms "distinct"). Collapsing a stub or an
+/// identical-modulo-records duplicate is benign and not reported (P8);
 /// correspondence records are unioned across every benign collision.
+///
+/// The categorized dependency arrays are sets (P15): each is sorted and
+/// deduplicated after normalization, so aliases whose arrays differ only in
+/// order or duplicates compare equal.
 ///
 /// Correspondence-record fields are validated fail-closed and put in
 /// canonical form here ([`validate_and_canonicalize_records`]): a malformed
 /// record shape errors the whole input — merge re-emits these fields, and
 /// the record union is only lossless on canonical arrays.
-///
-/// Shared by every recomputation boundary (ADR-006 carrier preparation):
-/// a distinct-real intra-input collision is producer error, and both `probe
-/// merge` (per input) and the unary `probe enrich` boundary reject it —
-/// silently selecting one atom's evidence can launder contamination (P8).
 #[allow(clippy::type_complexity)]
-pub(crate) fn normalize_atoms(
+fn normalize_atoms_reporting_collisions(
     atoms: BTreeMap<String, Atom>,
 ) -> Result<(BTreeMap<String, Atom>, usize, Vec<(String, String)>), String> {
     let mut out: BTreeMap<String, Atom> = BTreeMap::new();
@@ -341,15 +360,17 @@ pub(crate) fn normalize_atoms(
 
         // P8: the categorized dependency subsets are code-name arrays too —
         // normalizing them with the same rule as `dependencies` keeps the P15
-        // decomposition equality intact (non-string entries pass through
-        // untouched, like `dependencies-with-locations` above).
+        // decomposition equality intact (non-string entries are not renamed,
+        // like `dependencies-with-locations` above). They are sets (P15), so
+        // each is put in canonical order: strings sorted, then non-strings by
+        // their JSON text, duplicates removed.
         for field in CATEGORIZED_DEPENDENCY_ARRAYS {
             if let Some(arr) = atom
                 .extensions
                 .get_mut(field)
                 .and_then(|v| v.as_array_mut())
             {
-                for entry in arr {
+                for entry in arr.iter_mut() {
                     if let Some(name) = entry.as_str() {
                         let norm = normalize_code_name(name);
                         if norm != name {
@@ -357,6 +378,11 @@ pub(crate) fn normalize_atoms(
                         }
                     }
                 }
+                arr.sort_by_cached_key(|entry| match entry.as_str() {
+                    Some(name) => (false, name.to_string()),
+                    None => (true, entry.to_string()),
+                });
+                arr.dedup();
             }
         }
 
@@ -447,20 +473,12 @@ pub fn merge_atom_maps_raw(
     // considered. A distinct-real intra-input collision is producer error and
     // rejects the merge (same rule as the unary enrich boundary; silently
     // selecting one atom's evidence would feed enrichment inside merge).
-    let (mut base, norm_count, dropped) =
-        normalize_atoms(first).map_err(|e| input_context(0, e))?;
+    let (mut base, norm_count) = normalize_atoms(first).map_err(|e| input_context(0, e))?;
     stats.keys_normalized += norm_count;
-    if !dropped.is_empty() {
-        return Err(input_context(0, collision_error(&dropped)));
-    }
 
     for (i, incoming) in maps_iter {
-        let (incoming, norm_count, dropped) =
-            normalize_atoms(incoming).map_err(|e| input_context(i, e))?;
+        let (incoming, norm_count) = normalize_atoms(incoming).map_err(|e| input_context(i, e))?;
         stats.keys_normalized += norm_count;
-        if !dropped.is_empty() {
-            return Err(input_context(i, collision_error(&dropped)));
-        }
 
         for (key, incoming_atom) in incoming {
             // P27: on every equal-key resolution the survivor carries the set
@@ -598,27 +616,44 @@ pub fn merge_atom_files_raw(
 /// (trailing-dot stripping); values are passed through untouched.
 ///
 /// Returns `(map, keys_changed, collisions)`. A post-normalization key
-/// collision within the input keeps the category's last-wins rule (P7) but is
-/// warned about and counted — it feeds `stats.conflicts`, never resolves
-/// silently (P8).
+/// collision within the input is warned about and counted — it feeds
+/// `stats.conflicts`, never resolves silently (P8). The tie-break is key
+/// order, not P7's input order: `data` is a `BTreeMap`, so the file's member
+/// order is already gone and the alias sorting last wins (`f().` over `f()`).
+/// `position` is the 1-based input position and `total` the input count,
+/// both only used in the warning.
 fn normalize_generic(
     data: BTreeMap<String, serde_json::Value>,
+    position: usize,
+    total: usize,
 ) -> (BTreeMap<String, serde_json::Value>, usize, usize) {
     let mut out: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+    let mut originals: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut changed = 0;
-    let mut collisions = 0;
 
     for (key, value) in data {
         let norm_key = normalize_code_name(&key);
         if norm_key != key {
             changed += 1;
         }
-        if out.insert(norm_key.clone(), value).is_some() {
-            collisions += 1;
-            eprintln!(
-                "  Warning: normalization collision for '{norm_key}' within one input (keeping last, P7/P8)"
-            );
+        out.insert(norm_key.clone(), value);
+        originals.entry(norm_key).or_default().push(key);
+    }
+
+    let mut collisions = 0;
+    for (norm_key, keys) in &originals {
+        if keys.len() < 2 {
+            continue;
         }
+        collisions += keys.len() - 1;
+        let quoted: Vec<String> = keys.iter().map(|k| format!("'{k}'")).collect();
+        let (last, rest) = quoted.split_last().expect("at least two keys");
+        let quantifier = if keys.len() == 2 { "both" } else { "all" };
+        eprintln!(
+            "  Warning: input #{position} of {total}: normalization collision: {} and {last} \
+             {quantifier} normalize to '{norm_key}'; kept {last} (key order, P8)",
+            rest.join(", ")
+        );
     }
 
     (out, changed, collisions)
@@ -635,14 +670,15 @@ pub fn merge_generic_maps(
 ) -> (BTreeMap<String, serde_json::Value>, MergeStats) {
     let mut stats = MergeStats::new();
 
-    let mut maps_iter = maps.into_iter();
-    let first = maps_iter.next().unwrap_or_default();
-    let (mut base, norm_count, collisions) = normalize_generic(first);
+    let total = maps.len();
+    let mut maps_iter = maps.into_iter().enumerate();
+    let (_, first) = maps_iter.next().unwrap_or_default();
+    let (mut base, norm_count, collisions) = normalize_generic(first, 1, total);
     stats.keys_normalized += norm_count;
     stats.conflicts += collisions;
 
-    for incoming in maps_iter {
-        let (incoming, norm_count, collisions) = normalize_generic(incoming);
+    for (i, incoming) in maps_iter {
+        let (incoming, norm_count, collisions) = normalize_generic(incoming, i + 1, total);
         stats.keys_normalized += norm_count;
         stats.conflicts += collisions;
 
@@ -1063,7 +1099,12 @@ mod tests {
             "probe:a/1.0/g().".to_string(),
             make_real_atom("g", "src/other.rs", "rust", "exec"),
         );
-        let (out, changed, dropped) = normalize_atoms(atoms).unwrap();
+        let err = normalize_atoms(atoms.clone()).unwrap_err();
+        assert!(
+            err.contains("distinct real atom") && err.contains("probe:a/1.0/g()."),
+            "strict normalization rejects instead of returning the lossy map: {err}"
+        );
+        let (out, changed, dropped) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(changed, 1);
         assert_eq!(
@@ -1081,7 +1122,7 @@ mod tests {
             make_real_atom("g", "src/lib.rs", "rust", "exec"),
         );
         atoms.insert("probe:a/1.0/g().".to_string(), make_stub("g", "rust"));
-        let (_, _, dropped) = normalize_atoms(atoms).unwrap();
+        let (_, _, dropped) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert!(dropped.is_empty());
 
         // Identical duplicates collapse silently (dedup, no evidence lost).
@@ -1094,7 +1135,7 @@ mod tests {
             "probe:a/1.0/g().".to_string(),
             make_real_atom("g", "src/lib.rs", "rust", "exec"),
         );
-        let (_, _, dropped) = normalize_atoms(atoms).unwrap();
+        let (_, _, dropped) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert!(dropped.is_empty());
 
         // Duplicates differing only in correspondence records are the same
@@ -1113,7 +1154,7 @@ mod tests {
             make_real_atom("g", "src/lib.rs", "rust", "exec"),
         );
         atoms.insert("probe:a/1.0/g().".to_string(), with_record);
-        let (out, _, dropped) = normalize_atoms(atoms).unwrap();
+        let (out, _, dropped) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert!(dropped.is_empty());
         assert_eq!(get_records(&out["probe:a/1.0/g()"], MAPS_TO).len(), 1);
     }
@@ -1184,7 +1225,7 @@ mod tests {
             "probe:a/1.0/g()..".to_string(),
             make_real_atom("g", "src/other.rs", "rust", "exec"),
         );
-        let (out, _, dropped) = normalize_atoms(atoms).unwrap();
+        let (out, _, dropped) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(
             dropped,
@@ -1447,7 +1488,7 @@ mod tests {
         let mut atoms = BTreeMap::new();
         atoms.insert("probe:a/1.0/f()".to_string(), atom);
 
-        let (out, _, dropped) = normalize_atoms(atoms).unwrap();
+        let (out, _, dropped) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert!(dropped.is_empty());
         assert_eq!(
             get_records(&out["probe:a/1.0/f()"], MAPS_TO),
@@ -1470,7 +1511,7 @@ mod tests {
         let mut atoms = BTreeMap::new();
         atoms.insert("probe:a/1.0/f()".to_string(), atom);
 
-        let (out, _, _) = normalize_atoms(atoms).unwrap();
+        let (out, _, _) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert_eq!(
             get_records(&out["probe:a/1.0/f()"], MAPS_TO),
             &vec![serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"})]
@@ -1493,7 +1534,7 @@ mod tests {
             .insert(MAPS_TO.to_string(), serde_json::json!([r, s]));
         let mut atoms = BTreeMap::new();
         atoms.insert("probe:a/1.0/f()".to_string(), atom.clone());
-        let (out, _, _) = normalize_atoms(atoms).unwrap();
+        let (out, _, _) = normalize_atoms_reporting_collisions(atoms).unwrap();
         assert_eq!(
             get_records(&out["probe:a/1.0/f()"], MAPS_TO),
             &vec![serde_json::json!({"target": "probe:Pkg.f", "confidence": "exact"})]
@@ -2298,9 +2339,9 @@ mod tests {
     }
 
     // Plan issue 6 (P8): an intra-input post-normalization collision in a
-    // specs/proofs map keeps the category's last-wins rule but is counted in
-    // `stats.conflicts`, never resolved silently. (BTreeMap iteration puts
-    // the dotted key after its normalized form, so the dotted entry wins.)
+    // specs/proofs map is counted in `stats.conflicts`, never resolved
+    // silently. The tie-break is key order: BTreeMap iteration puts the
+    // dotted key after its normalized form, so the dotted entry wins.
     #[test]
     fn test_generic_intra_input_collision_counted() {
         let mut input = BTreeMap::new();
@@ -2319,8 +2360,17 @@ mod tests {
         assert_eq!(merged.len(), 1);
         assert_eq!(
             merged["probe:a/1.0/mod/f()"]["which"], "dotted",
-            "last-wins kept (P7)"
+            "the alias sorting last is kept (key order, P8)"
         );
+
+        let input = BTreeMap::from([
+            ("f()".to_string(), serde_json::json!("plain")),
+            ("f().".to_string(), serde_json::json!("dotted")),
+            ("f()..".to_string(), serde_json::json!("double")),
+        ]);
+        let (merged, stats) = merge_generic_maps(vec![input]);
+        assert_eq!(stats.conflicts, 2, "each extra alias counted once");
+        assert_eq!(merged["f()"], "double", "the most-dotted alias wins");
     }
 
     // P9: `merge_atom_files` dedups the flattened provenance — merging the
@@ -2662,7 +2712,7 @@ mod tests {
         let mut atoms = BTreeMap::new();
         atoms.insert("probe:a/1.0/f()".to_string(), atom);
 
-        let (out, _, _) = normalize_atoms(atoms).unwrap();
+        let (out, _, _) = normalize_atoms_reporting_collisions(atoms).unwrap();
         let dwl = out["probe:a/1.0/f()"]
             .extensions
             .get("dependencies-with-locations")
@@ -2686,7 +2736,7 @@ mod tests {
         let mut atoms = BTreeMap::new();
         atoms.insert("probe:a/1.0/f()".to_string(), atom);
 
-        let (out, _, _) = normalize_atoms(atoms).unwrap();
+        let (out, _, _) = normalize_atoms_reporting_collisions(atoms).unwrap();
         let f = &out["probe:a/1.0/f()"];
         assert!(f.dependencies.contains("probe:a/1.0/g()"));
         for field in CATEGORIZED_DEPENDENCY_ARRAYS {
@@ -2697,6 +2747,52 @@ mod tests {
             );
             assert_eq!(arr[1], 42, "{field}: non-string entry untouched");
         }
+    }
+
+    // P8/P15: the categorized arrays are sets — after normalization they are
+    // sorted and deduplicated, so aliases whose arrays differ only in order
+    // or duplicates collapse benignly, while a real difference still rejects.
+    #[test]
+    fn test_categorized_arrays_compared_as_sets() {
+        let aliases = |plain: serde_json::Value, dotted: serde_json::Value| {
+            let with = |arr: serde_json::Value| {
+                let mut atom = make_real_atom("f", "src/lib.rs", "rust", "exec");
+                atom.extensions.insert("body-dependencies".to_string(), arr);
+                atom
+            };
+            BTreeMap::from([
+                ("probe:a/1.0/f()".to_string(), with(plain)),
+                ("probe:a/1.0/f().".to_string(), with(dotted)),
+            ])
+        };
+
+        let (out, _) = normalize_atoms(aliases(
+            serde_json::json!(["probe:a/1.0/g()"]),
+            serde_json::json!(["probe:a/1.0/g().", "probe:a/1.0/g()"]),
+        ))
+        .expect("duplicates only: same set");
+        assert_eq!(
+            out["probe:a/1.0/f()"].extensions["body-dependencies"],
+            serde_json::json!(["probe:a/1.0/g()"])
+        );
+
+        let (out, _) = normalize_atoms(aliases(
+            serde_json::json!(["probe:a/1.0/h()", "probe:a/1.0/g()"]),
+            serde_json::json!(["probe:a/1.0/g().", "probe:a/1.0/h()."]),
+        ))
+        .expect("order only: same set");
+        assert_eq!(
+            out["probe:a/1.0/f()"].extensions["body-dependencies"],
+            serde_json::json!(["probe:a/1.0/g()", "probe:a/1.0/h()"]),
+            "canonical sorted form"
+        );
+
+        let err = normalize_atoms(aliases(
+            serde_json::json!(["probe:a/1.0/g()"]),
+            serde_json::json!(["probe:a/1.0/h()"]),
+        ))
+        .unwrap_err();
+        assert!(err.contains("distinct real atom"), "{err}");
     }
 
     // P14 at the envelope level: the same evidence presented in different

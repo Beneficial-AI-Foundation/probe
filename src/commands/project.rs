@@ -247,48 +247,26 @@ pub fn cmd_project(
     // makes unrepairable. An already-projected input is a view: its labels
     // are inherited, never recomputed over the trimmed graph, so it is only
     // normalized. Either way seed matching runs over normalized keys (P8),
-    // the same rule `load_mappings` applies to endpoints.
+    // the same rule `load_mappings` applies to endpoints, and a distinct-real
+    // collision rejects the input — on a view it would silently pick one
+    // atom's inherited label.
     let prepared = if loaded.projected {
         eprintln!("  Input is a projection: labels inherited, no recomputation");
         crate::commands::merge::normalize_atoms(loaded.atoms)
-            .map(|(atoms, keys_normalized, dropped)| (atoms, keys_normalized, dropped, None))
+            .map(|(atoms, keys_normalized)| (atoms, keys_normalized, None))
     } else {
         crate::commands::propagate::prepare_atoms(loaded.atoms).map(|(atoms, stats)| {
             let enrichment = (stats.transitive, stats.local);
-            (
-                atoms,
-                stats.keys_normalized,
-                stats.dropped_atoms,
-                Some(enrichment),
-            )
+            (atoms, stats.keys_normalized, Some(enrichment))
         })
     };
-    let (atoms, keys_normalized, dropped_atoms, enrichment) = match prepared {
+    let (atoms, keys_normalized, enrichment) = match prepared {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error: {}: {e}", input.display());
             std::process::exit(1);
         }
     };
-    // P8: a normalization collision that would discard a distinct real atom
-    // is producer error at every boundary that normalizes — silently
-    // selecting one atom's evidence could freeze laundered labels into the
-    // view. Reject, exactly as `probe enrich` does.
-    if !dropped_atoms.is_empty() {
-        for (discarded, kept) in &dropped_atoms {
-            eprintln!(
-                "Error: normalization collision: atom {discarded:?} would be discarded \
-                 (a distinct atom already occupies {kept:?})"
-            );
-        }
-        eprintln!(
-            "Error: {}: refusing to project — normalization collided {} distinct \
-             atom(s); fix the producer aliases and regenerate (P8)",
-            input.display(),
-            dropped_atoms.len()
-        );
-        std::process::exit(1);
-    }
     if keys_normalized > 0 {
         eprintln!("    Keys normalized: {keys_normalized}");
     }

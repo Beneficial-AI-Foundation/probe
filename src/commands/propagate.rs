@@ -198,11 +198,6 @@ pub struct PrepareStats {
     pub transitive: usize,
     pub local: usize,
     pub missing_deps: Vec<String>,
-    /// Post-normalization collisions that discarded a distinct real atom, as
-    /// `(discarded original key, surviving normalized key)` pairs. Discarding
-    /// evidence silently can launder contamination, so the `probe enrich`
-    /// boundary rejects the input when this is non-empty (P8).
-    pub dropped_atoms: Vec<(String, String)>,
 }
 
 // @kb: kb/engineering/properties.md#p8-code-name-normalization
@@ -215,20 +210,18 @@ pub struct PrepareStats {
 /// must run first.
 ///
 /// Normalization is not injective, so it can collide keys even within a
-/// single input; a collision between distinct real atoms is reported in
-/// [`PrepareStats::dropped_atoms`] and the CLI boundary rejects it
-/// fail-closed — the same P8 rule merge applies to each of its inputs
-/// (silently selecting one atom's evidence can launder contamination).
+/// single input; a collision between distinct real atoms is an error — the
+/// same P8 rule merge applies to each of its inputs (silently selecting one
+/// atom's evidence can launder contamination).
 ///
-/// Errors on a malformed correspondence-record shape, the same fail-closed
-/// rule merge applies per input (ADR-006): every recomputation boundary
-/// re-emits `maps-to`/`mapped-from`, so a shape the executable schema rejects
-/// must not pass through.
+/// Also errors on a malformed correspondence-record shape, the same
+/// fail-closed rule merge applies per input (ADR-006): every recomputation
+/// boundary re-emits `maps-to`/`mapped-from`, so a shape the executable
+/// schema rejects must not pass through.
 pub fn prepare_atoms(
     atoms: BTreeMap<String, Atom>,
 ) -> Result<(BTreeMap<String, Atom>, PrepareStats), String> {
-    let (mut atoms, keys_normalized, dropped_atoms) =
-        crate::commands::merge::normalize_atoms(atoms)?;
+    let (mut atoms, keys_normalized) = crate::commands::merge::normalize_atoms(atoms)?;
     let (transitive, local, missing_deps) = enrich_verification_status(&mut atoms);
     Ok((
         atoms,
@@ -237,7 +230,6 @@ pub fn prepare_atoms(
             transitive,
             local,
             missing_deps,
-            dropped_atoms,
         },
     ))
 }
@@ -300,24 +292,6 @@ pub fn cmd_enrich(input: &Path, output: Option<&Path>) {
         eprintln!("Error: {origin}: {e}");
         std::process::exit(1);
     });
-
-    // A normalization collision that discarded a distinct real atom is
-    // producer error at a unary boundary: silently selecting one atom's
-    // evidence can launder contamination (P8). Reject rather than write.
-    if !stats.dropped_atoms.is_empty() {
-        for (discarded, kept) in &stats.dropped_atoms {
-            eprintln!(
-                "Error: normalization collision: atom {discarded:?} would be discarded \
-                 (a distinct atom already occupies {kept:?})"
-            );
-        }
-        eprintln!(
-            "Error: {origin}: refusing to enrich — normalization collided {} distinct \
-             atom(s); fix the producer aliases and regenerate (P8)",
-            stats.dropped_atoms.len()
-        );
-        std::process::exit(1);
-    }
 
     let not_verified = atoms.len() - stats.transitive - stats.local;
 
@@ -1220,9 +1194,10 @@ mod tests {
     }
 
     // P8 at the unary boundary: a normalization collision that would discard
-    // a distinct real atom is reported in PrepareStats (the CLI rejects it).
+    // a distinct real atom is an error — a library caller never receives the
+    // lossy, already-enriched graph.
     #[test]
-    fn test_prepare_reports_collision() {
+    fn test_prepare_rejects_collision() {
         let mut atoms = BTreeMap::new();
 
         let mut g = make_atom("g");
@@ -1233,10 +1208,10 @@ mod tests {
         set_status(&mut g_alias, "failed");
         atoms.insert("g().".to_string(), g_alias);
 
-        let (_, stats) = prepare_atoms(atoms).unwrap();
-        assert_eq!(
-            stats.dropped_atoms,
-            vec![("g().".to_string(), "g()".to_string())]
+        let err = prepare_atoms(atoms).unwrap_err();
+        assert!(
+            err.contains("distinct real atom") && err.contains(r#""g()." vs "g()""#),
+            "{err}"
         );
     }
 
