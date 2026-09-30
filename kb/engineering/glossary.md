@@ -76,7 +76,27 @@ The set of normalized, enrichment-consistent atom maps — the domain on which t
 
 ## carrier preparation
 
-The operation `prepare = enrich ∘ normalize` (normalize first, [P8](properties.md#p8-code-name-normalization); then enrichment recomputation, [P23](properties.md#p23-transitive-verification)) that brings an authoritative atom map onto the [carrier](#carrier). Merge (μ) applies the two halves separately — normalization per input, enrichment once after all inputs are combined ([P4](properties.md#p4-merge-associativity-on-the-carrier)); the unary recomputation boundaries apply it whole: `probe enrich` (as `prepare_atoms` in `probe/src/commands/propagate.rs`) and `probe project` on authoritative inputs before seed matching and trimming — never on already-projected inputs, whose labels are inherited ([ADR-006](../decisions/006-correspondence-records.md)) and which `probe project` only normalizes. A distinct-real post-normalization collision rejects the input fail-closed at every boundary that normalizes.
+The operation `prepare = enrich ∘ normalize` (normalize first, [P8](properties.md#p8-code-name-normalization); then enrichment recomputation, [P23](properties.md#p23-transitive-verification)) that brings an authoritative atom map onto the [carrier](#carrier). Merge (μ) applies the two halves separately — normalization per input, enrichment once after all inputs are combined ([P4](properties.md#p4-merge-associativity-on-the-carrier)); the unary recomputation boundaries apply it whole: `probe enrich` (as `prepare_atoms` in `probe/src/commands/propagate.rs`) and `probe project` on authoritative inputs before seed matching and trimming (as `prepare_projection_input` in `probe/src/commands/project.rs`) — never on already-projected inputs, whose labels are inherited ([ADR-006](../decisions/006-correspondence-records.md)) and which `probe project` only normalizes. A [distinct-real](#distinct-real-atom) [normalization collision](#normalization-collision) rejects the input fail-closed at every [boundary that normalizes](#boundary-that-normalizes).
+
+## alias
+
+A code-name that differs from another only by trailing `.` characters (the legacy verus-analyzer artifact), e.g. `f()` and `f().`. Aliases denote the same code-name after normalization ([P8](properties.md#p8-code-name-normalization)).
+
+## normalization collision
+
+Two or more [aliases](#alias) in one input that normalize to the same key. Normalization is not injective, so this can happen within a single input; how it resolves depends on the category ([P8](properties.md#p8-code-name-normalization)). For atoms, collapsing a stub or a duplicate identical up to correspondence records is benign, and a collision between [distinct real atoms](#distinct-real-atom) is rejected. For specs/proofs, the collision is warned about and counted, and resolved by [key order](#key-order).
+
+## distinct real atom
+
+In a [normalization collision](#normalization-collision), a pair of non-[stub](#stub) atoms that still differ after normalization, ignoring their [correspondence records](#correspondence-record) (which union instead). The categorized dependency arrays are compared as sets. A collision between distinct real atoms is producer error and is rejected fail-closed ([P8](properties.md#p8-code-name-normalization)).
+
+## key order
+
+The tie-break for a specs/proofs [normalization collision](#normalization-collision): the alias that sorts last wins (`f().` over `f()`; among `f()`, `f().`, `f()..` the most-dotted one), because specs/proofs data are read into a sorted map and the file's member order is lost. Distinct from [P7](properties.md#p7-specsproofs-merge-is-last-wins)'s input order, which orders separate input files.
+
+## boundary that normalizes
+
+A hub entry point that applies [P8](properties.md#p8-code-name-normalization) normalization to its atom input and therefore enforces its fail-closed checks on it ([distinct-real](#distinct-real-atom) collision rejection, correspondence-record shape validation, [P27](properties.md#p27-correspondence-records-are-unioned-and-inert)): `probe merge` per atoms input, `probe enrich`, and `probe project` on any input. Specs/proofs inputs to `probe merge` are normalized too, but a collision there is warned about and resolved by [key order](#key-order), not rejected. The set is wider than the boundaries that recompute enrichment, since `probe project` normalizes an already-projected input without re-enriching it.
 
 ## version gate
 

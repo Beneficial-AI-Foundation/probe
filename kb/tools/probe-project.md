@@ -21,7 +21,7 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 
 | File | Purpose |
 |------|---------|
-| `src/commands/project.rs` | `project_atoms()` (pure function), `cmd_project()` (CLI handler), `ProjectStats` |
+| `src/commands/project.rs` | `prepare_projection_input()` (Step 2), `project_atoms()` (pure function over a prepared map: seed matching and Steps 4–6), `cmd_project()` (CLI handler), `ProjectStats` |
 | `src/main.rs` | CLI: `probe project <input> --mappings <file> [--forward-depth N] [--reverse-depth N] [-o output] [--emit-focus]` |
 
 ## Algorithm
@@ -30,32 +30,34 @@ See [architecture.md](../engineering/architecture.md) for how this fits into the
 
 1. Load atom file via `load_validated_atom_file()` (ReadOnly scope) — accepts single-tool, `probe/merged-atoms`, and already-projected `probe/projected-atoms` envelopes, and reports whether the input is a projection (in either format) so Step 2 knows to skip enrichment
 2. Run the **version-gate component** of the shared authority validator on the input ([ADR-006](../decisions/006-correspondence-records.md)): project re-stamps its output `tool.name: "probe"` at the current version, which would otherwise conceal a pre-contract origin from any later check
-3. Load mappings file via `load_mappings()` — validates `probe/mappings` schema
-4. Build seed set: all `from` and `to` endpoints, normalized ([P8](../engineering/properties.md#p8-code-name-normalization)), that exist in the (normalized) atom data (missing keys logged, not errored)
-
 ### Step 2: Prepare the carrier (enrichment on authoritative inputs only)
 
 On an authoritative (non-projected) input, apply `prepare = enrich ∘ normalize`: normalize the map (P8), then **recompute enrichment on the full input graph** ([P23](../engineering/properties.md#p23-transitive-verification)) *before* any trimming — otherwise a stale label from a producer's embedded old enrichment would be frozen into a depth-limited view that the projection rejection rule then makes unrepairable. Labels are never recomputed from the trimmed view. A post-normalization collision between distinct real atoms rejects the input fail-closed, exactly as `probe enrich` does ([P8](../engineering/properties.md#p8-code-name-normalization)) — silently selected evidence would be frozen into the view. An already-projected input skips the enrichment half: it stays readable and keeps its labels untouched, but is still normalized (with the same collision rejection) so seed matching runs over normalized keys (P8). Every input, projected or not, is first checked for out-of-enum `status-origin` values and rejected fail-closed, as `probe enrich` does ([ADR-006](../decisions/006-correspondence-records.md)).
 
-### Step 3: Build reverse adjacency index
+### Step 3: Load mappings and build the seed set
+
+1. Load mappings file via `load_mappings()` — validates `probe/mappings` schema and normalizes endpoints ([P8](../engineering/properties.md#p8-code-name-normalization))
+2. Build seed set: all `from` and `to` endpoints that exist in the prepared (normalized) atom data (missing keys logged, not errored)
+
+### Step 4: Build reverse adjacency index
 
 Iterate all atoms to build a "who depends on me?" map: `BTreeMap<String, BTreeSet<String>>`. Only built when `--reverse-depth > 0`.
 
-### Step 4: BFS expansion
+### Step 5: BFS expansion
 
 - **Forward** (callee direction): from seeds, follow `atom.dependencies` up to `--forward-depth`
 - **Backward** (caller direction): from seeds, follow the reverse index up to `--reverse-depth`
 - Union forward + backward + seeds into the included set
 - Selection is **dependency-only**: correspondence records (`maps-to`/`mapped-from`) are never traversed. (The pre-ADR-006 edge injection made mapped counterparts reachable; that reachability came from fabricated edges and is not reproduced.)
 
-### Step 5: Filter and trim
+### Step 6: Filter and trim
 
 - Keep only atoms whose code-name is in the included set
 - **Trim dependencies**: remove references to atoms outside the projection (no dangling refs)
 - **Trim categorized extension arrays** (`requires-dependencies`, `type-dependencies`, …) with the same filter — [P15](../engineering/properties.md#p15-dependency-completeness) decomposition is preserved
 - Count trimmed deps for metadata
 
-### Step 6: Write output
+### Step 7: Write output
 
 - Writes the **`probe/projected-atoms`** schema ([ADR-006](../decisions/006-correspondence-records.md)): a projection is a view; `probe merge` and `probe enrich` reject it (in this and the legacy `probe/merged-atoms`+`projection` form), while read-only consumers (summary, probegraph) accept it
 - Carries provenance from input (`inputs` for merged, wrapped `source` for single-tool)

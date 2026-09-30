@@ -19,7 +19,60 @@ pub struct ProjectStats {
 /// Result of projecting: the filtered atom map and stats.
 pub type ProjectResult = (BTreeMap<String, Atom>, ProjectStats);
 
+/// A projection input after carrier preparation.
+pub struct PreparedProjectionInput {
+    pub atoms: BTreeMap<String, Atom>,
+    pub keys_normalized: usize,
+    /// `(transitive, local)` label counts when enrichment was recomputed;
+    /// `None` for an already-projected input, whose labels are inherited.
+    pub enrichment: Option<(usize, usize)>,
+}
+
+// @kb: kb/tools/probe-project.md#step-2-prepare-the-carrier-enrichment-on-authoritative-inputs-only
+// @kb: kb/engineering/glossary.md#carrier-preparation
+// @kb: kb/engineering/properties.md#p8-code-name-normalization
+// @kb: kb/engineering/properties.md#p23-transitive-verification
+/// Prepare an atom map for [`project_atoms`]; `projected` is the flag
+/// `load_validated_atom_file` reports.
+///
+/// Rejects out-of-enum `status-origin` markers (ADR-006 Decision 2). On an
+/// authoritative input, applies `prepare = enrich ∘ normalize`: labels are
+/// recomputed on the *full* input graph before any trimming, otherwise a
+/// stale producer label would be frozen into a depth-limited view that the
+/// projection rejection rule makes unrepairable (P23). An already-projected
+/// input is a view: its labels are inherited, never recomputed over the
+/// trimmed graph, so it is only normalized. Either way keys are normalized
+/// (P8), matching the rule `load_mappings` applies to endpoints, and a
+/// distinct-real collision or a malformed correspondence record rejects the
+/// input — on a view a collision would silently pick one atom's inherited
+/// label.
+pub fn prepare_projection_input(
+    atoms: BTreeMap<String, Atom>,
+    projected: bool,
+) -> Result<PreparedProjectionInput, String> {
+    crate::types::validate_status_origins(&atoms)?;
+    if projected {
+        let (atoms, keys_normalized) = crate::commands::merge::normalize_atoms(atoms)?;
+        Ok(PreparedProjectionInput {
+            atoms,
+            keys_normalized,
+            enrichment: None,
+        })
+    } else {
+        let (atoms, stats) = crate::commands::propagate::prepare_atoms(atoms)?;
+        Ok(PreparedProjectionInput {
+            atoms,
+            keys_normalized: stats.keys_normalized,
+            enrichment: Some((stats.transitive, stats.local)),
+        })
+    }
+}
+
 /// Pure projection function: extract a subgraph seeded by mapping endpoints.
+///
+/// `atoms` must come from [`prepare_projection_input`]: seeds are matched by
+/// exact key against the normalized endpoints `load_mappings` produces, and
+/// labels are copied into the view as they are.
 ///
 /// Given an atom map and bidirectional mapping lookups, builds the seed set
 /// (all `from` + `to` keys that exist in `atoms`), then expands via BFS:
@@ -28,8 +81,7 @@ pub type ProjectResult = (BTreeMap<String, Atom>, ProjectStats);
 ///
 /// Returns the filtered atoms with dependencies trimmed to the included set.
 // @kb: kb/engineering/properties.md#p14-deterministic-output
-// @kb: kb/engineering/properties.md#p9-provenance-is-preserved
-// @kb: kb/engineering/properties.md#p1-envelope-completeness
+// @kb: kb/engineering/properties.md#p15-dependency-completeness
 pub fn project_atoms(
     atoms: &BTreeMap<String, Atom>,
     from_to: &HashMap<String, Vec<String>>,
@@ -39,7 +91,7 @@ pub fn project_atoms(
 ) -> ProjectResult {
     let atoms_in = atoms.len();
 
-    // Step 1: Build seed set from mapping endpoints present in atom data
+    // Step 3: Build seed set from mapping endpoints present in atom data
     let mut seeds = BTreeSet::new();
     for key in from_to.keys() {
         if atoms.contains_key(key) {
@@ -63,7 +115,7 @@ pub fn project_atoms(
     };
     let seeds_found = seeds.len();
 
-    // Step 2: Build reverse adjacency index ("who depends on me?")
+    // Step 4: Build reverse adjacency index ("who depends on me?")
     let mut reverse_adj: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     if reverse_depth > 0 {
         for (key, atom) in atoms {
@@ -76,7 +128,7 @@ pub fn project_atoms(
         }
     }
 
-    // Step 3: BFS forward (callees)
+    // Step 5: BFS forward (callees)
     let mut included = seeds.clone();
     if forward_depth > 0 {
         let mut queue: VecDeque<(String, usize)> = seeds.iter().map(|s| (s.clone(), 0)).collect();
@@ -97,7 +149,7 @@ pub fn project_atoms(
         }
     }
 
-    // Step 4: BFS backward (callers)
+    // Step 5: BFS backward (callers)
     if reverse_depth > 0 {
         let mut queue: VecDeque<(String, usize)> = seeds.iter().map(|s| (s.clone(), 0)).collect();
         let mut visited: BTreeSet<String> = seeds.clone();
@@ -117,7 +169,7 @@ pub fn project_atoms(
         }
     }
 
-    // Step 5: Filter atoms and trim dependencies
+    // Step 6: Filter atoms and trim dependencies
     let mut deps_trimmed = 0;
     let mut result: BTreeMap<String, Atom> = BTreeMap::new();
 
@@ -202,6 +254,8 @@ struct FocusMetadata {
     description: String,
 }
 
+// @kb: kb/engineering/properties.md#p9-provenance-is-preserved
+// @kb: kb/engineering/properties.md#p1-envelope-completeness
 /// CLI entry point for `probe project`.
 pub fn cmd_project(
     input: PathBuf,
@@ -232,35 +286,14 @@ pub fn cmd_project(
         provenance.len()
     );
 
-    // Fail closed on out-of-enum status-origin markers (ADR-006 Decision 2),
-    // as `probe enrich` does: the runtime does not schema-validate, and the
-    // projection would otherwise emit a marker the schema forbids.
-    if let Err(e) = crate::types::validate_status_origins(&loaded.atoms) {
-        eprintln!("Error: {}: {e}", input.display());
-        std::process::exit(1);
-    }
-
-    // Carrier preparation (ADR-006, P23): on an authoritative input, apply
-    // `prepare = enrich ∘ normalize` — labels are recomputed on the *full*
-    // input graph before any trimming, otherwise a stale producer label would
-    // be frozen into a depth-limited view that the projection rejection rule
-    // makes unrepairable. An already-projected input is a view: its labels
-    // are inherited, never recomputed over the trimmed graph, so it is only
-    // normalized. Either way seed matching runs over normalized keys (P8),
-    // the same rule `load_mappings` applies to endpoints, and a distinct-real
-    // collision rejects the input — on a view it would silently pick one
-    // atom's inherited label.
-    let prepared = if loaded.projected {
+    if loaded.projected {
         eprintln!("  Input is a projection: labels inherited, no recomputation");
-        crate::commands::merge::normalize_atoms(loaded.atoms)
-            .map(|(atoms, keys_normalized)| (atoms, keys_normalized, None))
-    } else {
-        crate::commands::propagate::prepare_atoms(loaded.atoms).map(|(atoms, stats)| {
-            let enrichment = (stats.transitive, stats.local);
-            (atoms, stats.keys_normalized, Some(enrichment))
-        })
-    };
-    let (atoms, keys_normalized, enrichment) = match prepared {
+    }
+    let PreparedProjectionInput {
+        atoms,
+        keys_normalized,
+        enrichment,
+    } = match prepare_projection_input(loaded.atoms, loaded.projected) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error: {}: {e}", input.display());
@@ -896,6 +929,107 @@ mod tests {
             "f is reachable only via records; records are never traversed"
         );
         assert_eq!(result.len(), 1);
+    }
+
+    fn with_status(mut atom: Atom, status: &str) -> Atom {
+        atom.extensions
+            .insert("verification-status".to_string(), serde_json::json!(status));
+        atom
+    }
+
+    // Verus-shaped stale label: f claims transitively-verified, but its
+    // callee's callee failed. Keys carry the legacy trailing dot.
+    fn stale_dotted_atoms() -> BTreeMap<String, Atom> {
+        let mut atoms = BTreeMap::new();
+        atoms.insert(
+            "probe:f().".to_string(),
+            with_status(
+                make_atom("f", "rust", "exec", &["probe:helper()."]),
+                "transitively-verified",
+            ),
+        );
+        atoms.insert(
+            "probe:helper().".to_string(),
+            make_atom("helper", "rust", "exec", &["probe:bad()"]),
+        );
+        atoms.insert(
+            "probe:bad()".to_string(),
+            with_status(make_atom("bad", "rust", "exec", &[]), "failed"),
+        );
+        atoms
+    }
+
+    fn status_of<'a>(atoms: &'a BTreeMap<String, Atom>, key: &str) -> &'a serde_json::Value {
+        &atoms[key].extensions["verification-status"]
+    }
+
+    #[test]
+    fn test_prepare_authoritative_normalizes_and_recomputes() {
+        let prepared = prepare_projection_input(stale_dotted_atoms(), false).unwrap();
+        assert_eq!(prepared.keys_normalized, 2);
+        assert!(prepared.enrichment.is_some());
+        assert_eq!(
+            status_of(&prepared.atoms, "probe:f()"),
+            "verified",
+            "stale label recomputed on the full graph (P23)"
+        );
+    }
+
+    #[test]
+    fn test_prepare_projected_normalizes_and_inherits_labels() {
+        let prepared = prepare_projection_input(stale_dotted_atoms(), true).unwrap();
+        assert_eq!(prepared.keys_normalized, 2);
+        assert!(prepared.enrichment.is_none());
+        assert_eq!(
+            status_of(&prepared.atoms, "probe:f()"),
+            "transitively-verified",
+            "a view's labels are inherited, never recomputed"
+        );
+    }
+
+    #[test]
+    fn test_prepare_rejects_invalid_input_on_both_branches() {
+        let mut collision = BTreeMap::new();
+        collision.insert(
+            "probe:g()".to_string(),
+            with_status(make_atom("g", "rust", "exec", &[]), "verified"),
+        );
+        collision.insert(
+            "probe:g().".to_string(),
+            with_status(make_atom("g", "rust", "exec", &[]), "failed"),
+        );
+        let mut bogus_marker = BTreeMap::new();
+        let mut f = make_atom("f", "rust", "exec", &[]);
+        f.extensions
+            .insert("status-origin".to_string(), serde_json::json!("bogus"));
+        bogus_marker.insert("probe:f()".to_string(), f);
+
+        for projected in [false, true] {
+            let err = prepare_projection_input(collision.clone(), projected)
+                .err()
+                .unwrap_or_else(|| panic!("projected={projected}: collision accepted"));
+            assert!(err.contains("distinct real atom"), "{err}");
+            let err = prepare_projection_input(bogus_marker.clone(), projected)
+                .err()
+                .unwrap_or_else(|| panic!("projected={projected}: marker accepted"));
+            assert!(err.contains("status-origin"), "{err}");
+        }
+    }
+
+    // A library caller that prepares first gets the CLI's behavior: the
+    // dotted key is found by its normalized seed and the view carries the
+    // recomputed label, not the stale one.
+    #[test]
+    fn test_prepare_then_project_matches_normalized_seed() {
+        let prepared = prepare_projection_input(stale_dotted_atoms(), false).unwrap();
+        let mut from_to: HashMap<String, Vec<String>> = HashMap::new();
+        from_to
+            .entry("probe:f()".to_string())
+            .or_default()
+            .push("probe:Lean.f".to_string());
+        let (result, stats) = project_atoms(&prepared.atoms, &from_to, &HashMap::new(), 0, 0);
+        assert_eq!(stats.seeds_found, 1);
+        assert_eq!(status_of(&result, "probe:f()"), "verified");
     }
 
     #[test]
