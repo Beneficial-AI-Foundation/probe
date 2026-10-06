@@ -1,6 +1,6 @@
 ---
 title: Architecture
-last-updated: 2026-07-21
+last-updated: 2026-10-06
 status: draft
 ---
 
@@ -101,14 +101,15 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 2. Auto-run probe-rust and probe-lean in parallel (scoped threads)
 3. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
 4. Generate mappings via priority-ordered matching — the charon-`def_id` join (Strategy 0) then three name/location strategies (owned by probe-aeneas; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo))
-5. Call `probe::merge::merge_atom_maps` with mappings
-6. Enrich merged atoms with Aeneas metadata (`translation-name`, `translation-path`, `translation-text`, `untracked`, `is-relevant`, `is-public`)
+5. [Raw merge](glossary.md#raw-staging-primitive) via `probe::commands::merge::merge_atom_files_raw` with the mappings: authority validation (projection rejection + version gate, so probe-lean input must be >= 0.16.0), `maps-to`/`mapped-from` [correspondence records](schema.md#correspondence-records-maps-to-mapped-from), no enrichment
+6. Add Aeneas metadata to merged atoms (`translation-name`, `translation-path`, `translation-text`, `untracked`, `is-relevant`, `is-public`); a verification status copied from a Lean atom onto a Rust atom gets `status-origin: "translation"` ([ADR-006](../decisions/006-correspondence-records.md))
+7. Run enrichment once (`enrich_verification_status`, [P23](properties.md#p23-transitive-verification)); `--skip-enrich` skips it
 
 **Key insight**: probe-aeneas is a *[functor](glossary.md#functor) factory*. It produces the [cross-language mapping](glossary.md#cross-language-mapping); `probe merge` applies it. Domain knowledge about [Aeneas](glossary.md#aeneas) lives here; generic composition lives in probe. (The algebraic structure is detailed in [categorical-framework.md](categorical-framework.md), a non-normative reference.)
 
 **Subcommands**: `extract`, `translate`, `listfuns`
 
-**External tools**: probe-rust (auto-installable), probe-lean (auto-cloned + built), lake
+**External tools**: probe-rust (auto-installable), probe-lean (auto-installed, matched to the Lean project's toolchain), lake
 
 ### probe-leanblueprint
 

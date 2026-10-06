@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-aeneas"
-last-updated: 2026-09-28
+last-updated: 2026-10-06
 status: draft
 ---
 
@@ -56,8 +56,9 @@ Emits `probe-aeneas/extract`.
   authority validation (projection rejection + version gate).
 - `translation-*` / `is-public` extensions round-trip through merge unchanged
   ([P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)).
-- **The only probe with a Rust crate dependency on the hub**: imports
-  `merge_atom_files`, `Atom`, `Mapping`, `MergedAtomEnvelope`, `InputProvenance`,
+- **Rust crate dependency on the hub** (probe-verus, probe-leanblueprint and
+  probe-vcvio have one too): 0.21.0 imports `merge_atom_files_raw`, `endpoint_lookup_maps`,
+  `load_atom_file`, `Atom`, `Mapping`, `MergedAtomEnvelope`, `InputProvenance` and
   `Tool` from `probe::`, and calls `enrich_verification_status`
   ([P23](../engineering/properties.md#p23-transitive-verification)).
 - Pre-contract extracts (below the [ADR-006](../decisions/006-correspondence-records.md)
