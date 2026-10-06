@@ -1,6 +1,6 @@
 ---
 title: Properties and Invariants
-last-updated: 2026-09-30
+last-updated: 2026-10-06
 status: draft
 ---
 
@@ -270,6 +270,7 @@ Scope, spec, and status align as:
 The **backlog** a Verus project still owes specs for is exactly the in-scope/tracked, compiled, non-external, spec-less functions — `untracked: false`, no status.
 
 - **probe-verus** — `untracked` is derived from scope (P25); a status is attached only to in-scope atoms, so `has-verification-status ⟹ ¬untracked` holds by construction.
+- **probe-aeneas** — the in-scope rule of P25 contains every status-bearing atom, so `has-verification-status ⟹ ¬untracked` holds by construction. A translated function whose Lean def has no primary spec, and is neither `trusted` nor `failed`, gets no status ([P16](#p16-verification-status-mapping)). It is backlog: the matched translation keeps it tracked.
 
 **Why it matters**: consumers must not read `untracked: true` as "unverified work to do" — it marks code deliberately outside the verification effort. The backlog is `untracked: false` with no status.
 
@@ -291,13 +292,35 @@ For Verus projects, an atom is **out of verification scope** — `untracked: tru
 
 **Why it matters**: cfg-gatedness alone is *not* a scope signal — many cfg-gated `exec` functions are in scope and verified (compiled behind active gates like `verus_keep_ghost` and default features). Scope is decided by whether the predicate holds in the verification build, not by the mere presence of a gate. Marking out-of-build code (inactive features, non-selected backends, `not(verus_keep_ghost)` fallbacks, `#[cfg(test)]`) `untracked: true` keeps it out of the backlog, which is reserved for in-scope, compiled, unspecified functions.
 
-For Aeneas projects, a Rust function is **out of verification scope** — `untracked: true`, no `verification-status` — exactly when it is not compiled into the verified library in the Aeneas build, has no body to translate, its Lean translation is explicitly annotated out of scope, or it is a function Aeneas structurally cannot translate that the project has curated out. Formally: `untracked: true ⟺ cfg-inactive ∨ unmounted ∨ bodiless-declaration ∨ non-library-target ∨ translation carries @[out_of_scope] ∨ config out-of-scope`:
+For Aeneas projects, a Rust function is **out of verification scope** — `untracked: true`, no `verification-status` — exactly when it is not compiled into the verified library in the Aeneas build, has no body to translate, its Lean translation is explicitly annotated out of scope, or it is a function Aeneas structurally cannot translate that the project has curated out. A status or a matched translation keeps the function in scope, unless the translation carries `@[out_of_scope]`. Formally, with the **in-scope rule** `in-scope ⟺ S ∨ (T ∧ ¬O)`:
+
+```
+untracked: true ⟺ ¬in-scope ∧ (cfg-inactive ∨ unmounted ∨ bodiless-declaration
+                                ∨ non-library-target ∨ O ∨ config out-of-scope)
+```
+
+The symbols are the typed predicates that probe-aeneas tests:
+
+- `S`: the atom has a string `verification-status`. A `null` or other non-string value does not count.
+- `T`: the atom has a string `translation-name`. probe-aeneas writes it for each matched translation whose Lean def is in the Lean input. A `null` value does not count.
+- `O`: the matched Lean translation carries `@[out_of_scope]` (cause 5).
+
+The causes 1 to 6 below keep their typed meaning. For example, the trait-signature form of cause 3 is `trait-required = true ∧ ¬T`, and cause 1 needs a resolved feature set and a string `cfg` that evaluates to false.
+
+The general form above is the rule. For valid input it reduces to a shorter form. probe-rust emits no `verification-status` and no `translation-name`, and the input guard of probe-aeneas accepts only probe-rust provenance for the Rust input. So every status is a copy from a matched translation that does not carry `@[out_of_scope]` (`S ⟹ T ∧ ¬O`). Also `O ⟹ T` always holds. Under these premises:
+
+```
+untracked: true ⟺ (T ∧ O) ∨ (¬T ∧ (cfg-inactive ∨ unmounted ∨ bodiless-declaration
+                                   ∨ non-library-target ∨ config out-of-scope))
+```
+
+So only `@[out_of_scope]` can untrack a matched translation. Causes 4 and 6 apply only to functions without a matched translation: they exist for functions that Aeneas never translates. This is a policy, not a proof. A matched translation is strong evidence that Aeneas compiled the function. A heuristic match can be wrong ([probe-aeneas#69](https://github.com/Beneficial-AI-Foundation/probe-aeneas/issues/69)), and the wrong function then stays tracked.
 
 1. **cfg-inactive** — the function's combined item-gating `#[cfg(...)]` predicate (own gate, enclosing `impl`/`mod`/`trait` gates, and the gates on the parent-file `mod` declaration chain, emitted by probe-rust as the `cfg` field) is false under the Aeneas build configuration, so the item is not compiled and cannot be translated or verified. probe-rust also emits the mod-chain component alone as `file-cfg`; that field never classifies on its own, it only refines the reported reason from `cfg-inactive` to `file-cfg-inactive`.
 2. **unmounted** — no `mod` chain from the package's library or binary target entries reaches the function's file, so rustc compiles it into no lib or bin build (probe-rust's `is-unmounted`). Configuration-independent, so it applies even when the feature set cannot be resolved. probe-rust emits it only from a provably complete module-tree walk, so lib/bin-compiled code is never flagged.
 3. **bodiless declaration** — a function with no body: there is no implementation here to verify. Rust has exactly two forms, and probe-rust emits a distinct fact for each, so their disjunction is this clause:
    - **foreign declaration** (`is-foreign`) — declared inside an `extern { … }` block. The implementation lives outside Rust, so nothing in the atom graph will ever discharge the obligation. A function with a non-Rust ABI but a real body (`pub extern "C" fn f() { … }`) is *not* foreign and stays in scope.
-   - **trait signature** (`trait-required`) — a trait method declared without a default body. The proof obligations live on the `impl`s, which are tracked as their own atoms. Trait methods *with* a default body are ordinary code and stay in scope. Where Aeneas translates a trait *declaration* as an interface record, that atom carries a status and P24 keeps it tracked, so this fires only on signatures with no matched translation.
+   - **trait signature** (`trait-required`) — a trait method declared without a default body. The proof obligations live on the `impl`s, which are tracked as their own atoms. Trait methods *with* a default body are ordinary code and stay in scope. Where Aeneas translates a trait *declaration* as an interface record, the matched translation keeps the atom tracked by the in-scope rule, with or without a status. So this form fires only on signatures with no matched translation (`¬T`).
 
    This is the same clause the Verus rule above states as `has-body: false`; the two vocabularies describe one property, approached from the producer that reports it.
 4. **non-library target** — code outside the verified library/binary target: a build script (`build.rs`), integration tests (`tests/`), `examples/`, or `benches/`. Aeneas translates the crate's library tree, not these separate compilation targets. Detected on `code-path` components: a path with no `src` component whose components include `build.rs`/`tests`/`examples`/`benches` (the `src` guard keeps in-`src` modules merely named `tests` in scope). This mirrors the Verus non-library-target case above.
@@ -306,10 +329,10 @@ For Aeneas projects, a Rust function is **out of verification scope** — `untra
 
 Causes (1) and (2) are about whether rustc compiles the item at all; (3) is about the declaration itself; (4)–(6) are targeting and editorial policy. probe-aeneas reports the applicable cause on each out-of-scope atom in `untracked-reason`, ordered most-intrinsic-first, and its normative field semantics live in that repo's [docs/SCHEMA.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/SCHEMA.md).
 
-**Every extracted (compiled) Rust function is tracked backlog by default** (`untracked: false`, no `verification-status`), whether or not Aeneas produced a Lean translation for it. Absence from `functions.json` alone does **not** imply out-of-scope: a compiled function that Aeneas has not yet translated is unverified backlog, not out of scope. `functions.json` is the translation-matching bridge (which Lean def a Rust function maps to), not the scope oracle.
+**Every extracted (compiled) Rust function is tracked backlog by default** (`untracked: false`, no `verification-status` unless one is copied from its translation), whether or not Aeneas produced a Lean translation for it. Absence from `functions.json` alone does **not** imply out-of-scope: a compiled function that Aeneas has not yet translated is unverified backlog, not out of scope. `functions.json` is the translation-matching bridge (which Lean def a Rust function maps to), not the scope oracle.
 
 - The **active configuration** for the Aeneas build = the package's **resolved default features** (transitive closure of `[features] default` in `Cargo.toml`), overlaid by any `--features` / `--no-default-features` / `--all-features` in the project's `charon.cargo_args`. cfg evaluation mirrors the Verus rules above: only item-gating `#[cfg(...)]` counts (not cosmetic `#[cfg_attr(...)]`), and evaluation is **conservative** — a predicate referencing a flag/feature the tool cannot resolve keeps the atom in scope (backlog), never silently dropping a real backlog item.
-- As with Verus, a status-bearing atom is never untracked (P24): every reclassification above applies only to atoms that would otherwise be backlog.
+- The in-scope rule contains P24: a status-bearing atom is never untracked. It also keeps a matched translation without `@[out_of_scope]` tracked when that translation gives no status. Every reclassification above applies only to atoms outside the in-scope rule.
 - The **configuration-independent** causes (2) and (3) are judged from source structure alone, so they apply even when the feature set cannot be resolved and cfg classification is skipped.
 
 ## P27. Correspondence records are unioned and inert

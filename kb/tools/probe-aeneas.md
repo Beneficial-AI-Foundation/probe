@@ -53,7 +53,17 @@ Emits `probe-aeneas/extract`.
   raw (no-enrichment, authority-validating) merge primitive and runs
   enrichment exactly once, after its metadata phase; `--skip-enrich`
   guards the only enrichment pass. Precomputed input files pass the same
-  authority validation (projection rejection + version gate).
+  authority validation (projection rejection + version gate), before any
+  other work. An input provenance guard also rejects a Rust input unless
+  every provenance entry has schema `probe-rust/extract`, and a Lean input
+  unless every entry has schema `probe-lean/extract`. So a probe-aeneas
+  output cannot be fed back in, and every status on a Rust atom is a copy
+  from the same run.
+- **Scope** ([P24](../engineering/properties.md#p24-a-status-bearing-atom-is-in-analysis-scope),
+  [P25](../engineering/properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope)):
+  `untracked` follows the in-scope rule. A status or a matched translation
+  keeps a Rust function tracked, unless the translation carries
+  `@[out_of_scope]`.
 - `translation-*` / `is-public` extensions round-trip through merge unchanged
   ([P10](../engineering/properties.md#p10-extensions-are-preserved-through-merge)).
 - **Rust crate dependency on the hub** (probe-verus, probe-leanblueprint and

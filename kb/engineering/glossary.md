@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-09-30
+last-updated: 2026-10-06
 status: draft
 ---
 
@@ -259,6 +259,17 @@ progress signal, and `true` is not "unverified work to do" — see
 [P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope).
 An out-of-scope atom carries no `verification-status`; the reason it is out of
 scope is reported in `untracked-reason`.
+
+## in-scope rule
+
+The probe-aeneas condition that keeps a Rust atom tracked whatever its
+out-of-scope facts: the atom has a `verification-status`, or a matched
+translation that does not carry `@[out_of_scope]`. Formally
+`S ∨ (T ∧ ¬O)`, defined in
+[P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope).
+Not to be confused with the trusted boundary of
+[P23](properties.md#p23-transitive-verification), which shields callers from
+blockers.
 
 ## backlog
 

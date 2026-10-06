@@ -1,6 +1,6 @@
 ---
 title: Schema 3.1 Interchange Specification
-last-updated: 2026-09-30
+last-updated: 2026-10-06
 status: draft
 ---
 
@@ -307,6 +307,8 @@ When `--mappings <file>` is provided to `probe merge`, mappings attach [correspo
 
 After combining all inputs, merge **re-enriches** the atoms category via the shared enrichment recomputation ([P23](properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged output labels are recomputed, never inherited.
 
+A consumer that re-merges or re-enriches data with `status-origin` markers must use the hub 0.5.0 or later. Hub 0.4.0 parses such a file but ignores `status-origin`, so its enrichment treats a copied status as local evidence. For example, a Rust atom with `verification-status: "verified"`, `status-origin: "translation"` and no dependencies stays `verified` under hub 0.5.0, but hub 0.4.0 promotes it to `transitively-verified`.
+
 ### Normalization
 
 Per input, before conflict resolution, all code-name keys and dependency references are normalized: trailing `.` characters are stripped (legacy verus-analyzer artifact). Normalization covers code-name-bearing extension arrays, correspondence-record targets, and mapping endpoints ([P8](properties.md#p8-code-name-normalization)); the categorized dependency arrays are also sorted and deduplicated, since they are sets ([P15](properties.md#p15-dependency-completeness)). The per-input ordering is semantic: aliases collapse within their own input before cross-input conflicts are resolved. A post-normalization collision between distinct real atoms (ignoring correspondence records) within one input is a merge **error**, the same fail-closed rule `probe enrich` and `probe project` (on any input) apply; benign collapses (stub, identical-modulo-records) union their correspondence records ([P27](properties.md#p27-correspondence-records-are-unioned-and-inert)).
@@ -383,7 +385,7 @@ The distinct schema string is an **authority boundary**, not a hint: `probe merg
 | 2.0 | all | Initial Schema 2.0 envelope format |
 | 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
 | 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0`. |
-| 3.1 | probe (hub) | Added optional `maps-to`/`mapped-from` correspondence records and the `status-origin` marker; added the `probe/projected-atoms` schema. Hub-side only — producers keep emitting 3.0; the behavioral change (no cross-language edges in `dependencies`) is coordinated through the [ADR-006](../decisions/006-correspondence-records.md) rollout, not the schema number. |
+| 3.1 | probe (hub) | Added optional `maps-to`/`mapped-from` correspondence records and the `status-origin` marker; added the `probe/projected-atoms` schema. Hub-side only — producers keep emitting 3.0; the behavioral change (no cross-language edges in `dependencies`) is coordinated through the [ADR-006](../decisions/006-correspondence-records.md) rollout, not the schema number. Re-merging or re-enriching 3.1 data needs hub >= 0.5.0 (see [Authority validation and re-enrichment](#authority-validation-and-re-enrichment)). |
 
 ### Bumping the interchange schema-version (major)
 
