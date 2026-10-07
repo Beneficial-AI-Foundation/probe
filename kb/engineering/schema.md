@@ -385,7 +385,7 @@ The distinct schema string is an **authority boundary**, not a hint: `probe merg
 | 2.0 | all | Initial Schema 2.0 envelope format |
 | 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
 | 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0`. |
-| 3.1 | probe (hub) | Added optional `maps-to`/`mapped-from` correspondence records and the `status-origin` marker; added the `probe/projected-atoms` schema. Hub-side only — producers keep emitting 3.0; the behavioral change (no cross-language edges in `dependencies`) is coordinated through the [ADR-006](../decisions/006-correspondence-records.md) rollout, not the schema number. Re-merging or re-enriching 3.1 data needs hub >= 0.5.0 (see [Authority validation and re-enrichment](#authority-validation-and-re-enrichment)). |
+| 3.1 | probe (hub) | Added optional `maps-to`/`mapped-from` correspondence records and the `status-origin` marker; added the `probe/projected-atoms` schema. Hub-side only — producers keep emitting 3.0; the behavioral change (no cross-language edges in `dependencies`) is coordinated through the [ADR-006](../decisions/006-correspondence-records.md) rollout, not the schema number. Re-merging or re-enriching data with `status-origin` markers needs hub >= 0.5.0, also when the envelope declares `schema-version` `3.0` (see [Authority validation and re-enrichment](#authority-validation-and-re-enrichment)). |
 
 ### Bumping the interchange schema-version (major)
 
