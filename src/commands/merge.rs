@@ -1025,6 +1025,49 @@ mod tests {
         assert_eq!(merged["probe:a/1.0/mod/helper()"].code_path, "src/lib.rs");
     }
 
+    // #92 / P23 snapshot caveat: stub resolution demotes a Lean source, but
+    // the copied translated label is kept; its callers stay blocked.
+    #[test]
+    fn test_stub_resolution_keeps_copied_label() {
+        fn status(atom: &mut Atom, vs: &str) {
+            atom.extensions
+                .insert("verification-status".to_string(), serde_json::json!(vs));
+        }
+        let mut s_atom = make_real_atom("S", "S.lean", "lean", "theorem");
+        status(&mut s_atom, "transitively-verified");
+        s_atom.dependencies.insert("probe:q".to_string());
+        let mut r = make_real_atom("r", "src/lib.rs", "rust", "exec");
+        status(&mut r, "transitively-verified");
+        r.extensions.insert(
+            "status-origin".to_string(),
+            serde_json::json!("translation"),
+        );
+        let mut f = make_real_atom("f", "src/f.rs", "rust", "exec");
+        status(&mut f, "verified");
+        f.dependencies.insert("probe:r".to_string());
+
+        let mut aeneas = BTreeMap::new();
+        aeneas.insert("probe:S".to_string(), s_atom);
+        aeneas.insert("probe:q".to_string(), make_stub("q", "lean"));
+        aeneas.insert("probe:r".to_string(), r);
+        aeneas.insert("probe:f".to_string(), f);
+
+        let mut q_real = make_real_atom("q", "Q.lean", "lean", "theorem");
+        status(&mut q_real, "unverified");
+        let mut other = BTreeMap::new();
+        other.insert("probe:q".to_string(), q_real);
+
+        let (merged, _) = merge(vec![aeneas, other]);
+        let vs = |k: &str| {
+            merged[k].extensions["verification-status"]
+                .as_str()
+                .unwrap()
+        };
+        assert_eq!(vs("probe:S"), "verified");
+        assert_eq!(vs("probe:r"), "transitively-verified");
+        assert_eq!(vs("probe:f"), "verified");
+    }
+
     #[test]
     fn test_new_atoms_added() {
         let mut base = BTreeMap::new();

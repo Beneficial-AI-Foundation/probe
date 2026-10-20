@@ -1,6 +1,6 @@
 ---
 title: Glossary
-last-updated: 2026-10-06
+last-updated: 2026-10-20
 status: draft
 ---
 
@@ -54,17 +54,21 @@ Not to be confused with atom extension fields `translation-name`, `translation-p
 
 Mapping-generation invariants are owned by probe-aeneas — see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo).
 
+## code atom
+
+Any [atom](#atom) whose `language` is not `"blueprint"`. Synthetic blueprint atoms are presentation aggregates. The assurance contract of [P23](properties.md#p23-transitive-verification) and the `probe summary` partitions are stated over code atoms only ([ADR-006](../decisions/006-correspondence-records.md) Decision 5).
+
 ## correspondence record
 
 A `maps-to` or `mapped-from` entry on an [atom](#atom), attached by `probe merge --mappings`: `{target, confidence, method?}`. Records assert "there is a mappings-file entry linking these names, with this confidence" — a different relation from a dependency, with its own verification semantics: the correspondence is a trust boundary, not a call. Identity is the `(target, confidence, method)` triple in canonical form (empty `method` ≡ absent, canonicalized to omission); shape is validated fail-closed at every boundary that normalizes. Unioned through every merge conflict, inert to enrichment and projection ([P13](properties.md#p13-correspondence-records-attach-unconditionally), [P27](properties.md#p27-correspondence-records-are-unioned-and-inert), [schema.md § Correspondence records](schema.md#correspondence-records-maps-to-mapped-from)). The correspondence relation is the union over both fields; cross-language resolution is a derived consumer view.
 
 ## status-origin
 
-An enumerated atom extension marking whose evidence a `verification-status` is: `"translation"` (imported — copied from a corresponding atom in another language, probe-aeneas) or `"kernel-taint"` (local, but reflecting a producer-known negative finding the emitted graph cannot express, probe-lean). Enrichment treats every bearing atom as a [blocker seed](#blocker-seed). See [ADR-006](../decisions/006-correspondence-records.md) and [P23](properties.md#p23-transitive-verification).
+An enumerated atom extension marking whose evidence a `verification-status` is: `"translation"` (imported — copied from a corresponding atom in another language, probe-aeneas) or `"kernel-taint"` (local, but reflecting a producer-known negative finding the emitted graph cannot express, probe-lean). Enrichment treats every bearing atom as a [blocker seed](#blocker-seed). On a [code atom](#code-atom), a `"translation"` label is a snapshot of the Lean source label at copy time and is never relabeled. See [ADR-006](../decisions/006-correspondence-records.md) and [P23](properties.md#p23-transitive-verification).
 
 ## blocker seed
 
-A seed of the enrichment BFS ([P23](properties.md#p23-transitive-verification)): an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom. A locally verified atom that reaches a blocker seed along a dependency path with no trusted boundary is labelled `"verified"`, not `"transitively-verified"`; a seed itself is never promoted and keeps its own base status. Not to be confused with a projection's [seed set](#seed-set), which selects atoms for `probe project` and has no verification semantics.
+A seed of the enrichment BFS ([P23](properties.md#p23-transitive-verification)): an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom. A locally verified atom that reaches a blocker seed along a dependency path with no trusted boundary is labelled `"verified"`, not `"transitively-verified"`; a seed itself keeps its own base status. A seed is never promoted, except that a `"translation"` code atom keeps its copied label, which can be `"transitively-verified"`; its callers are still blocked. Not to be confused with a projection's [seed set](#seed-set), which selects atoms for `probe project` and has no verification semantics.
 
 ## raw staging primitive
 
@@ -190,13 +194,13 @@ In enrichment ([P23](properties.md#p23-transitive-verification)), a trusted atom
 
 ## transitively-verified (verification-status)
 
-A `verification-status` value indicating that a locally verified atom has no **seed** — an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom — reachable along a dependency path that does not pass through a trusted boundary. Computed by enrichment **recomputation** (see [P23](properties.md#p23-transitive-verification)): one reverse BFS, labels set fresh (contaminated `transitively-verified` is downgraded, never kept).
+A `verification-status` value indicating that a locally verified atom has no **seed** — an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom — reachable along a dependency path that does not pass through a trusted boundary. Computed by enrichment **recomputation** (see [P23](properties.md#p23-transitive-verification)): one reverse BFS, labels set fresh (contaminated `transitively-verified` is downgraded, never kept). Exception: on a [code atom](#code-atom) with `status-origin: "translation"`, the label is copied from the Lean primary spec and kept as a snapshot; it means the Lean source was clean when probe-aeneas copied it.
 
 After enrichment, the distinction between `"transitively-verified"` and `"verified"` encodes the transitive scope:
-- `"transitively-verified"` — no seed reachable along a non-trusted path (Dark Green in UX)
-- `"verified"` — a seed is reachable, or the atom is itself a seed (Light Green in UX)
+- `"transitively-verified"` — no seed reachable along a non-trusted path (Dark Green in UX); on a `status-origin: "translation"` code atom, the Lean source was clean when probe-aeneas copied the label
+- `"verified"` — a seed is reachable, or the atom is itself a seed (Light Green in UX); on a `"translation"` code atom, no clean assertion was kept, which does not prove that a sorry exists
 
-Labels assert consistency with the graph they were computed on, not proof re-validation. probe-verus and probe-aeneas run enrichment as the last step of `extract` (skippable via `--skip-enrich`); `probe merge` re-enriches its output; the `probe enrich` CLI command is available for standalone use.
+Labels assert consistency with the graph they were computed on, not proof re-validation. probe-verus runs enrichment as the last step of `extract`, and probe-aeneas runs it once and then refreshes its copied labels from the final Lean labels (both skippable via `--skip-enrich`); `probe merge` re-enriches its output; the `probe enrich` CLI command is available for standalone use.
 
 ## trust base
 

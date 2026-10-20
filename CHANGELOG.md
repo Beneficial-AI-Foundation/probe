@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Breaking for consumers of translated statuses** (#92, ADR-006 Decision 2 amendment): enrichment no longer relabels an atom with `status-origin: "translation"`. Its copied label is kept as it arrives, so a copied `transitively-verified` stays `transitively-verified` instead of being demoted to `verified`. The atom stays a blocker seed: its callers are never promoted through it, and a copied `trusted` is still never a trusted boundary. `kernel-taint` and malformed markers keep the old rule. Only code atoms with the exact value qualify: a blueprint aggregate with a propagated marker is still relabeled. A copied label is a snapshot of the Lean source label when probe-aeneas copied it; P23 states the new scope caveat. Enrichment counts (`probe enrich`, merge and project summaries) include kept copied labels by their label. Needs the matching probe-aeneas release (probe-aeneas#78) to produce copied `transitively-verified` labels.
+
 ## [0.5.0] - 2026-09-30
 
 The ADR-006 hub contract release (Decision 7): 0.5.0 is the reserved

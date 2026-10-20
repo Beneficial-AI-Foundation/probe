@@ -1,6 +1,6 @@
 ---
 title: "Tool: probe-aeneas"
-last-updated: 2026-10-06
+last-updated: 2026-10-20
 status: draft
 ---
 
@@ -45,10 +45,13 @@ Emits `probe-aeneas/extract`.
   `method` are never discarded or reconstructed from endpoints.
 - **`status-origin: "translation"` marker** ([ADR-006](../decisions/006-correspondence-records.md)):
   every verification status copied from a Lean atom onto a Rust atom is
-  marked, and a copied `transitively-verified` is normalized to `verified`
-  at copy time. Marked atoms are blocker seeds in hub enrichment
-  ([P23](../engineering/properties.md#p23-transitive-verification)) —
-  imported evidence is never turned into a local transitive claim.
+  marked. The copied label is the Lean primary spec label, kept verbatim
+  and refreshed from the final Lean label after the enrichment pass
+  (from 0.22.0, probe-aeneas#78; 0.21.0 normalized a copied
+  `transitively-verified` to `verified`). Marked atoms are blocker seeds in hub enrichment
+  ([P23](../engineering/properties.md#p23-transitive-verification)): the
+  hub keeps their copied label as a snapshot and never promotes a caller
+  through them.
 - **Single final enrichment**: its extract pipeline stages on the hub's
   raw (no-enrichment, authority-validating) merge primitive and runs
   enrichment exactly once, after its metadata phase; `--skip-enrich`

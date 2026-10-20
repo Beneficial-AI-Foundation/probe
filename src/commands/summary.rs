@@ -46,10 +46,7 @@ fn is_verified(atom: &Atom) -> bool {
 /// atom in another language. `status-origin: "kernel-taint"` is local
 /// evidence and stays in the ordinary partitions.
 fn is_translation_origin(atom: &Atom) -> bool {
-    atom.extensions
-        .get("status-origin")
-        .and_then(|v| v.as_str())
-        == Some("translation")
+    crate::types::has_translation_origin(atom)
 }
 
 /// Presentation aggregates (probe-leanblueprint synthetic node atoms) sit
