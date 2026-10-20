@@ -1,0 +1,27 @@
+digraph G {
+  rankdir=TB; nodesep=0.35; ranksep=0.45;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", margin="0.15,0.08"];
+  edge [color="#777777", arrowsize=0.7];
+  A [label="GF16 * &GF16
+(Mul::mul)", fillcolor="#F8BBD0", color="#AD1457", penwidth=2.5];
+  B [label="GF16 *= &GF16
+(MulAssign::mul_assign)", fillcolor="#F2F2F2", color="#BBBBBB", fontcolor="#777777"];
+  C [label="accelerated::mul", fillcolor="#F2F2F2", color="#BBBBBB", fontcolor="#777777"];
+  D [label="accelerated::mul2", fillcolor="#F2F2F2", color="#BBBBBB", fontcolor="#777777"];
+  E [label="accelerated::
+mul2_unreduced", fillcolor="#F2F2F2", color="#BBBBBB", fontcolor="#777777"];
+  F [label="unaccelerated::mul", fillcolor="#F2F2F2", color="#BBBBBB", fontcolor="#777777"];
+  G [label="unaccelerated::mul2", fillcolor="#F8BBD0", color="#AD1457", penwidth=2.5];
+  H [label="unaccelerated::
+poly_mul", fillcolor="#F2F2F2", color="#BBBBBB", fontcolor="#777777"];
+  I [label="reduce::poly_reduce", fillcolor="#F2F2F2", color="#BBBBBB", fontcolor="#777777"];
+  A -> B;
+  B -> C;
+  B -> F;
+  C -> D;
+  D -> E;
+  D -> I;
+  F -> H;
+  F -> I;
+  G -> F;
+}

@@ -1,0 +1,19 @@
+// probe-vcvio on secure-messaging: the SCKA part of its classification.
+// Source: vcvio_SecureMessaging_4831a16.json (probe-vcvio 0.1.0 over the probe-lean extract of 4831a16).
+// Edges = classification links (the construction's `scheme`, the property's `construction`),
+// not dependencies. Counts = atoms whose classification names that construction.
+// All verdicts here are via "type" (constructions) or "naming" (scheme, properties).
+digraph G {
+  rankdir=BT; nodesep=0.35; ranksep=0.6;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", margin="0.15,0.08", fillcolor="#F2F2F2", color="#888888"];
+  edge [color="#777777", arrowsize=0.7];
+  S [label="SCKAScheme\nscheme", fillcolor="#333333", fontcolor=white];
+  u [label="oppUniKemCKA.scheme\nconstruction"]; b [label="oppBiKemCKA.scheme\nconstruction"];
+  m [label="MLKEMBraid.scheme\nconstruction"]; p [label="SPQR.scheme\nconstruction\n(no property links)"];
+  more [label="+3 more constructions\n(schemeWithDecaps,\nmlkemBraidScheme, v1Scheme)", style="rounded,dashed", fillcolor="#FFFFFF"];
+  pu [label="13 correctness\n3 security\n1 ambiguous", shape=note, fillcolor="#FFFFFF"];
+  pb [label="12 correctness", shape=note, fillcolor="#FFFFFF"];
+  pm [label="8 correctness", shape=note, fillcolor="#FFFFFF"];
+  u -> S; b -> S; m -> S; p -> S; more -> S;
+  pu -> u; pb -> b; pm -> m;
+}

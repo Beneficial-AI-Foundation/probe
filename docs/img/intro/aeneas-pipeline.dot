@@ -1,0 +1,16 @@
+// How probe-aeneas builds the spqr-verify graph (spqr-verify 01245a1, probe-aeneas 0.21.0).
+digraph G {
+  rankdir=LR; nodesep=0.3; ranksep=0.7;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", fillcolor="#F2F2F2", color="#888888", margin="0.18,0.08"];
+  edge [color="#555555", arrowsize=0.7];
+  rs [label="Rust crate spqr\nsrc/", shape=note, style=filled];
+  ln [label="Lean project\nSrcTranslated/ (Aeneas output)\nSpqr/Specs/ (proofs)", shape=note, style=filled];
+  tj [label="translation.json\nRust item ↔ Lean name\n(charon def-id)", shape=note, style=filled];
+  pr [label="probe-rust", fillcolor="#333333", fontcolor=white];
+  pl [label="probe-lean", fillcolor="#333333", fontcolor=white];
+  rj [label="rust_extract.json\n684 Rust atoms", shape=folder, fillcolor="#FFFFFF"];
+  lj [label="lean_extract.json\n2848 Lean atoms", shape=folder, fillcolor="#FFFFFF"];
+  pa [label="probe-aeneas\njoin + enrich", fillcolor="#333333", fontcolor=white];
+  out [label="aeneas_spqr_1.6.0.json\n3532 atoms\n234 maps-to / mapped-from pairs", shape=folder, fillcolor="#FFFFFF", penwidth=2];
+  rs -> pr -> rj -> pa; ln -> pl -> lj -> pa; tj -> pa; pa -> out;
+}

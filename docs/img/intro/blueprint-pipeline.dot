@@ -1,0 +1,15 @@
+// How probe-leanblueprint builds the secure-messaging graph (secure-messaging 4831a16, probe-leanblueprint 0.10.0).
+digraph G {
+  rankdir=LR; nodesep=0.3; ranksep=0.6;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", fillcolor="#F2F2F2", color="#888888", margin="0.18,0.08"];
+  edge [color="#555555", arrowsize=0.7];
+  ln [label="Lean project\nSecureMessaging/", shape=note, style=filled];
+  bp [label="Verso blueprint\ndocs/…/Chapters/*.lean\n:::theorem (lean := \"…\")", shape=note, style=filled];
+  pl [label="probe-lean", fillcolor="#333333", fontcolor=white];
+  vb [label="lake exe vbp build", fillcolor="#333333", fontcolor=white];
+  lj [label="Lean atoms\n2941", shape=folder, fillcolor="#FFFFFF"];
+  mj [label="blueprint-manifest.json\nnodes, statuses, uses", shape=folder, fillcolor="#FFFFFF"];
+  pb [label="probe-leanblueprint\njoin by Lean name", fillcolor="#333333", fontcolor=white];
+  out [label="leanblueprint_SecureMessaging_4831a16.json\n2941 Lean atoms (256 with a blueprint label)\n+ 149 blueprint node atoms", shape=folder, fillcolor="#FFFFFF", penwidth=2];
+  ln -> pl -> lj -> pb; bp -> vb -> mj -> pb; pb -> out;
+}

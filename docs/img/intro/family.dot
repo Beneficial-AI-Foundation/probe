@@ -1,0 +1,17 @@
+// The probe family. Each language probe reads one language; the hub combines.
+digraph G {
+  rankdir=LR; nodesep=0.25; ranksep=0.6;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", fillcolor="#F2F2F2", color="#888888", margin="0.18,0.08"];
+  edge [color="#555555", arrowsize=0.7];
+  rs [label="Rust code", shape=note, style=filled]; vs [label="Verus code", shape=note, style=filled]; ls [label="Lean code", shape=note, style=filled];
+  tj [label="translation.json\n(Aeneas)", shape=note, style=filled]; bp [label="Verso blueprint", shape=note, style=filled];
+  pr [label="probe-rust", fillcolor="#333333", fontcolor=white]; pv [label="probe-verus", fillcolor="#333333", fontcolor=white]; pl [label="probe-lean", fillcolor="#333333", fontcolor=white];
+  pa [label="probe-aeneas", fillcolor="#333333", fontcolor=white]; pb [label="probe-leanblueprint", fillcolor="#333333", fontcolor=white]; pc [label="probe-vcvio", fillcolor="#333333", fontcolor=white];
+  hub [label="probe (hub)\nmerge · enrich · summary · project", fillcolor="#555555", fontcolor=white];
+  J [label="JSON graph\n(Schema 3.x)", shape=folder, fillcolor="#FFFFFF"];
+  rs -> pr; vs -> pv; ls -> pl;
+  pr -> pa; pl -> pa; tj -> pa;
+  pl -> pb; bp -> pb; pl -> pc;
+  pr -> J; pv -> J; pl -> J; pa -> J; pb -> J; pc -> J;
+  J -> hub [dir=both];
+}

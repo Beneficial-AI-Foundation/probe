@@ -1,0 +1,16 @@
+// How status spreads: the only sorry cluster in secure-messaging (SecureMessaging/PRFPRNG/Defs.lean).
+// Source: leanblueprint_SecureMessaging_4831a16.json. Edges = dependencies (all within PRFPRNGScheme).
+// Yellow = unverified (sorry in its own body); light green = verified (own body sorry-free, but a
+// sorry is reachable, so not transitively-verified).
+digraph G {
+  rankdir=BT; nodesep=0.3; ranksep=0.6;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", margin="0.15,0.08"];
+  edge [color="#555555", arrowsize=0.7, dir=back];
+  node [fillcolor="#C99A00", color="#8a6a00", fontcolor=white];
+  o1 [label="oracleChallPrf\nsorry"]; o2 [label="oracleChallPrng\nsorry"]; o3 [label="oracleCorr\nsorry"]; o4 [label="oracleProcess\nsorry"];
+  ie [label="pppIdealExp\nsorry"];
+  node [fillcolor="#43A047", color="#1B5E20", fontcolor=white];
+  si [label="pppSecurityImpl"]; re [label="pppRealExp"]; adv [label="pppAdvantage"];
+  o1 -> si; o2 -> si; o3 -> si; o4 -> si;
+  si -> re; re -> adv; ie -> adv;
+}
