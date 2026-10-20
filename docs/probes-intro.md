@@ -162,7 +162,7 @@ The join does not add edges to `dependencies`. It adds **correspondence records*
 | `verified` | its own body or proof is complete, but not everything below it is verified, or the status is imported | <span class="chip v">light green</span> |
 | `unverified` | contains `sorry`, `admit` or `assume` | <span class="chip unv">yellow</span> |
 | `failed` | the verifier rejects it | <span class="chip fail">red</span> |
-| `trusted` | accepted without proof: axioms, Verus `external_body`, external or opaque Lean declarations | <span class="chip tr">purple</span> |
+| `trusted` | accepted without proof: axioms, Verus `external_body`, external or opaque Lean declarations | <span class="chip tr">purple</span> <!-- enum-ok --> |
 | no status | tracked, but has no spec yet | <span class="chip none">white</span> |
 | `untracked: true` | out of scope (for example, code behind an inactive `cfg`) | <span class="chip unt">grey</span> |
 
@@ -190,7 +190,7 @@ A Rust function gets a status only from its Lean counterpart. If the Lean transl
 
 `pppSecurityImpl` has no `sorry` in its own body, so it is `verified`. Four functions it calls contain `sorry`, so it is not `transitively-verified`. Its `assumptions` field lists `sorryAx`. Everything that depends on it inherits the same problem.
 
-<span class="small">This is the only sorry cluster in secure-messaging (`SecureMessaging/PRFPRNG/Defs.lean`): 8 unverified atoms, 3 verified, all others transitively-verified.</span>
+<span class="small">This is the only sorry cluster in secure-messaging (`SecureMessaging/PRFPRNG/Defs.lean`): 8 unverified atoms, 3 verified, all others transitively-verified.</span> <!-- enum-ok -->
 
 ---
 
@@ -234,7 +234,7 @@ Correctness is proved for three of the five constructions. No security theorem i
 
 ![h:390](img/intro/sm-scka-zoom.png)
 
-<span class="small">Purple: the Lean declaration each blueprint node is bound to. Grey dashed: `blueprint-statement-uses`. Solid: Lean `type-dependencies` (statement). Dotted: `term-dependencies` only (proof). The blueprint's statement edges match the Lean theorem's statement edges.</span>
+<span class="small">Purple: the Lean declaration each blueprint node is bound to. Grey dashed: `blueprint-statement-uses`. Solid: Lean `type-dependencies` (statement). Dotted: `term-dependencies` only (proof). The blueprint's statement edges match the Lean theorem's statement edges.</span> <!-- enum-ok -->
 
 ---
 
