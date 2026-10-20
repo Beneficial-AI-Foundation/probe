@@ -1,0 +1,36 @@
+// spqr-verify: one Rust function, its Aeneas translation and its spec.
+// Source: aeneas_spqr_1.6.0.json (probe-aeneas 0.21.0, spqr-verify 01245a1).
+// Every node and edge below is a field in that file. All nodes are drawn dark green
+// (transitively-verified): the extract marks the three Rust atoms "verified", a probe-aeneas
+// issue being fixed (a Rust function cannot be only "verified" when its spec is transitively-verified).
+digraph G {
+  rankdir=LR; nodesep=0.6; ranksep=1.6; ordering=out;
+  node [fontname="Inter", fontsize=15, style="filled,rounded", shape=box, penwidth=1.5, fontcolor=white, margin="0.25,0.12"];
+  edge [fontname="Inter", fontsize=12, arrowsize=0.8];
+
+  subgraph cluster_rust { label="Rust  ·  src/encoding/gf.rs\n(probe-rust)"; fontname="Inter"; fontsize=14; style="rounded,dashed"; color="#999999";
+    R1 [label="mul"]; R2 [label="poly_mul"]; R3 [label="poly_reduce"]; }
+  subgraph cluster_lean { label="Lean  ·  SrcTranslated/Funs.lean\n(Aeneas translation, probe-lean)"; fontname="Inter"; fontsize=14; style="rounded,dashed"; color="#999999";
+    L1 [label="mul"]; L2 [label="poly_mul"]; L3 [label="poly_reduce"]; }
+  subgraph cluster_spec { label="Lean  ·  Spqr/Specs/Encoding/Gf/…\n(hand-written proofs, probe-lean)"; fontname="Inter"; fontsize=14; style="rounded,dashed"; color="#999999";
+    T1 [label="mul_spec", shape=box, style="filled", peripheries=2];
+    T2 [label="poly_mul_spec", shape=box, style="filled", peripheries=2];
+    T3 [label="poly_reduce_spec", shape=box, style="filled", peripheries=2]; }
+
+  R1, R2, R3, L1, L2, L3, T1, T2, T3 [fillcolor="#1B5E20", color="#0d3311"];
+
+
+  // Rust dependencies
+  R1 -> R2 [color="#555555", constraint=false]; R1 -> R3 [color="#555555", constraint=false];
+  // Lean term-dependencies (body / proof): dotted
+  L1 -> L2 [style=dotted, constraint=false]; L1 -> L3 [style=dotted, constraint=false];
+  T1 -> T2 [style=dotted, constraint=false]; T1 -> T3 [style=dotted, constraint=false];
+  // maps-to (correspondence record, from charon-def-id)
+  R1 -> L1 [label="maps-to", color="#E8710A", fontcolor="#E8710A", penwidth=3];
+  R2 -> L2 [label="maps-to", color="#E8710A", fontcolor="#E8710A", penwidth=3];
+  R3 -> L3 [label="maps-to", color="#E8710A", fontcolor="#E8710A", penwidth=3];
+  // primary-spec
+  L1 -> T1 [label="primary-spec", color="#7C3AED", fontcolor="#7C3AED", style=dashed, penwidth=2];
+  L2 -> T2 [label="primary-spec", color="#7C3AED", fontcolor="#7C3AED", style=dashed, penwidth=2];
+  L3 -> T3 [label="primary-spec", color="#7C3AED", fontcolor="#7C3AED", style=dashed, penwidth=2];
+}

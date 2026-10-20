@@ -1,0 +1,95 @@
+<!-- Merge-operator slide recoloured to the deck convention (verified light green, unverified yellow, trusted purple). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect width="1920" height="1080" fill="#FFFFFF"/>
+  <text x="72" y="84" font-family="DejaVu Sans" font-size="44" font-weight="700" fill="#1C1917">&#x03BC;, the probe merge operator</text>
+
+  <text x="72" y="160" font-family="DejaVu Sans" font-size="24" fill="#78716C">Associativity</text>
+  <text x="72" y="206" font-family="DejaVu Sans" font-size="32" fill="#1C1917">&#x03BC;(&#x03BC;(A, B), C) = &#x03BC;(A, &#x03BC;(B, C))</text>
+
+  <text x="720" y="160" font-family="DejaVu Sans" font-size="24" fill="#78716C">Identity</text>
+  <text x="720" y="206" font-family="DejaVu Sans" font-size="32" fill="#1C1917">&#x03BC;(A, &#x2205;) = A</text>
+
+  <text x="1200" y="160" font-family="DejaVu Sans" font-size="24" fill="#78716C">Commutativity under disjoint keys</text>
+  <text x="1200" y="206" font-family="DejaVu Sans" font-size="32" fill="#1C1917">&#x03BC;(A, B) = &#x03BC;(B, A)</text>
+
+  <text x="72" y="278" font-family="DejaVu Sans" font-size="24" fill="#78716C">Mappings</text>
+  <text x="220" y="278" font-family="DejaVu Sans" font-size="30" fill="#1C1917">F_M(&#x03BC;(A, B)) = &#x03BC;(F_M(A), F_M(B))</text>
+  <text x="780" y="278" font-family="DejaVu Sans" font-size="30" fill="#1C1917">F_M(F_M(A)) = F_M(A)</text>
+
+  <line x1="72" y1="322" x2="1848" y2="322" stroke="#E7E5E4" stroke-width="2"/>
+
+  <g transform="translate(0,36)">
+  <text x="72" y="372" font-family="DejaVu Sans" font-size="30" font-weight="700" fill="#1C1917">Illustration: an assumed spec meets the real crate</text>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#1C1917"/>
+    </marker>
+  </defs>
+
+  <!-- Inputs: A = curve25519-dalek, B = subtle -->
+  <rect x="72" y="400" width="1276" height="190" rx="16" fill="#FAFAF9" stroke="#E7E5E4" stroke-width="2"/>
+  <text x="96" y="436" font-family="DejaVu Sans" font-size="24" font-weight="700" fill="#1C1917">A = curve25519-dalek</text>
+
+  <rect x="96" y="456" width="380" height="104" rx="12" fill="#E5F6EC" stroke="#157A45" stroke-width="2.5"/>
+  <text x="286" y="498" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">EdwardsPoint::compress</text>
+  <text x="286" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#145C32">transitively-verified</text>
+  <line x1="476" y1="508" x2="514" y2="508" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <rect x="520" y="456" width="380" height="104" rx="12" fill="#E5F6EC" stroke="#157A45" stroke-width="2.5"/>
+  <text x="710" y="498" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">FieldElement::is_negative</text>
+  <text x="710" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#145C32">transitively-verified</text>
+  <line x1="900" y1="508" x2="938" y2="508" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <rect x="944" y="456" width="380" height="104" rx="12" fill="#F4F4F5" stroke="#71717A" stroke-width="2.5" stroke-dasharray="7 6"/>
+  <text x="1134" y="498" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">subtle::Choice::from</text>
+  <text x="1134" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#7C3AED">stub, trusted (assumed spec)</text>
+
+  <text x="1398" y="512" text-anchor="middle" font-family="DejaVu Sans" font-size="56" font-weight="700" fill="#1C1917">&#x03BC;</text>
+  <text x="1398" y="548" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#78716C">merge</text>
+
+  <rect x="1448" y="400" width="400" height="190" rx="16" fill="#FAFAF9" stroke="#E7E5E4" stroke-width="2"/>
+  <text x="1472" y="436" font-family="DejaVu Sans" font-size="24" font-weight="700" fill="#1C1917">B = subtle</text>
+  <rect x="1472" y="456" width="352" height="104" rx="12" fill="#FFF8E1" stroke="#C99A00" stroke-width="2.5"/>
+  <text x="1648" y="498" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">Choice::from</text>
+  <text x="1648" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#8A6A00">unverified</text>
+
+  <!-- union: both inputs flow into one atom map -->
+  <line x1="710" y1="590" x2="710" y2="662" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <line x1="1648" y1="590" x2="1210" y2="664" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <text x="730" y="636" font-family="DejaVu Sans" font-size="24" font-weight="700" fill="#1C1917">union</text>
+
+  <rect x="96" y="670" width="380" height="104" rx="12" fill="#E5F6EC" stroke="#C2410C" stroke-width="3"/>
+  <text x="286" y="712" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">EdwardsPoint::compress</text>
+  <text x="286" y="746" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#145C32">transitively-verified</text>
+  <line x1="476" y1="722" x2="514" y2="722" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <rect x="520" y="670" width="380" height="104" rx="12" fill="#E5F6EC" stroke="#C2410C" stroke-width="3"/>
+  <text x="710" y="712" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">FieldElement::is_negative</text>
+  <text x="710" y="746" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#145C32">transitively-verified</text>
+  <line x1="900" y1="722" x2="938" y2="722" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <rect x="944" y="670" width="380" height="104" rx="12" fill="#FFF8E1" stroke="#C99A00" stroke-width="2.5"/>
+  <text x="1134" y="712" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">subtle::Choice::from</text>
+  <text x="1134" y="746" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#8A6A00">unverified</text>
+
+  <text x="1472" y="708" font-family="DejaVu Sans" font-size="24" fill="#C2410C">stale labels</text>
+  <text x="1472" y="742" font-family="DejaVu Sans" font-size="22" fill="#57534E">stub replaced,</text>
+  <text x="1472" y="770" font-family="DejaVu Sans" font-size="22" fill="#57534E">assumption dropped</text>
+
+  <!-- recompute: callers reach an unverified seed, so they are only locally verified -->
+  <line x1="710" y1="774" x2="710" y2="846" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <text x="730" y="820" font-family="DejaVu Sans" font-size="24" font-weight="700" fill="#1C1917">recompute</text>
+
+  <rect x="96" y="854" width="380" height="104" rx="12" fill="#F1F8E9" stroke="#43A047" stroke-width="2.5"/>
+  <text x="286" y="896" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">EdwardsPoint::compress</text>
+  <text x="286" y="930" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#2E7D32">verified</text>
+  <line x1="476" y1="906" x2="514" y2="906" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <rect x="520" y="854" width="380" height="104" rx="12" fill="#F1F8E9" stroke="#43A047" stroke-width="2.5"/>
+  <text x="710" y="896" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">FieldElement::is_negative</text>
+  <text x="710" y="930" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#2E7D32">verified</text>
+  <line x1="900" y1="906" x2="938" y2="906" stroke="#1C1917" stroke-width="2.5" marker-end="url(#arr)"/>
+  <rect x="944" y="854" width="380" height="104" rx="12" fill="#FFF8E1" stroke="#C99A00" stroke-width="2.5"/>
+  <text x="1134" y="896" text-anchor="middle" font-family="DejaVu Sans" font-size="22" font-weight="700" fill="#1C1917">subtle::Choice::from</text>
+  <text x="1134" y="930" text-anchor="middle" font-family="DejaVu Sans" font-size="20" fill="#8A6A00">unverified</text>
+
+  <text x="1472" y="892" font-family="DejaVu Sans" font-size="24" fill="#57534E">seed reachable</text>
+  <text x="1472" y="926" font-family="DejaVu Sans" font-size="22" fill="#57534E">labels rewritten</text>
+  </g>
+</svg>

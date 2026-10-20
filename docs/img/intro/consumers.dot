@@ -1,0 +1,11 @@
+// Who reads the JSON.
+digraph G {
+  rankdir=LR; nodesep=0.35; ranksep=0.9;
+  node [fontname="Inter", fontsize=14, shape=box, style="filled,rounded", fillcolor="#F2F2F2", color="#888888", margin="0.2,0.1"];
+  edge [color="#555555", arrowsize=0.8];
+  J [label="probe JSON", shape=folder, fillcolor="#FFFFFF"];
+  V [label="VeriLib\nproject pages, \"Graph\" view,\n\"Probe Graph\" view (probegraph)"];
+  F [label="FVS (formal-verification-skills)\nClaude Code plugin:\n/fvs:map-code · /fvs:fc-plan · /fvs:trust-audit"];
+  Q [label="your own queries\njq · probe summary · probe project"];
+  J -> V; J -> F; J -> Q;
+}

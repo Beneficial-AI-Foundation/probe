@@ -1,0 +1,35 @@
+// secure-messaging SCKA chapter: blueprint nodes per construction, with statement-uses edges
+// from each theorem to its construction's definition. (Every correctness theorem also uses
+// Def 9.1.3 and every security theorem Def 9.1.4; those edges are left out for readability.)
+// Source: leanblueprint_SecureMessaging_4831a16.json (probe-leanblueprint 0.10.0).
+// Fill = blueprint status: dark green formalized/fully-proved, white ready/ready, grey blocked/none.
+digraph G {
+  rankdir=TB; nodesep=0.25; ranksep=0.5;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", margin="0.15,0.08"];
+  edge [color="#888888", arrowsize=0.7, dir=back];
+  graph [fontname="Inter", fontsize=14, style="rounded,dashed", color="#999999"];
+
+  subgraph cluster_u { label="Opp-UniKEM-CKA (9.2)";
+    uspec [label="Def 9.2.1", fillcolor="#1B5E20", color="#0d3311", fontcolor=white];
+    ucorr [label="correctness\nThm 9.2.2", fillcolor="#1B5E20", color="#0d3311", fontcolor=white, peripheries=2];
+    usec  [label="security\nThm 9.2.4", fillcolor="#FFFFFF", color="#333333", peripheries=2]; }
+  subgraph cluster_b { label="Opp-BiKEM-CKA (9.3)";
+    bspec [label="Def 9.3.1", fillcolor="#1B5E20", color="#0d3311", fontcolor=white];
+    bcorr [label="correctness\nThm 9.3.2", fillcolor="#1B5E20", color="#0d3311", fontcolor=white, peripheries=2];
+    bsec  [label="security\nThm 9.3.3", fillcolor="#FFFFFF", color="#333333", peripheries=2]; }
+  subgraph cluster_r { label="Opp-RKEM-CKA (9.4)";
+    rspec [label="Def 9.4.1", fillcolor="#FFFFFF", color="#333333"];
+    rcorr [label="correctness\nThm 9.4.2", fillcolor="#E0E0E0", color="#808080", fontcolor="#555555", style="filled,rounded,dashed", peripheries=2];
+    rsec  [label="security\nThm 9.4.3", fillcolor="#E0E0E0", color="#808080", fontcolor="#555555", style="filled,rounded,dashed", peripheries=2]; }
+  subgraph cluster_m { label="ML-KEM Braid (9.5)";
+    mspec [label="Def 9.5.7", fillcolor="#1B5E20", color="#0d3311", fontcolor=white];
+    mcorr [label="correctness\nThm 9.5.8", fillcolor="#1B5E20", color="#0d3311", fontcolor=white, peripheries=2];
+    msec  [label="security\nThm 9.5.9", fillcolor="#FFFFFF", color="#333333", peripheries=2]; }
+  subgraph cluster_p { label="SPQR protocol (9.6)";
+    pspec [label="Def 9.6.5", fillcolor="#1B5E20", color="#0d3311", fontcolor=white];
+    pcorr [label="correctness\nThm 9.6.6", fillcolor="#FFFFFF", color="#333333", peripheries=2];
+    psec  [label="security\nThm 9.6.7", fillcolor="#FFFFFF", color="#333333", peripheries=2]; }
+
+  uspec -> ucorr; uspec -> usec; bspec -> bcorr; bspec -> bsec; rspec -> rcorr; rspec -> rsec;
+  mspec -> mcorr; mspec -> msec; pspec -> pcorr; pspec -> psec;
+}

@@ -1,0 +1,13 @@
+// What a probe does: read a project, write a graph of atoms as JSON.
+digraph G {
+  rankdir=LR; nodesep=0.3; ranksep=0.7; compound=true;
+  node [fontname="Inter", fontsize=14, shape=box, style="filled,rounded", fillcolor="#F2F2F2", color="#888888", margin="0.2,0.1"];
+  edge [color="#555555", arrowsize=0.8];
+  subgraph cluster_src { label="a project"; fontname="Inter"; fontsize=14; style="rounded,dashed"; color="#999999";
+    s1 [label="gf.rs", shape=note, style=filled]; s2 [label="Funs.lean", shape=note, style=filled]; s3 [label="Mul.lean", shape=note, style=filled]; }
+  P [label="probe\n(uses the language's own\nindexer or compiler)", fillcolor="#333333", fontcolor=white, color="#333333"];
+  subgraph cluster_json { label="JSON: one entry per atom"; fontname="Inter"; fontsize=14; style="rounded,dashed"; color="#999999";
+    a1 [label="mul"]; a2 [label="poly_mul"]; a3 [label="poly_reduce"]; a4 [label="mul_spec"];
+    a1 -> a2; a1 -> a3; a4 -> a1; }
+  s2 -> P [ltail=cluster_src]; P -> a1 [lhead=cluster_json];
+}

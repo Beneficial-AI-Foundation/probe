@@ -1,0 +1,35 @@
+// secure-messaging: blueprint Theorem 9.2.2 and the Lean theorem it binds to.
+// Source: leanblueprint_SecureMessaging_4831a16.json (probe-leanblueprint 0.10.0, probe-lean inside).
+// Left: blueprint node atoms (language "blueprint"); grey dashed = blueprint-statement-uses.
+// Right: Lean atoms; solid = type-dependencies (statement), dotted = term-dependencies only (proof).
+// Purple = the blueprint node's dependencies (the Lean declaration it is bound to).
+// All Lean atoms here are transitively-verified; all blueprint nodes formalized/fully-proved.
+digraph G {
+  rankdir=LR; nodesep=0.25; ranksep=2.2; newrank=true;
+  node [fontname="Inter", fontsize=13, shape=box, style="filled,rounded", margin="0.15,0.08", fillcolor="#1B5E20", color="#0d3311", fontcolor=white, width=2.9];
+  edge [arrowsize=0.7];
+  graph [fontname="Inter", fontsize=14, style="rounded,dashed", color="#999999"];
+
+  subgraph cluster_bp { label="Verso blueprint  (probe-leanblueprint)";
+    b0 [label="Theorem 9.2.2\nOpp-UniKEM-CKA correctness", peripheries=2];
+    b1 [label="Definition 9.1.3\nSCKA correctness"];
+    b2 [label="Definition 9.2.1\nOpp-UniKEM-CKA"];
+    b3 [label="Definition 4.1.4\nerasure code correctness"];
+    b4 [label="Definition 6.3.1\non/off KEM"]; }
+  subgraph cluster_lean { label="Lean  (probe-lean)";
+    t  [label="oppUniKemCKA.correctness_true_ge", peripheries=2];
+    d1 [label="SCKAScheme.correctnessExp"];
+    d2 [label="oppUniKemCKA.scheme"];
+    d3 [label="ErasureCode.Correct"];
+    d4 [label="KEMScheme.OnOffStructure"];
+    r  [label="oppUniKemCKA.\ncorrectness_true_ge_reduction", peripheries=2]; }
+
+  edge [color="#7C3AED", style=dashed, penwidth=2.2];
+  b0 -> t; b1 -> d1; b2 -> d2; b3 -> d3; b4 -> d4;
+  edge [color="#999999", style=dashed, penwidth=1, constraint=false];
+  b0 -> b1; b0 -> b2; b0 -> b3; b0 -> b4;
+  edge [color="#333333", style=solid, penwidth=1.2, constraint=false];
+  t -> d1; t -> d2; t -> d3; t -> d4;
+  t -> r [style=dotted];
+  b4 -> r [style=invis, constraint=true];
+}
