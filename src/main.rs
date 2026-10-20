@@ -94,7 +94,9 @@ enum Commands {
     /// reachable along a dependency path that doesn't pass through a
     /// trusted boundary. Atoms that come out "verified" are only locally
     /// verified (such a seed is reachable, or the atom is itself a seed);
-    /// stale "transitively-verified" labels are downgraded.
+    /// stale "transitively-verified" labels are downgraded. Exception: a
+    /// code atom with status-origin "translation" keeps its copied label
+    /// (a snapshot of the Lean source label) but still blocks its callers.
     ///
     /// The input must pass authority validation (ADR-006): projections in
     /// either format and pre-contract envelopes are rejected.

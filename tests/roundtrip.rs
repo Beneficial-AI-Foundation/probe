@@ -957,3 +957,91 @@ fn p15_decomposition_survives_merge_then_project() {
         "the excluded callee is trimmed from dependencies and every subset"
     );
 }
+
+/// #92 over real binary outputs: a copied `transitively-verified` keeps its
+/// label through merge and project, its caller stays `verified`, and summary
+/// lists it only as imported evidence.
+#[test]
+fn copied_label_survives_merge_project_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut r = atom(&[], Some("transitively-verified"));
+    r["status-origin"] = serde_json::json!("translation");
+    let aeneas = dir.path().join("aeneas.json");
+    write_json(
+        &aeneas,
+        &single_tool_envelope(
+            "probe-aeneas/extract",
+            "probe-aeneas",
+            "0.21.0",
+            "app",
+            serde_json::json!({
+                "probe:app/1.0/r()": r,
+                "probe:app/1.0/c()": atom(&["probe:app/1.0/r()"], Some("verified")),
+            }),
+        ),
+    );
+    let (_, lean) = write_inputs(dir.path());
+
+    let merged = dir.path().join("merged.json");
+    let out = run_probe(&[
+        "merge",
+        aeneas.to_str().unwrap(),
+        lean.to_str().unwrap(),
+        "-o",
+        merged.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "merge failed: {}", stderr_of(&out));
+    let data = &read_json(&merged)["data"];
+    assert_eq!(
+        data["probe:app/1.0/r()"]["verification-status"],
+        "transitively-verified"
+    );
+    assert_eq!(data["probe:app/1.0/c()"]["verification-status"], "verified");
+
+    let mappings = dir.path().join("m.json");
+    write_json(
+        &mappings,
+        &mappings_file(&[("probe:app/1.0/c()", "probe:Lean.T")]),
+    );
+    let projected = dir.path().join("projected.json");
+    let out = run_probe(&[
+        "project",
+        merged.to_str().unwrap(),
+        "--mappings",
+        mappings.to_str().unwrap(),
+        "-o",
+        projected.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "project failed: {}", stderr_of(&out));
+    let data = &read_json(&projected)["data"];
+    assert_eq!(
+        data["probe:app/1.0/r()"]["verification-status"],
+        "transitively-verified"
+    );
+    assert_eq!(data["probe:app/1.0/c()"]["verification-status"], "verified");
+
+    let summary = dir.path().join("summary.json");
+    let out = run_probe(&[
+        "summary",
+        projected.to_str().unwrap(),
+        "-o",
+        summary.to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "summary failed: {}", stderr_of(&out));
+    let data = &read_json(&summary)["data"];
+    let r_key = serde_json::json!("probe:app/1.0/r()");
+    assert!(data["imported_verified"]
+        .as_array()
+        .unwrap()
+        .contains(&r_key));
+    for list in [
+        "verified_entrypoints",
+        "verified_functions",
+        "verified_lemmas",
+    ] {
+        assert!(
+            !data[list].as_array().unwrap().contains(&r_key),
+            "{list} must not list imported evidence"
+        );
+    }
+}

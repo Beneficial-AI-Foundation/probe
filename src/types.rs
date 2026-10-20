@@ -155,6 +155,17 @@ impl Atom {
     }
 }
 
+/// `status-origin: "translation"` (exact value): the status was copied from
+/// another language by probe-aeneas (ADR-006 Decision 2). Shared by
+/// enrichment (kept snapshot labels) and `probe summary` (imported list).
+// @kb: kb/decisions/006-correspondence-records.md#amendment-2026-10-20-probe92-copied-labels-are-kept
+pub(crate) fn has_translation_origin(atom: &Atom) -> bool {
+    atom.extensions
+        .get("status-origin")
+        .and_then(|v| v.as_str())
+        == Some("translation")
+}
+
 // @kb: kb/engineering/schema.md#common-optional-fields — status-origin marker
 /// Validate every atom's `status-origin` marker against the two-value enum
 /// (ADR-006 Decision 2: `"translation"` or `"kernel-taint"`).

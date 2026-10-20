@@ -386,3 +386,166 @@ fn mapping_canonicalization_counts_loader_and_empty_inputs() {
         }
     }
 }
+
+/// P4 associativity and the enrichment fixed point with copied translated
+/// labels (#92): a translated atom keeps the label it arrives with, stays a
+/// seed, and is never relabeled. Two keys, `r` (Rust, depends on `s`) and
+/// `s` (Lean source), each absent or drawn from a vocabulary of stubs,
+/// distinct reals, local/translated/kernel-taint statuses, so stub
+/// resolution and first-wins both decide which label survives.
+#[test]
+fn laws_hold_with_translated_labels() {
+    fn variant(key: &str, code_path: &str, status: Option<&str>, origin: Option<&str>) -> Atom {
+        let mut v = json!({
+            "display-name": key, "dependencies": if key == "r" { json!(["s"]) } else { json!([]) },
+            "code-module": "", "code-path": code_path,
+            "code-text": {"lines-start": 0, "lines-end": 0},
+            "kind": "exec", "language": if key == "r" { "rust" } else { "lean" }
+        });
+        if let Some(s) = status {
+            v["verification-status"] = json!(s);
+        }
+        if let Some(o) = origin {
+            v["status-origin"] = json!(o);
+        }
+        serde_json::from_value(v).unwrap()
+    }
+    let vocab = |key: &str| -> Vec<Option<Atom>> {
+        let stub = Atom {
+            dependencies: Default::default(),
+            ..variant(key, "", None, None)
+        };
+        vec![
+            None,
+            Some(stub),
+            Some(variant(key, "a", Some("unverified"), None)),
+            Some(variant(key, "b", Some("transitively-verified"), None)),
+            Some(variant(
+                key,
+                "c",
+                Some("transitively-verified"),
+                Some("translation"),
+            )),
+            Some(variant(key, "d", Some("verified"), Some("translation"))),
+            Some(variant(
+                key,
+                "e",
+                Some("transitively-verified"),
+                Some("kernel-taint"),
+            )),
+        ]
+    };
+    let mut maps = Vec::new();
+    for r in vocab("r") {
+        for s in vocab("s") {
+            let mut m = BTreeMap::new();
+            if let Some(a) = r.clone() {
+                m.insert("r".to_owned(), a);
+            }
+            if let Some(a) = s {
+                m.insert("s".to_owned(), a);
+            }
+            maps.push(m);
+        }
+    }
+    let as_json = |m: &BTreeMap<String, Atom>| serde_json::to_value(m).unwrap();
+    for a in &maps {
+        let once = merge(vec![a.clone()], false, None);
+        assert_eq!(
+            as_json(&merge(vec![once.clone()], false, None)),
+            as_json(&once),
+            "enrichment fixed point"
+        );
+        for b in &maps {
+            let ab = merge(vec![a.clone(), b.clone()], false, None);
+            for c in &maps {
+                let left = merge(vec![ab.clone(), c.clone()], false, None);
+                let bc = merge(vec![b.clone(), c.clone()], false, None);
+                let right = merge(vec![a.clone(), bc], false, None);
+                assert_eq!(as_json(&left), as_json(&right), "associativity");
+            }
+        }
+    }
+}
+
+/// P4 associativity and the enrichment fixed point for copied labels next to
+/// trusted boundaries (#92): copied `trusted` (a seed, never a boundary),
+/// plain `trusted` (a boundary) and unmarked `verified` (a candidate) around
+/// a translated `r` that depends on `s`, with an unmarked caller `c -> r`
+/// that a translated or copied-trusted `r` must block.
+#[test]
+fn laws_hold_with_translated_labels_and_trust() {
+    fn variant(key: &str, code_path: &str, status: Option<&str>, origin: Option<&str>) -> Atom {
+        let mut v = json!({
+            "display-name": key,
+            "dependencies": match key { "r" => json!(["s"]), "c" => json!(["r"]), _ => json!([]) },
+            "code-module": "", "code-path": code_path,
+            "code-text": {"lines-start": 0, "lines-end": 0},
+            "kind": "exec", "language": if key == "s" { "lean" } else { "rust" }
+        });
+        if let Some(s) = status {
+            v["verification-status"] = json!(s);
+        }
+        if let Some(o) = origin {
+            v["status-origin"] = json!(o);
+        }
+        serde_json::from_value(v).unwrap()
+    }
+    let stub = |key: &str| Atom {
+        dependencies: Default::default(),
+        ..variant(key, "", None, None)
+    };
+    let r_vocab: Vec<Option<Atom>> = vec![
+        None,
+        Some(stub("r")),
+        Some(variant(
+            "r",
+            "a",
+            Some("transitively-verified"),
+            Some("translation"),
+        )),
+        Some(variant("r", "b", Some("verified"), Some("translation"))),
+        Some(variant("r", "c", Some("trusted"), Some("translation"))),
+        Some(variant("r", "d", Some("verified"), None)),
+    ];
+    let s_vocab: Vec<Option<Atom>> = vec![
+        None,
+        Some(stub("s")),
+        Some(variant("s", "e", Some("unverified"), None)),
+        Some(variant("s", "f", Some("trusted"), None)),
+        Some(variant("s", "g", Some("transitively-verified"), None)),
+    ];
+    let c_vocab: Vec<Option<Atom>> = vec![None, Some(variant("c", "h", Some("verified"), None))];
+    let mut maps = Vec::new();
+    for r in &r_vocab {
+        for s in &s_vocab {
+            for c in &c_vocab {
+                let mut m = BTreeMap::new();
+                for (key, value) in [("r", r), ("s", s), ("c", c)] {
+                    if let Some(a) = value.clone() {
+                        m.insert(key.to_owned(), a);
+                    }
+                }
+                maps.push(m);
+            }
+        }
+    }
+    let as_json = |m: &BTreeMap<String, Atom>| serde_json::to_value(m).unwrap();
+    for a in &maps {
+        let once = merge(vec![a.clone()], false, None);
+        assert_eq!(
+            as_json(&merge(vec![once.clone()], false, None)),
+            as_json(&once),
+            "enrichment fixed point"
+        );
+        for b in &maps {
+            let ab = merge(vec![a.clone(), b.clone()], false, None);
+            for c in &maps {
+                let left = merge(vec![ab.clone(), c.clone()], false, None);
+                let bc = merge(vec![b.clone(), c.clone()], false, None);
+                let right = merge(vec![a.clone(), bc], false, None);
+                assert_eq!(as_json(&left), as_json(&right), "associativity");
+            }
+        }
+    }
+}

@@ -20,6 +20,17 @@ fn has_status_origin(atom: &Atom) -> bool {
     atom.extensions.contains_key("status-origin")
 }
 
+/// A copied label (probe-aeneas) on a code atom: a snapshot of the Lean source
+/// label at copy time, kept as it arrives (P23, ADR-006 Decision 2
+/// amendment). Exact `"translation"` only: a `kernel-taint` or malformed
+/// marker is still relabeled, so it fails closed to `"verified"`. Blueprint
+/// aggregates that carry a propagated marker are presentation data, not
+/// copies, so they are relabeled too (Decision 5).
+// @kb: kb/decisions/006-correspondence-records.md#amendment-2026-10-20-probe92-copied-labels-are-kept
+fn is_kept_copied_label(atom: &Atom) -> bool {
+    crate::types::has_translation_origin(atom) && atom.language != "blueprint"
+}
+
 fn is_verified(atom: &Atom) -> bool {
     get_verification_status(atom).is_some_and(|s| s == "verified" || s == "transitively-verified")
 }
@@ -71,9 +82,13 @@ fn is_extracted_type_member(dep: &str, atoms: &BTreeMap<String, Atom>) -> bool {
 /// reaches a seed along a path with no trusted boundary, or is itself a
 /// seed → `"verified"`; otherwise → `"transitively-verified"`. A contaminated
 /// atom arriving as `"transitively-verified"` is downgraded, and a
-/// `status-origin`-bearing `"transitively-verified"` is rewritten to
-/// `"verified"` unconditionally. The result is a function of the final graph
-/// and base statuses only.
+/// `kernel-taint` (or malformed-marker) `"transitively-verified"` is
+/// rewritten to `"verified"` unconditionally. The result is a function of
+/// the final graph and base statuses only.
+///
+/// Exception: a code atom with `status-origin: "translation"` is never
+/// relabeled. Its label is a copied snapshot and acts as a base status. It
+/// stays a seed, so its callers are never promoted through it.
 ///
 /// Contamination flows through missing-status atoms (transparent by
 /// construction) and stops only at trusted boundaries (`"trusted"` with no
@@ -81,7 +96,9 @@ fn is_extracted_type_member(dep: &str, atoms: &BTreeMap<String, Atom>) -> bool {
 /// downgrades below `"verified"`, and `"failed"`/`"unverified"`/`"trusted"`
 /// atoms are never rewritten.
 ///
-/// Returns `(transitive_count, local_count, missing_deps)` for reporting.
+/// Returns `(transitive_count, local_count, missing_deps)` for reporting. The
+/// counts cover every `"transitively-verified"`/`"verified"` label after the
+/// pass, kept copied labels included.
 /// `missing_deps` lists only *genuine orphans* — dependency code-names absent
 /// from the atom map that are not members of an extracted type. References to
 /// constructors/fields of an extracted `inductive`/`structure` are benign (the
@@ -102,7 +119,9 @@ pub fn enrich_verification_status(
     let mut all_missing: BTreeSet<String> = BTreeSet::new();
 
     for (code_name, atom) in atoms.iter() {
-        if is_verified(atom) {
+        // Translation-marked code atoms keep their copied label (not candidates)
+        // but stay in the reverse index and the seed set below.
+        if is_verified(atom) && !is_kept_copied_label(atom) {
             candidates.insert(code_name.clone());
         }
         for dep in &atom.dependencies {
@@ -169,8 +188,9 @@ pub fn enrich_verification_status(
     // 4. Set every candidate's label fresh: blocked (reaches a seed along a
     //    non-trusted path, or is itself a seed) → "verified"; otherwise →
     //    "transitively-verified". This downgrades a contaminated
-    //    "transitively-verified" and rewrites a status-origin-bearing
-    //    "transitively-verified" to "verified" unconditionally.
+    //    "transitively-verified" and rewrites a kernel-taint (or
+    //    malformed-marker) "transitively-verified" to "verified"
+    //    unconditionally. Translation-marked code atoms are not candidates.
     let mut transitive_count = 0;
     let mut local_count = 0;
 
@@ -186,6 +206,17 @@ pub fn enrich_verification_status(
             "verification-status".to_string(),
             serde_json::Value::String(label.to_string()),
         );
+    }
+
+    // Kept copied labels count by the label they keep.
+    for atom in atoms.values() {
+        if is_verified(atom) && is_kept_copied_label(atom) {
+            if get_verification_status(atom) == Some("transitively-verified") {
+                transitive_count += 1;
+            } else {
+                local_count += 1;
+            }
+        }
     }
 
     (transitive_count, local_count, missing_deps)
@@ -990,10 +1021,10 @@ mod tests {
         );
     }
 
-    // Plan §3 test (i): an imported "transitively-verified" is rewritten to
-    // "verified" unconditionally, not only when contaminated.
+    // Plan §3 test (i), amended (#92): a copied label is a snapshot and is
+    // kept as it arrives, contaminated or not; the atom still blocks callers.
     #[test]
-    fn test_translation_origin_transitively_verified_rewritten() {
+    fn test_translation_origin_label_kept() {
         let mut atoms = BTreeMap::new();
 
         let mut g = make_atom("g");
@@ -1001,8 +1032,148 @@ mod tests {
         set_origin(&mut g, "translation");
         atoms.insert("g".to_string(), g);
 
+        // A blocker visible in the graph does not demote a copied label.
+        let mut h = make_atom("h");
+        set_status(&mut h, "transitively-verified");
+        set_origin(&mut h, "translation");
+        add_dep(&mut h, "bad");
+        atoms.insert("h".to_string(), h);
+
+        let mut bad = make_atom("bad");
+        set_status(&mut bad, "failed");
+        atoms.insert("bad".to_string(), bad);
+
         enrich_verification_status(&mut atoms);
-        assert_eq!(get_vs(atoms.get("g").unwrap()), Some("verified"));
+        assert_eq!(
+            get_vs(atoms.get("g").unwrap()),
+            Some("transitively-verified")
+        );
+        assert_eq!(
+            get_vs(atoms.get("h").unwrap()),
+            Some("transitively-verified")
+        );
+    }
+
+    // #92: a caller of a copied "transitively-verified" is not promoted
+    // through it — imported evidence never makes a local label clean.
+    #[test]
+    fn test_caller_of_translated_transitively_verified_stays_verified() {
+        let mut atoms = BTreeMap::new();
+
+        let mut f = make_atom("f");
+        set_status(&mut f, "transitively-verified");
+        add_dep(&mut f, "g");
+        atoms.insert("f".to_string(), f);
+
+        let mut g = make_atom("g");
+        set_status(&mut g, "transitively-verified");
+        set_origin(&mut g, "translation");
+        atoms.insert("g".to_string(), g);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("f").unwrap()), Some("verified"));
+        assert_eq!(
+            get_vs(atoms.get("g").unwrap()),
+            Some("transitively-verified")
+        );
+    }
+
+    // #92: only "translation" is exempt — a kernel-taint atom arriving as
+    // "transitively-verified" is still demoted.
+    #[test]
+    fn test_kernel_taint_transitively_verified_still_demoted() {
+        let mut atoms = BTreeMap::new();
+
+        let mut t = make_atom("t");
+        set_status(&mut t, "transitively-verified");
+        set_origin(&mut t, "kernel-taint");
+        atoms.insert("t".to_string(), t);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("t").unwrap()), Some("verified"));
+    }
+
+    // #92: only the exact value "translation" is exempt. Malformed markers
+    // (reachable through the bare-map API, which does not validate) arriving
+    // as "transitively-verified" fail closed to "verified".
+    #[test]
+    fn test_malformed_marker_transitively_verified_demoted() {
+        let mut atoms = BTreeMap::new();
+        for (key, marker) in [
+            ("null", serde_json::Value::Null),
+            ("num", serde_json::json!(42)),
+            ("case", serde_json::json!("Translation")),
+        ] {
+            let mut a = make_atom(key);
+            set_status(&mut a, "transitively-verified");
+            a.extensions.insert("status-origin".to_string(), marker);
+            atoms.insert(key.to_string(), a);
+        }
+
+        enrich_verification_status(&mut atoms);
+        for key in ["null", "num", "case"] {
+            assert_eq!(get_vs(atoms.get(key).unwrap()), Some("verified"), "{key}");
+        }
+    }
+
+    // #92: a blueprint aggregate carrying a propagated "translation" marker is
+    // presentation data, not a copy (Decision 5), so it is still relabeled.
+    #[test]
+    fn test_blueprint_translation_marker_still_relabeled() {
+        let mut atoms = BTreeMap::new();
+        let mut node = make_atom("node");
+        node.language = "blueprint".to_string();
+        set_status(&mut node, "transitively-verified");
+        set_origin(&mut node, "translation");
+        atoms.insert("node".to_string(), node);
+
+        enrich_verification_status(&mut atoms);
+        assert_eq!(get_vs(atoms.get("node").unwrap()), Some("verified"));
+    }
+
+    // #92: the reported counts include kept copied labels, by label.
+    #[test]
+    fn test_counts_include_kept_copied_labels() {
+        let mut atoms = BTreeMap::new();
+        let mut g = make_atom("g");
+        set_status(&mut g, "transitively-verified");
+        set_origin(&mut g, "translation");
+        atoms.insert("g".to_string(), g);
+        let mut h = make_atom("h");
+        set_verified(&mut h);
+        set_origin(&mut h, "translation");
+        atoms.insert("h".to_string(), h);
+        let mut f = make_atom("f");
+        set_verified(&mut f);
+        add_dep(&mut f, "g");
+        atoms.insert("f".to_string(), f);
+
+        let (transitive, local, _) = enrich_verification_status(&mut atoms);
+        assert_eq!((transitive, local), (1, 2));
+    }
+
+    // #92: enrichment is idempotent with kept translated labels.
+    #[test]
+    fn test_translation_origin_label_kept_idempotent() {
+        let mut atoms = BTreeMap::new();
+
+        let mut f = make_atom("f");
+        set_verified(&mut f);
+        add_dep(&mut f, "g");
+        atoms.insert("f".to_string(), f);
+
+        let mut g = make_atom("g");
+        set_status(&mut g, "transitively-verified");
+        set_origin(&mut g, "translation");
+        atoms.insert("g".to_string(), g);
+
+        enrich_verification_status(&mut atoms);
+        let once = atoms.clone();
+        enrich_verification_status(&mut atoms);
+        assert_eq!(
+            serde_json::to_value(&once).unwrap(),
+            serde_json::to_value(&atoms).unwrap()
+        );
     }
 
     // Plan §3 test (j): trusted-boundary precedence — copied trust

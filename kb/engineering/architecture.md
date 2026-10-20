@@ -1,6 +1,6 @@
 ---
 title: Architecture
-last-updated: 2026-10-06
+last-updated: 2026-10-20
 status: draft
 ---
 
@@ -104,8 +104,9 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 5. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
 6. Generate mappings via priority-ordered matching — the charon-`def_id` join (Strategy 0) then three name/location strategies (owned by probe-aeneas; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo))
 7. [Raw merge](glossary.md#raw-staging-primitive) via `probe::commands::merge::merge_atom_files_raw` with the mappings: authority validation (projection rejection + version gate, so probe-lean input must be >= 0.16.0), `maps-to`/`mapped-from` [correspondence records](schema.md#correspondence-records-maps-to-mapped-from), no enrichment
-8. Add Aeneas metadata to merged atoms (`translation-name`, `translation-path`, `translation-text`, `untracked`, `is-relevant`, `is-public`); a verification status copied from a Lean atom onto a Rust atom gets `status-origin: "translation"` ([ADR-006](../decisions/006-correspondence-records.md)). A translation with no primary spec gets no status ([P16](properties.md#p16-verification-status-mapping)). `untracked` follows the in-scope rule of [P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope)
+8. Add Aeneas metadata to merged atoms (`translation-name`, `translation-path`, `translation-text`, `untracked`, `is-relevant`, `is-public`); a verification status copied verbatim from a Lean atom onto a Rust atom gets `status-origin: "translation"` ([ADR-006](../decisions/006-correspondence-records.md)), so it is a blocker seed during step 9. A translation with no primary spec gets no status ([P16](properties.md#p16-verification-status-mapping)). `untracked` follows the in-scope rule of [P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope)
 9. Run enrichment once (`enrich_verification_status`, [P23](properties.md#p23-transitive-verification)); `--skip-enrich` skips it
+10. Refresh each copied `verified`/`transitively-verified` from the final label of its Lean primary spec (from probe-aeneas 0.22.0, [ADR-006](../decisions/006-correspondence-records.md) Decision 2 amendment); skipped with step 9
 
 **Key insight**: probe-aeneas is a *[functor](glossary.md#functor) factory*. It produces the [cross-language mapping](glossary.md#cross-language-mapping); `probe merge` applies it. Domain knowledge about [Aeneas](glossary.md#aeneas) lives here; generic composition lives in probe. (The algebraic structure is detailed in [categorical-framework.md](categorical-framework.md), a non-normative reference.)
 

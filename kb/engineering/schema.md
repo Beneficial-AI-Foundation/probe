@@ -1,6 +1,6 @@
 ---
 title: Schema 3.1 Interchange Specification
-last-updated: 2026-10-06
+last-updated: 2026-10-20
 status: draft
 ---
 
@@ -60,7 +60,7 @@ When `probe merge` produces output, `source` is replaced by `inputs`:
 {
   "schema": "probe/merged-atoms",
   "schema-version": "3.1",
-  "tool": { "name": "probe", "version": "0.5.0", "command": "merge" },
+  "tool": { "name": "probe", "version": "0.6.0", "command": "merge" },
   "inputs": [
     { "schema": "probe-verus/atoms", "source": { ... } },
     { "schema": "probe-lean/atoms", "source": { ... } }
@@ -154,9 +154,9 @@ The derivation rule and its rationale are owned by probe-verus:
 | Field | Type | Tools | Description |
 |-------|------|-------|-------------|
 | `primary-spec` | string | probe-verus, probe-lean | Primary specification text (verus) or code-name of primary spec theorem (lean) |
-| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment ([P23](properties.md#p23-transitive-verification)): `"transitively-verified"` = locally verified and no **seed** (explicit `"failed"`/`"unverified"` atom, or any `status-origin`-bearing atom) is reachable along a dependency path that does not pass through a trusted boundary; `"verified"` = locally verified only. Labels assert consistency with the graph they were computed on; they are not proof re-validation. |
+| `verification-status` | string | probe-verus, probe-lean, probe-aeneas | `"transitively-verified"`, `"verified"`, `"failed"`, `"unverified"`, or `"trusted"`. After enrichment ([P23](properties.md#p23-transitive-verification)): `"transitively-verified"` = locally verified and no **seed** (explicit `"failed"`/`"unverified"` atom, or any `status-origin`-bearing atom) is reachable along a dependency path that does not pass through a trusted boundary; `"verified"` = locally verified only. Exception: on a code atom with `status-origin: "translation"`, the label is copied from the Lean primary spec and kept as a snapshot (`"transitively-verified"` = the Lean source was clean at copy time). Labels assert consistency with the graph they were computed on; they are not proof re-validation. |
 | `trusted-reason` | string | probe-verus, probe-lean | Present only when `verification-status` is `"trusted"`. probe-verus: `"admit"`, `"external-body"`, `"assume-specification"`. probe-lean: `"axiom"`, `"external"`. |
-| `status-origin` | string | probe-aeneas, probe-lean | Evidence marker on `verification-status`: `"translation"` (status copied from a corresponding atom in another language — imported evidence) or `"kernel-taint"` (probe-lean: the kernel-level taint walk found reachable taint the emitted graph cannot express). Enrichment treats every bearing atom as a **blocker seed**: never promoted to `"transitively-verified"`, unconditionally demoted from an imported `"transitively-verified"`, and blocking promotion of atoms that reach it along a non-trusted path. A `"trusted"` atom carrying `status-origin` is **not** a trust boundary. Enforcement is fail-closed: the enrichment predicates are presence-based (any bearing atom seeds, whatever the value), and `probe merge`/`probe enrich`/`probe summary`/`probe project` reject out-of-enum or non-string values at their load boundaries — the executable schema constrains the marker, but runtime inputs are not schema-validated. See [ADR-006](../decisions/006-correspondence-records.md). |
+| `status-origin` | string | probe-aeneas, probe-lean | Evidence marker on `verification-status`: `"translation"` (status copied from a corresponding atom in another language — imported evidence) or `"kernel-taint"` (probe-lean: the kernel-level taint walk found reachable taint the emitted graph cannot express). Enrichment treats every bearing atom as a **blocker seed** that blocks promotion of atoms that reach it along a non-trusted path. A `"translation"` code atom keeps its copied label (a snapshot of the Lean source label, never relabeled); any other marker value, and a blueprint aggregate, is never promoted to `"transitively-verified"` and is unconditionally demoted from it. A `"trusted"` atom carrying `status-origin` is **not** a trust boundary. Enforcement is fail-closed: the enrichment predicates are presence-based (any bearing atom seeds, whatever the value), and `probe merge`/`probe enrich`/`probe summary`/`probe project` reject out-of-enum or non-string values at their load boundaries — the executable schema constrains the marker, but runtime inputs are not schema-validated. See [ADR-006](../decisions/006-correspondence-records.md). |
 | `maps-to` / `mapped-from` | array of records | probe (merge) | Correspondence records attached by `probe merge --mappings`; see [Correspondence records](#correspondence-records-maps-to-mapped-from). |
 | `untracked` | bool | probe-verus, probe-rust, probe-aeneas | Whether excluded from analysis scope |
 | `specs` | array of strings | probe-lean | Theorem atoms referencing this atom |
@@ -305,7 +305,7 @@ When `--mappings <file>` is provided to `probe merge`, mappings attach [correspo
 - **Version gate**: atoms envelopes whose `tool.name` is in the per-producer gate table with `tool.version` below that producer's contract threshold are errors (pre-contract artifacts can carry unmarked imported or graph-inexpressible evidence). The `probe` entry is an interval (`threshold ≤ version < 1.0.0`) and additionally rejects `tool.command: "merge-atoms"` at any version. `probe summary` and `probe project` run the version-gate component too.
 - **Validator edge cases** (fail-closed): missing or malformed `tool` metadata on an atoms envelope is a rejection, as is an unparsable `tool.version` on a gated tool name (versions parse as numeric `major.minor[.patch]` only — pre-release suffixes do not parse). The legacy-projection predicate is presence-based: `projection: null` counts as present. Unknown `tool.name`s pass at any version ([ADR-006](../decisions/006-correspondence-records.md) Decision 7's audited-population scope), and non-atoms categories (specs/proofs) are not gated. Unknown schema strings keep their ordinary category-detection error.
 
-After combining all inputs, merge **re-enriches** the atoms category via the shared enrichment recomputation ([P23](properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged output labels are recomputed, never inherited.
+After combining all inputs, merge **re-enriches** the atoms category via the shared enrichment recomputation ([P23](properties.md#p23-transitive-verification)) — stub resolution can invalidate labels computed at extract time, so merged output labels are recomputed, never inherited. The exception is a copied `"translation"` label on a code atom: enrichment keeps it as it arrives and never upgrades it, because only probe-aeneas sets it ([ADR-006](../decisions/006-correspondence-records.md) Decision 2 amendment).
 
 A consumer that re-merges or re-enriches data with `status-origin` markers must use the hub 0.5.0 or later. Hub 0.4.0 parses such a file but ignores `status-origin`, so its enrichment treats a copied status as local evidence. For example, a Rust atom with `verification-status: "verified"`, `status-origin: "translation"` and no dependencies stays `verified` under hub 0.5.0, but hub 0.4.0 promotes it to `transitively-verified`.
 

@@ -1,6 +1,6 @@
 ---
 title: "ADR-006: Correspondence records and the verification evidence contract"
-last-updated: 2026-09-30
+last-updated: 2026-10-20
 status: accepted
 ---
 
@@ -104,18 +104,23 @@ contaminated or graph-inexpressible evidence into clean transitive labels.
 `status-origin` is an enumerated atom extension with exactly two values:
 
 - `"translation"` — the status is **imported evidence**, copied from a
-  corresponding atom in another language (probe-aeneas). Aeneas normalizes
-  a copied `transitively-verified` to `verified` at copy time.
+  corresponding atom in another language (probe-aeneas). Since the
+  amendment below, the copied label is kept as it arrives: it is a
+  snapshot of the Lean source label at copy time.
 - `"kernel-taint"` — the status reflects a **producer-known negative
   finding the emitted graph cannot express** (probe-lean: kernel-reachable
   taint). Stamped whenever the taint pass runs, including under
   `--skip-enrich`, so an *unmarked* `verified` atom is safely promotable.
 
-Enrichment treats every `status-origin`-bearing atom uniformly as a
+Enrichment treats every `status-origin`-bearing atom as a
 **blocker seed** ([P23](../engineering/properties.md#p23-transitive-verification)):
 
-- never promoted to `transitively-verified`;
-- unconditionally demoted from an imported or stale
+- never relabeled when it is a code atom carrying exactly
+  `"translation"`: the copied label is kept as it arrives (amendment
+  below), so a copied `verified` is never promoted;
+- for any other marker value (`"kernel-taint"`, or an unknown or
+  non-string value) and for blueprint aggregates, never promoted to
+  `transitively-verified`, and unconditionally demoted from a stale
   `transitively-verified` (not only when contaminated);
 - blocking promotion of every atom that reaches it along a non-trusted
   dependency path (the per-atom rule alone would let callers launder the
@@ -125,18 +130,80 @@ Enrichment treats every `status-origin`-bearing atom uniformly as a
   This includes copied `trusted`: `trusted` + `status-origin` seeds like
   any other marked atom.
 
-The two values differ only in *whose evidence* the status is — imported vs
-local — which matters to consumers (Decision 9), not to enrichment. On
+The two values block in the same way. They differ in *whose evidence* the
+status is — imported vs local — which matters to consumers (Decision 9),
+and, since the amendment below, in relabeling: only a `"translation"` code
+atom keeps its label. On
 blueprint presentation aggregates (Decision 5), a propagated marker means
 "the aggregate contains evidence of that class", not "this status was
 copied verbatim" — the aggregate reading is part of the value definitions.
+
+### Amendment (2026-10-20, probe#92): copied labels are kept
+
+The original rule also demoted a copied `transitively-verified` to
+`verified`, at copy time in probe-aeneas and again in enrichment. It
+followed from one principle: the hub never shows a positive label that it
+cannot recompute itself. The hub cannot recompute a translated label,
+because the proof is on the Lean side and Decision 1 removed the
+dependency edge from a Rust atom to its Lean spec.
+
+The demotion was not needed to stop laundering. Both laundering cases
+start from a copied `verified`:
+
+- Leaf: Rust `g` copies `verified` from Lean `T`, and `T` depends on an
+  `unverified` lemma. If `g` has no Rust dependencies, enrichment without
+  the seed rule promotes `g` to `transitively-verified`.
+- Caller: Rust `f` is locally verified and calls `g`. Enrichment without
+  the blocking rule promotes `f`.
+
+The seed rule (a marked atom is never promoted) and the blocking rule (a
+marked atom blocks its callers) stop both cases. The cost was real: a translated Rust atom no longer showed whether its
+Lean spec was clean (on SparsePostQuantumRatchet-verify, every copied
+status showed `verified` although every Lean spec was clean).
+
+The amendment makes one deliberate exception to that principle. The hub
+trusts the positive label that probe-aeneas copies from the probe-lean
+kernel walk:
+
+- probe-aeneas copies the primary spec label verbatim, writes the marker
+  before its enrichment pass, and refreshes each copied `verified` or
+  `transitively-verified` from the final Lean label after that pass.
+- Enrichment never relabels a `"translation"` code atom. The atom stays a
+  blocker seed, so its callers are never promoted through it, and a
+  copied `trusted` is still never a trusted boundary.
+
+**Contract: a copied label is a snapshot.** It is the final Lean label of
+the probe-aeneas run that wrote it. Later merges and enrichment passes
+never change it, so it can disagree with the merged graph it sits in.
+Ordinary stub resolution is enough: a Lean source S over a status-less
+stub q is demoted when a later merge brings in a real `unverified` q,
+while the copied Rust label stays `transitively-verified`. This risk is
+larger than the P23 scope caveat, which still recomputes against every
+blocker in the graph. It is accepted because the caller protection is
+unchanged and the label comes from the most authoritative check in the
+system. A copied `verified` means "imported, no clean assertion kept",
+not "a sorry exists": probe-aeneas 0.21.0 extracts, a probe-aeneas run
+with `--skip-enrich` over a capped probe-lean input, and a hub 0.5.0 that
+re-enriched a new file all give `verified` for a clean source
+([schema.md](../engineering/schema.md#authority-validation-and-re-enrichment)).
+The probe-aeneas side ships in probe-aeneas 0.22.0 (probe-aeneas#78); the
+hub side in hub 0.6.0. The alternative design (recompute a
+translated label from a `status-source` pointer) was rejected because it
+needs eligibility rules for trusted, status-less, stub and cyclic
+sources to stay sound.
+
+P4 still holds: a translated label behaves like a base status, which
+enrichment never rewrites, so enriching an intermediate merge does not
+change which atom a later conflict selects.
 
 ## Decision 3: Enrichment recomputes; merge re-enriches
 
 Enrichment is a **recomputation**, not an upgrade pass: one reverse BFS
 from one seed set (explicit `failed`/`unverified` atoms plus every
 `status-origin`-bearing atom), then every `verified`/
-`transitively-verified` atom has its label set fresh. The result is a
+`transitively-verified` atom has its label set fresh, except a
+code atom with `status-origin: "translation"`, whose copied label is kept
+(Decision 2 amendment). The result is a
 function of the final graph and base statuses only. The full executable
 definition, including transparency of missing-status atoms and the trusted
 boundary precedence, is normative in
@@ -292,7 +359,8 @@ contributing decl carries one; when contributors carry different values,
 use `"translation"` if any contributor has `"translation"`, otherwise
 `"kernel-taint"`. This is a deliberately **lossy presentation convention**,
 not an assurance ordering — the two values are different dimensions
-(origin vs. known hidden taint), enrichment blocks identically on either,
+(origin vs. known hidden taint), enrichment blocks identically on either
+and relabels a blueprint aggregate whatever its marker,
 and blueprint atoms appear in no summary partition, so the only
 information lost is that kernel taint *also* contributed to a
 translation-marked aggregate (see the aggregate reading in Decision 2).
