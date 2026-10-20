@@ -68,7 +68,7 @@ An enumerated atom extension marking whose evidence a `verification-status` is: 
 
 ## blocker seed
 
-A seed of the enrichment BFS ([P23](properties.md#p23-transitive-verification)): an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom. A locally verified atom that reaches a blocker seed along a dependency path with no trusted boundary is labelled `"verified"`, not `"transitively-verified"`; a seed itself keeps its own base status. A seed is never promoted, except that a `"translation"` code atom keeps its copied label, which can be `"transitively-verified"`; its callers are still blocked. Not to be confused with a projection's [seed set](#seed-set), which selects atoms for `probe project` and has no verification semantics.
+A seed of the enrichment BFS ([P23](properties.md#p23-transitive-verification)): an explicit `"failed"`/`"unverified"` atom, or any [`status-origin`](#status-origin)-bearing atom. A locally verified atom that reaches a blocker seed along a dependency path with no trusted boundary is labelled `"verified"`, not `"transitively-verified"`; a seed itself keeps its own base status. Enrichment never raises a seed's label to `"transitively-verified"`. A `"translation"` code atom keeps the label it arrives with, which can be `"transitively-verified"`. Not to be confused with a projection's [seed set](#seed-set), which selects atoms for `probe project` and has no verification semantics.
 
 ## raw staging primitive
 

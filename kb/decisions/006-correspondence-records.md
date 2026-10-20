@@ -145,11 +145,21 @@ The original rule also demoted a copied `transitively-verified` to
 followed from one principle: the hub never shows a positive label that it
 cannot recompute itself. The hub cannot recompute a translated label,
 because the proof is on the Lean side and Decision 1 removed the
-dependency edge from a Rust atom to its Lean spec. Neither laundering
-counterexample needed the demotion. Both promote a copied `verified`.
-The cost was real: a translated Rust atom no longer showed whether its
-Lean spec was clean (on SparsePostQuantumRatchet-verify, 171 copied
-statuses showed `verified` over 171 clean Lean specs).
+dependency edge from a Rust atom to its Lean spec.
+
+The demotion was not needed to stop laundering. Both laundering cases
+start from a copied `verified`:
+
+- Leaf: Rust `g` copies `verified` from Lean `T`, and `T` depends on an
+  `unverified` lemma. If `g` has no Rust dependencies, enrichment without
+  the seed rule promotes `g` to `transitively-verified`.
+- Caller: Rust `f` is locally verified and calls `g`. Enrichment without
+  the blocking rule promotes `f`.
+
+The seed rule (a marked atom is never promoted) and the blocking rule (a
+marked atom blocks its callers) stop both cases. The cost was real: a translated Rust atom no longer showed whether its
+Lean spec was clean (on SparsePostQuantumRatchet-verify, every copied
+status showed `verified` although every Lean spec was clean).
 
 The amendment makes one deliberate exception to that principle. The hub
 trusts the positive label that probe-aeneas copies from the probe-lean
