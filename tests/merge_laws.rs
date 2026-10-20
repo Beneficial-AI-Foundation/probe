@@ -1,23 +1,25 @@
 //! Generated-input law and boundary-parity tests for the merge operator.
 //!
 //! The unit suites in src/commands/merge.rs pin the P4/P5 laws and the P27
-//! record semantics on hand-picked fixtures. This suite closes the
-//! example-based gap (test-report I1) by sweeping generated inputs instead:
-//! both PR #81 review counterexamples were law violations on shapes outside
-//! the fixture family, so the laws are exercised here over every combination
-//! of a small adversarial vocabulary (stubs vs distinct reals, dotted-alias
-//! keys, tied identity triples, empty-method twins, empty and exotic record
-//! fields), on the enriched and raw paths alike.
+//! record semantics on hand-picked fixtures. This suite sweeps generated
+//! inputs instead: both PR #81 review counterexamples were law violations on
+//! shapes outside the fixture family, so the laws are exercised here over
+//! every combination of a small adversarial vocabulary (stubs vs distinct
+//! reals, dotted-alias keys, tied identity triples, empty-method twins, empty
+//! and exotic record fields, categorized dependency arrays spelled as the
+//! same or different sets), on the enriched and raw paths alike.
 //!
-//! Adapted from the cross-model (codex) verification pass over commit
-//! 989b7f4; all four tests passed against that commit unchanged.
+//! The record sweeps were adapted from the cross-model (codex) verification
+//! pass over commit 989b7f4.
 
 use jsonschema::Validator;
 use probe::commands::merge::{merge_atom_maps, merge_atom_maps_raw};
 use probe::commands::propagate::prepare_atoms;
-use probe::types::{load_mappings, Atom, Mapping, MAPPING_CONFIDENCE_VALUES};
+use probe::types::{
+    load_mappings, Atom, Mapping, CATEGORIZED_DEPENDENCY_ARRAYS, MAPPING_CONFIDENCE_VALUES,
+};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// `kind` 0 = stub (empty code-path, lines 0,0 — P3); 1 and 2 = two
 /// *distinct* real atoms, so equal-key pairs exercise real-vs-real
@@ -34,6 +36,15 @@ fn atom(kind: usize) -> Atom {
 
 fn single(value: Atom, key: &str) -> BTreeMap<String, Atom> {
     BTreeMap::from([(key.to_owned(), value)])
+}
+
+/// The same input with every key's `f` prefix replaced by `prefix`, so it
+/// shares no normalized key with an input keyed on `f`.
+fn rekey(input: &BTreeMap<String, Atom>, prefix: &str) -> BTreeMap<String, Atom> {
+    input
+        .iter()
+        .map(|(key, value)| (key.replacen('f', prefix, 1), value.clone()))
+        .collect()
 }
 
 fn merge(
@@ -103,12 +114,22 @@ fn laws_hold_over_generated_record_variants() {
         for first in &variants {
             // Self-merge idempotence: the record union is a set (P27).
             let canonical = merge(vec![first.clone()], raw, None);
+            // Mapping re-application is a no-op: F_M(F_M(A)) = F_M(A).
+            let mapped = merge(vec![first.clone()], raw, Some(&mappings));
+            assert_eq!(merge(vec![mapped.clone()], raw, Some(&mappings)), mapped);
             assert_eq!(
                 merge(vec![first.clone(), first.clone()], raw, None),
                 canonical
             );
             for second in &variants {
                 // Mapping compatibility: F_M(mu(A, B)) = mu(F_M(A), F_M(B)).
+                // Commutativity on disjoint keys: renaming every key of
+                // `second` makes the inputs disjoint, so order cannot matter.
+                let disjoint = rekey(second, "g");
+                assert_eq!(
+                    merge(vec![first.clone(), disjoint.clone()], raw, None),
+                    merge(vec![disjoint, first.clone()], raw, None)
+                );
                 let flat = merge(vec![first.clone(), second.clone()], raw, Some(&mappings));
                 let mapped_first = merge(vec![first.clone()], raw, Some(&mappings));
                 let mapped_second = merge(vec![second.clone()], raw, Some(&mappings));
@@ -545,6 +566,229 @@ fn laws_hold_with_translated_labels_and_trust() {
                 let bc = merge(vec![b.clone(), c.clone()], false, None);
                 let right = merge(vec![a.clone(), bc], false, None);
                 assert_eq!(as_json(&left), as_json(&right), "associativity");
+            }
+        }
+    }
+}
+
+/// Independent oracle for one categorized array (P8/P15): normalize every
+/// string entry, then collect into a set. Strings and non-strings are kept
+/// apart by a tag so `"42"` and `42` stay distinct. Merge must collapse two
+/// aliases exactly when their oracle sets are equal.
+fn oracle_set(array: &Value) -> BTreeSet<(bool, String)> {
+    array
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| match entry.as_str() {
+            Some(name) => (false, name.trim_end_matches('.').to_owned()),
+            None => (true, entry.to_string()),
+        })
+        .collect()
+}
+
+/// The canonical array the oracle predicts: strings sorted, then non-strings
+/// by their JSON text, no duplicates.
+fn oracle_canonical(array: &Value) -> Value {
+    Value::Array(
+        oracle_set(array)
+            .into_iter()
+            .map(|(non_string, text)| {
+                if non_string {
+                    serde_json::from_str(&text).unwrap()
+                } else {
+                    Value::String(text)
+                }
+            })
+            .collect(),
+    )
+}
+
+/// The categorized-array vocabulary: the same sets spelled with different
+/// order, duplicates and trailing dots, plus sets that differ by one entry
+/// mixed string/non-string arrays, and a name that JSON escapes.
+fn categorized_arrays() -> Vec<Value> {
+    vec![
+        json!([]),
+        json!(["g()"]),
+        json!(["g()."]),
+        json!(["g()", "g().."]),
+        json!(["h()"]),
+        json!(["g()..", "h()"]),
+        json!(["h()", "g()", "h()."]),
+        json!(["g()", 42]),
+        json!([42, "g().", 42]),
+        json!(["42"]),
+        json!([42]),
+        // `"` sorts before `#` by value but after it by JSON text (`\"`),
+        // so this pins the sort to the string value.
+        json!(["k#", "k\"."]),
+    ]
+}
+
+/// P8/P15 set semantics, checked against the oracle: two atoms under aliased
+/// keys in one input, equal except for one categorized array, collapse iff
+/// the normalized arrays are equal as sets, and the survivor carries the
+/// canonical array; any set difference between two real atoms rejects the
+/// input. With a stub on either side the input is never rejected and the
+/// real atom survives (P3/P6). Swept over every ordered pair of arrays, all
+/// five `CATEGORIZED_DEPENDENCY_ARRAYS` fields, every stub/real combination,
+/// and both the raw and the enriched path. `dependencies` stays empty so the
+/// categorized field is the only difference between the aliases.
+#[test]
+fn categorized_arrays_collapse_iff_equal_as_sets() {
+    let arrays = categorized_arrays();
+    for field in CATEGORIZED_DEPENDENCY_ARRAYS {
+        for plain in &arrays {
+            for dotted in &arrays {
+                for (plain_kind, dotted_kind) in [(1, 1), (0, 1), (1, 0), (0, 0)] {
+                    let with = |kind: usize, array: &Value| {
+                        let mut value = atom(kind);
+                        value.extensions.insert(field.into(), array.clone());
+                        value
+                    };
+                    let input = BTreeMap::from([
+                        ("f()".to_owned(), with(plain_kind, plain)),
+                        ("f()..".to_owned(), with(dotted_kind, dotted)),
+                    ]);
+                    let same_set = oracle_set(plain) == oracle_set(dotted);
+                    let both_real = plain_kind == 1 && dotted_kind == 1;
+                    for raw in [false, true] {
+                        let result = if raw {
+                            merge_atom_maps_raw(vec![input.clone()], None)
+                        } else {
+                            merge_atom_maps(vec![input.clone()], None)
+                        };
+                        let case = format!(
+                            "{field}: {plain} (kind {plain_kind}) vs {dotted} \
+                             (kind {dotted_kind}), raw {raw}"
+                        );
+                        if both_real && !same_set {
+                            let err = result.expect_err(&case);
+                            assert!(err.contains("distinct real atom"), "{case}: {err}");
+                            assert!(err.starts_with("input #1 of 1: "), "{case}: {err}");
+                            continue;
+                        }
+                        let (out, _) = result.expect(&case);
+                        assert_eq!(out.len(), 1, "{case}");
+                        let survivor = &out["f()"];
+                        // The real side wins a stub collision; otherwise
+                        // the first key in order ("f()") survives.
+                        let expected = if plain_kind == 0 && dotted_kind == 1 {
+                            dotted
+                        } else {
+                            plain
+                        };
+                        assert_eq!(
+                            survivor.is_stub(),
+                            plain_kind == 0 && dotted_kind == 0,
+                            "{case}"
+                        );
+                        assert_eq!(
+                            survivor.extensions[field],
+                            oracle_canonical(expected),
+                            "{case}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// P4 (associativity, mapping compatibility) and P5 (self-merge idempotence)
+/// on atoms that carry categorized arrays, on both paths. The variants are
+/// one-key inputs (plain or dotted key) and two-key inputs whose aliases hold
+/// the same set spelled differently, so the intra-input collapse runs inside
+/// every nesting. Each array is placed on a different categorized field so
+/// all five fields take part, and one record shape rides along so the record
+/// union and the set comparison interact. 3 kinds x 3 arrays x 2 records,
+/// plus 4 alias-pair inputs: 22 variants, 22^3 x 2 associativity cases.
+#[test]
+fn laws_hold_over_generated_categorized_variants() {
+    let spellings = [
+        (json!(["g()", "h()"]), json!(["h().", "g()..", "g()"])),
+        (json!(["g()", 42]), json!([42, "g().", 42])),
+        (json!(["h()"]), json!(["h()...", "h()"])),
+    ];
+    let records = [None, Some(json!([{"target":"f.", "confidence":"exact"}]))];
+    let with = |kind: usize, field: &str, array: &Value, record: &Option<Value>| {
+        let mut value = atom(kind);
+        value.extensions.insert(field.into(), array.clone());
+        if let Some(record) = record {
+            value.extensions.insert("maps-to".into(), record.clone());
+        }
+        value
+    };
+    let mut variants = Vec::new();
+    for kind in 0..3 {
+        for (index, (array, _)) in spellings.iter().enumerate() {
+            for record in &records {
+                let field = CATEGORIZED_DEPENDENCY_ARRAYS[index];
+                let key = if record.is_some() { "f.." } else { "f" };
+                variants.push(single(with(kind, field, array, record), key));
+            }
+        }
+    }
+    for (index, (array, respelled)) in spellings.iter().enumerate() {
+        let field = CATEGORIZED_DEPENDENCY_ARRAYS[(index + 3) % 5];
+        variants.push(BTreeMap::from([
+            ("f".to_owned(), with(1, field, array, &None)),
+            ("f..".to_owned(), with(1, field, respelled, &records[1])),
+        ]));
+    }
+    // A stub alias next to a real one also collapses without error.
+    variants.push(BTreeMap::from([
+        (
+            "f".to_owned(),
+            with(0, "type-dependencies", &json!(["k()"]), &None),
+        ),
+        (
+            "f.".to_owned(),
+            with(2, "term-dependencies", &json!(["g()."]), &None),
+        ),
+    ]));
+    assert_eq!(variants.len(), 22);
+    let mappings = vec![Mapping {
+        from: "f..".into(),
+        to: "f.".into(),
+        confidence: "exact".into(),
+        method: None,
+    }];
+    for raw in [false, true] {
+        for first in &variants {
+            let canonical = merge(vec![first.clone()], raw, None);
+            // Mapping re-application is a no-op: F_M(F_M(A)) = F_M(A).
+            let mapped = merge(vec![first.clone()], raw, Some(&mappings));
+            assert_eq!(merge(vec![mapped.clone()], raw, Some(&mappings)), mapped);
+            assert_eq!(
+                merge(vec![first.clone(), first.clone()], raw, None),
+                canonical
+            );
+            assert_eq!(merge(vec![canonical.clone()], raw, None), canonical);
+            for second in &variants {
+                // Commutativity on disjoint keys: renaming every key of
+                // `second` makes the inputs disjoint, so order cannot matter.
+                let disjoint = rekey(second, "g");
+                assert_eq!(
+                    merge(vec![first.clone(), disjoint.clone()], raw, None),
+                    merge(vec![disjoint, first.clone()], raw, None)
+                );
+                let flat = merge(vec![first.clone(), second.clone()], raw, Some(&mappings));
+                let mapped_first = merge(vec![first.clone()], raw, Some(&mappings));
+                let mapped_second = merge(vec![second.clone()], raw, Some(&mappings));
+                assert_eq!(flat, merge(vec![mapped_first, mapped_second], raw, None));
+                for third in &variants {
+                    let flat = merge(
+                        vec![first.clone(), second.clone(), third.clone()],
+                        raw,
+                        None,
+                    );
+                    let left_pair = merge(vec![first.clone(), second.clone()], raw, None);
+                    let right_pair = merge(vec![second.clone(), third.clone()], raw, None);
+                    assert_eq!(flat, merge(vec![left_pair, third.clone()], raw, None));
+                    assert_eq!(flat, merge(vec![first.clone(), right_pair], raw, None));
+                }
             }
         }
     }

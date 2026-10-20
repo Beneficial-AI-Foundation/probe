@@ -638,7 +638,8 @@ fn specs_intra_input_collision_warned_and_counted() {
             "timestamp": "2026-01-01T00:00:00Z",
             "data": {
                 "probe:Lean.spec": {"which": "lean"},
-                "probe:Lean.spec.": {"which": "lean-dotted"}
+                "probe:Lean.spec.": {"which": "lean-dotted"},
+                "probe:Lean.spec..": {"which": "lean-dotted-twice"}
             }
         }),
     );
@@ -662,18 +663,28 @@ fn specs_intra_input_collision_warned_and_counted() {
         "collision warning names input, both keys, and the kept one: {stderr}"
     );
     assert!(
-        stderr.contains("input #2 of 2: normalization collision: 'probe:Lean.spec' and"),
-        "a collision in a later input names that input's position: {stderr}"
+        stderr.contains(
+            "input #2 of 2: normalization collision: 'probe:Lean.spec', \
+             'probe:Lean.spec.' and 'probe:Lean.spec..' all normalize to \
+             'probe:Lean.spec'; kept 'probe:Lean.spec..' (key order, P8)"
+        ),
+        "a three-alias collision in a later input names its position, every \
+         key and the kept one: {stderr}"
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     assert!(
-        stdout.contains("Conflicts:        2"),
-        "each input's collision counted in stats.conflicts: {stdout}"
+        stdout.contains("Conflicts:        3"),
+        "each collapsed alias counted in stats.conflicts (1 + 2): {stdout}"
     );
     assert_eq!(
         read_json(&merged)["data"]["probe:a/1.0/s()"]["which"],
         "dotted",
         "the alias sorting last is kept (key order, P8)"
+    );
+    assert_eq!(
+        read_json(&merged)["data"]["probe:Lean.spec"]["which"],
+        "lean-dotted-twice",
+        "the most-dotted of three aliases is kept (key order, P8)"
     );
 }
 
