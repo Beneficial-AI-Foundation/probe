@@ -44,7 +44,7 @@ Aeneas doesn't always produce clean name mappings. When a precise charon-`def_id
 join is unavailable (Strategy 0 — see [probe-aeneas docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md)), three name/location strategies handle the spectrum:
 1. **Rust-qualified-name** — when Charon provides exact names (best case)
 2. **File + display-name** — when names match but no qualified name available
-3. **File + line-overlap** — when the Lean name doesn't match but source locations overlap (fallback). A record with a `rust_name` must still name the atom's item (the same base name, or the instance of an impl with the atom's self type that has no method record) and binds no atom with a same-named sibling in its file, because the record's lines come from the source Charon compiled, which a project may patch
+3. **File + line-overlap** — when the Lean name doesn't match but source locations overlap (fallback). A record with a `rust_name` must still name the atom's item (the same base name, or the instance of an impl with the atom's self type that has no method record) and binds an atom with a same-named sibling in its file only when the record's line range contains the atom's range, because the record's lines come from the source Charon compiled, which a project may patch
 
 Priority order ensures the most confident match wins (the `def_id` integer join first, then these).
 
