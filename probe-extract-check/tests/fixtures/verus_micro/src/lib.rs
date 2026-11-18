@@ -18,7 +18,7 @@ proof fn positive_sum(a: int, b: int)
 exec fn checked_add(a: u32, b: u32) -> (result: u32)
     requires
         is_positive(a as int),
-        a as int + b as int < u32::MAX as int,
+        a as int + (b as int) < u32::MAX as int,
     ensures
         result == a + b,
 {
