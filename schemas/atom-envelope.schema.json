@@ -22,6 +22,7 @@
         },
         "schema-version": { "$ref": "#/$defs/schemaVersion" },
         "tool": { "$ref": "#/$defs/tool" },
+        "indexer": { "$ref": "#/$defs/indexer" },
         "source": { "$ref": "#/$defs/source" },
         "timestamp": { "$ref": "#/$defs/timestamp" },
         "data": { "$ref": "#/$defs/atomDictionary" }
@@ -153,6 +154,27 @@
         }
       },
       "required": ["name", "version", "command"],
+      "additionalProperties": false
+    },
+
+    "indexer": {
+      "type": "object",
+      "description": "The SCIP indexer that produced the index the atoms come from. For debugging only.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "metadata.tool_info.name of the SCIP index, copied as is (may be empty)."
+        },
+        "version": {
+          "type": "string",
+          "description": "metadata.tool_info.version of the SCIP index, copied as is (may be empty)."
+        },
+        "selection": {
+          "type": "string",
+          "description": "How the producer selected the indexer binary (e.g. \"verus-analyzer 2026-09-25\")."
+        }
+      },
+      "required": ["name", "version"],
       "additionalProperties": false
     },
 
