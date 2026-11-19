@@ -1,14 +1,14 @@
 ---
-title: Schema 3.1 Interchange Specification
-last-updated: 2026-10-20
+title: Schema 3.2 Interchange Specification
+last-updated: 2026-11-19
 status: draft
 ---
 
-# Schema 3.1 Interchange Specification
+# Schema 3.2 Interchange Specification
 
 This is the authoritative specification for the JSON interchange format shared by all probe tools. Per-tool `docs/SCHEMA.md` files document tool-specific details; this file defines the contract they all share.
 
-The current version is **3.1** (hub-side minor bump: correspondence records and `status-origin`, see the [version history](#version-history)). 3.x is additive — producers may keep emitting `3.0`; consumers accept any `3.x`.
+The current version is **3.2** (minor bump: the optional `indexer` envelope field, see the [version history](#version-history)). 3.x is additive — producers may keep emitting `3.0`; consumers accept any `3.x`.
 
 ## Envelope
 
@@ -22,6 +22,11 @@ Every probe output file is wrapped in a metadata envelope:
     "name": "probe-verus",
     "version": "5.0.0",
     "command": "extract"
+  },
+  "indexer": {
+    "name": "rust-analyzer",
+    "version": "0.3.269-standalone",
+    "selection": "verus-analyzer 2026-09-25"
   },
   "source": {
     "repo": "https://github.com/org/project.git",
@@ -50,7 +55,22 @@ Every probe output file is wrapped in a metadata envelope:
 | `source.package` | string | yes | Crate/project name |
 | `source.package-version` | string | yes | Version identifier (semver for Rust; commit hash for Lean if no version) |
 | `timestamp` | string | yes | ISO 8601 |
+| `indexer` | object | no | The SCIP indexer that produced the index the atoms come from. For debugging only. See [Indexer](#indexer). |
 | `data` | object | yes | Payload. Structure depends on `schema`. |
+
+### Indexer
+
+`indexer` records which SCIP indexer (the tool that writes a SCIP index) produced the index that a producer read. It is for debugging only: no consumer may change its behavior because of it.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `indexer.name` | string | yes | `metadata.tool_info.name` of the SCIP index, copied as is. Empty if the index has no name. |
+| `indexer.version` | string | yes | `metadata.tool_info.version` of the SCIP index, copied as is. Empty if the index has no version. |
+| `indexer.selection` | string | no | How the producer selected the indexer binary, in the producer's own words (e.g. `"verus-analyzer 2026-09-25"`, `"verus-analyzer path"`, `"rust-analyzer"`). |
+
+`selection` exists because verus-analyzer writes `rust-analyzer` and a `0.3.N` version in `tool_info`, which does not name the verus-analyzer release.
+
+Only single-tool atoms-category envelopes (`*/atoms`, `*/extract`) carry `indexer`, and only when the producer built the atoms from a SCIP index. A producer that writes an extract from an earlier atoms file copies `indexer` from that file. `probe merge` does not carry `indexer` into `inputs`, and other outputs (specs, proofs, stubs, verification reports) do not have it.
 
 ### Merged envelope variant
 
@@ -386,6 +406,7 @@ The distinct schema string is an **authority boundary**, not a hint: `probe merg
 | 2.1 | probe-rust | Added optional `rust-qualified-name`, `is-disabled`, and `is-public` fields to atoms |
 | 3.0 | all | **Breaking**: renamed atom field `is-disabled` → `untracked` (identical semantics: `untracked: true` = out of verification scope). Unified every producer on `schema-version` `3.0`. |
 | 3.1 | probe (hub) | Added optional `maps-to`/`mapped-from` correspondence records and the `status-origin` marker; added the `probe/projected-atoms` schema. Hub-side only — producers keep emitting 3.0; the behavioral change (no cross-language edges in `dependencies`) is coordinated through the [ADR-006](../decisions/006-correspondence-records.md) rollout, not the schema number. Re-merging or re-enriching data with `status-origin` markers needs hub >= 0.5.0, also when the envelope declares `schema-version` `3.0` (see [Authority validation and re-enrichment](#authority-validation-and-re-enrichment)). |
+| 3.2 | probe-verus | Added the optional `indexer` envelope field on single-tool atoms-category envelopes, for debugging only. Producers keep emitting the `schema-version` they emit now (probe-verus emits 3.0); consumers ignore the field. |
 
 ### Bumping the interchange schema-version (major)
 

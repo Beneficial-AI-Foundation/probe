@@ -708,3 +708,74 @@ fn confidence_vocabulary_matches_executable_schema() {
         .collect();
     assert_eq!(enum_values, probe::types::MAPPING_CONFIDENCE_VALUES);
 }
+
+fn verus_atoms_envelope_with(indexer: serde_json::Value, schema: &str) -> serde_json::Value {
+    json!({
+        "schema": schema,
+        "schema-version": "3.0",
+        "tool": { "name": "probe-verus", "version": "9.0.0", "command": "atomize" },
+        "indexer": indexer,
+        "source": {
+            "repo": "https://github.com/org/project",
+            "commit": "abc123",
+            "language": "rust",
+            "package": "my-crate",
+            "package-version": "1.0.0"
+        },
+        "timestamp": "2026-11-19T12:00:00Z",
+        "data": {}
+    })
+}
+
+/// The optional `indexer` field validates on atoms-category envelopes, with
+/// and without `selection`.
+#[test]
+fn envelope_with_indexer_is_valid() {
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+
+    for indexer in [
+        json!({
+            "name": "rust-analyzer",
+            "version": "0.3.269-standalone",
+            "selection": "verus-analyzer 2026-09-25"
+        }),
+        json!({ "name": "", "version": "" }),
+    ] {
+        for schema_value in ["probe-verus/atoms", "probe-verus/extract"] {
+            let doc = verus_atoms_envelope_with(indexer.clone(), schema_value);
+            let result = validator.validate(&doc);
+            assert!(result.is_ok(), "{schema_value} with indexer: {result:?}");
+        }
+    }
+}
+
+/// A malformed `indexer` is rejected, and so is `indexer` on a non-atoms
+/// envelope.
+#[test]
+fn malformed_or_misplaced_indexer_is_rejected() {
+    let schema = load_schema();
+    let validator = Validator::new(&schema).expect("valid schema");
+
+    for indexer in [
+        json!({ "name": "rust-analyzer" }),
+        json!({ "name": "rust-analyzer", "version": "0.3.269", "extra": 1 }),
+        json!({ "name": "rust-analyzer", "version": 3 }),
+        json!("rust-analyzer 0.3.269"),
+    ] {
+        let doc = verus_atoms_envelope_with(indexer.clone(), "probe-verus/atoms");
+        assert!(
+            validator.validate(&doc).is_err(),
+            "indexer {indexer} should be rejected"
+        );
+    }
+
+    let doc = verus_atoms_envelope_with(
+        json!({ "name": "rust-analyzer", "version": "0.3.269" }),
+        "probe-verus/specs",
+    );
+    assert!(
+        validator.validate(&doc).is_err(),
+        "indexer on a specs envelope should be rejected"
+    );
+}
