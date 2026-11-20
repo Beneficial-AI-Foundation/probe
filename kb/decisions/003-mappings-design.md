@@ -1,6 +1,6 @@
 ---
 title: "ADR-003: Cross-language mappings"
-last-updated: 2026-10-27
+last-updated: 2026-11-20
 status: accepted (application semantics superseded by ADR-006)
 ---
 
@@ -40,13 +40,9 @@ Mapping generation requires domain knowledge (Aeneas name conventions, functions
 
 ### Name/location matching is pragmatic (probe-aeneas)
 
-Aeneas doesn't always produce clean name mappings. When a precise charon-`def_id`
-join is unavailable (Strategy 0 — see [probe-aeneas docs/USAGE.md](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md)), three name/location strategies handle the spectrum:
-1. **Rust-qualified-name** — when Charon provides exact names (best case)
-2. **File + display-name** — when names match but no qualified name available
-3. **File + line-overlap** — when the Lean name doesn't match but source locations overlap (fallback). A record with a `rust_name` must still name the atom's item (the same base name, or the instance of an impl with the atom's self type that has no method record) and binds an atom with a same-named sibling in its file only when the record's line range contains the atom's range, because the record's lines come from the source Charon compiled, which a project may patch
+Aeneas does not always produce clean name mappings. probe-aeneas first tries a precise charon-`def_id` integer join (Strategy 0). When that join is unavailable, three name/location strategies handle the rest: `rust-qualified-name`, `file+display-name`, and `file+line-overlap`. Priority order makes sure that the most confident match wins.
 
-Priority order ensures the most confident match wins (the `def_id` integer join first, then these).
+Under [ADR-005](005-doc-ownership-boundary.md), the exact rules of each strategy belong to probe-aeneas. This ADR does not repeat them, so that the two cannot drift apart. See [probe-aeneas docs/USAGE.md § Translation Strategies](https://github.com/Beneficial-AI-Foundation/probe-aeneas/blob/main/docs/USAGE.md#translation-strategies).
 
 ### 1-to-1 generation, 1-to-many application
 
