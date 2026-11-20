@@ -1,6 +1,6 @@
 ---
 title: Architecture
-last-updated: 2026-10-20
+last-updated: 2026-11-20
 status: draft
 ---
 
@@ -101,7 +101,7 @@ An additional enricher, `probe-leanblueprint/`, layers Lean blueprint progress m
 2. Check each pre-generated input (`--rust`, `--lean`) before any extractor runs: the hub authority check (`probe::authority::validate_authority`), and a provenance guard. Every provenance entry of the Rust input must have schema `probe-rust/extract`, and of the Lean input `probe-lean/extract`
 3. Auto-run probe-rust and probe-lean in parallel (scoped threads) for each input that was not pre-generated. Auto-install for `extract` skips a probe-lean binary older than 0.16.0, the version-gate threshold
 4. Apply the same two checks to each extracted input, before any other work
-5. Load `functions.json` (Aeneas-generated Rust↔Lean name mappings, reused from project root if present)
+5. Load `functions.json` (Rust↔Lean function records that probe-aeneas builds from Aeneas output, reused from project root if present)
 6. Generate mappings via priority-ordered matching — the charon-`def_id` join (Strategy 0) then three name/location strategies (owned by probe-aeneas; see [properties.md § Single-probe invariants](properties.md#single-probe-invariants-owned-by-each-probes-repo))
 7. [Raw merge](glossary.md#raw-staging-primitive) via `probe::commands::merge::merge_atom_files_raw` with the mappings: authority validation (projection rejection + version gate, so probe-lean input must be >= 0.16.0), `maps-to`/`mapped-from` [correspondence records](schema.md#correspondence-records-maps-to-mapped-from), no enrichment
 8. Add Aeneas metadata to merged atoms (`translation-name`, `translation-path`, `translation-text`, `untracked`, `is-relevant`, `is-public`); a verification status copied verbatim from a Lean atom onto a Rust atom gets `status-origin: "translation"` ([ADR-006](../decisions/006-correspondence-records.md)), so it is a blocker seed during step 9. A translation with no primary spec gets no status ([P16](properties.md#p16-verification-status-mapping)). `untracked` follows the in-scope rule of [P25](properties.md#p25-atoms-not-in-the-verification-build-are-out-of-scope)
